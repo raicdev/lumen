@@ -171,6 +171,10 @@ class TerminalService {
   private snapshot: TerminalSnapshot = { instances: [], groups: [], activeGroup: 0, activeId: null };
 
   constructor() {
+    // Shell sessions live in the main process: after a reload (or a restarted
+    // renderer) the previous page's are orphans. Requests run in order, so
+    // this ends them before this page starts any of its own.
+    void api().request.terminalReset({}).catch(() => {});
     window.addEventListener("lumen:terminal-data", (e) => {
       const { id, data } = (e as CustomEvent<{ id: string; data: string }>).detail;
       const instance = this.bySession.get(id);

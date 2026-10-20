@@ -103,13 +103,23 @@ async function buildView(config: LumenConfig, outDir: string, minify: boolean): 
 /** Native-backed modules stay external so they resolve from node_modules at runtime. */
 const NATIVE_EXTERNALS = ["koffi", "node-pty"];
 
+/**
+ * Bundle the main process into `main.mjs` plus shared chunks next to it. With
+ * code splitting, what a module loads with `import()` lands in its own chunk,
+ * so each thread (the app, its workers) only parses the code it runs.
+ */
 async function buildMain(config: LumenConfig, outDir: string): Promise<string> {
+  await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
   const outfile = join(outDir, "main.mjs");
   try {
     await esbuild.build({
-      entryPoints: [join(ROOT, config.main)],
-      outfile,
+      entryPoints: { main: join(ROOT, config.main) },
+      outdir: outDir,
+      outExtension: { ".js": ".mjs" },
+      splitting: true,
+      // Flat: chunks resolve paths with import.meta.url like the entry does.
+      chunkNames: "[name]-[hash]",
       bundle: true,
       platform: "node",
       format: "esm",
@@ -227,9 +237,9 @@ async function commandPackage(config: LumenConfig): Promise<string> {
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  // Copy build output.
+  // Copy build output: the view's assets, the main bundle and its chunks.
   await cp(join(ROOT, ".lumen", "build", "assets"), join(outDir, "assets"), { recursive: true });
-  await copyFile(join(ROOT, ".lumen", "build", "main", "main.mjs"), join(outDir, "main.mjs"));
+  await cp(join(ROOT, ".lumen", "build", "main"), outDir, { recursive: true });
 
   // Native pieces: webview glue, FFI addon, PTY addon.
   await copyWebviewLibrary(outDir);

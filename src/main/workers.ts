@@ -14,9 +14,13 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 
 export type WorkerKind = "lsp" | "fs" | "exthost";
 
-/** Entry file for workers: the dispatcher in dev (sources), the bundle itself when packaged. */
+/**
+ * Entry file for workers: the dispatcher in dev (sources), the bundle's entry
+ * when packaged. This module may sit in a shared chunk next to it, so the
+ * entry is named rather than taken from import.meta.url.
+ */
 export function workerEntry(): URL {
-  return import.meta.url.endsWith(".ts") ? new URL("./index.ts", import.meta.url) : new URL(import.meta.url);
+  return import.meta.url.endsWith(".ts") ? new URL("./index.ts", import.meta.url) : new URL("./main.mjs", import.meta.url);
 }
 
 class WorkerClient<S extends Service> {
@@ -74,10 +78,24 @@ class WorkerClient<S extends Service> {
     this.#ensure().postMessage({ id: 0, method, args });
   }
 
-  /** Like notify, and replayed if the worker has to be restarted. */
+  /** Bytes of JavaScript heap in use, or null while the worker is not running. */
+  async heapUsed(): Promise<number | null> {
+    const stats = await this.#worker?.getHeapStatistics().catch(() => null);
+    return stats ? stats.used_heap_size : null;
+  }
+
+  /** Notify only a running worker: a stopped one holds no state the message could update. */
+  notifyIfRunning<K extends keyof S & string>(method: K, ...args: Parameters<S[K]>): void {
+    this.#worker?.postMessage({ id: 0, method, args });
+  }
+
+  /**
+   * Settings the worker needs, replayed whenever it starts. They do not start
+   * it: the worker (and the code it loads) waits for its first real call.
+   */
   configure<K extends keyof S & string>(method: K, ...args: Parameters<S[K]>): void {
     this.#replay.set(method, args);
-    this.notify(method, ...args);
+    this.notifyIfRunning(method, ...args);
   }
 }
 

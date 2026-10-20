@@ -70,6 +70,12 @@ export class ExtensionHostClient {
     return !!this.#worker;
   }
 
+  /** Bytes of JavaScript heap in use (all extensions together), or null while stopped. */
+  async heapUsed(): Promise<number | null> {
+    const stats = await this.#worker?.getHeapStatistics().catch(() => null);
+    return stats ? stats.used_heap_size : null;
+  }
+
   /** (Re)start with the enabled extensions. The view re-sends its documents when it sees "ready". */
   async start(config: ConfigSnapshot, workspace: string | null): Promise<number> {
     this.#config = config;

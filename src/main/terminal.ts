@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { existsSync } from "fs";
+import { existsSync, lstatSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type { IPty } from "node-pty";
@@ -13,6 +13,8 @@ export type TerminalSession = {
   id: string;
   cwd: string;
   shell: string;
+  /** Profile name, or the executable of an extension's own shellPath. */
+  label: string;
   pty: IPty;
   alive: boolean;
   cols: number;
@@ -36,12 +38,36 @@ function defaultShell(): { file: string; args: string[] } {
 
 export type TerminalProfile = { id: string; name: string; file: string; args: string[] };
 
+/**
+ * Store apps are installed under %ProgramFiles%\WindowsApps, which cannot be
+ * started directly (CreateProcess fails with access denied). Some installers
+ * still put that folder on PATH (PowerShell 7 from the Store does); only the
+ * app execution aliases in %LOCALAPPDATA%\Microsoft\WindowsApps can start them.
+ */
+function isStorePackageDir(dir: string): boolean {
+  if (process.platform !== "win32") return false;
+  const packages = join(process.env.ProgramW6432 ?? process.env.ProgramFiles ?? "C:\\Program Files", "WindowsApps").toLowerCase();
+  return join(dir).toLowerCase().startsWith(packages + "\\");
+}
+
+/** Like existsSync, but true for app execution aliases too (reparse points that stat cannot follow). */
+function pathExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function findOnPath(exe: string): string | null {
   const dirs = (process.env.PATH ?? "").split(process.platform === "win32" ? ";" : ":");
-  for (const dir of dirs) {
-    if (!dir) continue;
+  for (const raw of dirs) {
+    // Unexpanded REG_EXPAND_SZ entries (%USERPROFILE%\…) can reach us from some launchers.
+    const dir = raw.replace(/%([^%]+)%/g, (whole, name: string) => process.env[name] ?? whole);
+    if (!dir || isStorePackageDir(dir)) continue;
     const candidate = join(dir, exe);
-    if (existsSync(candidate)) return candidate;
+    if (pathExists(candidate)) return candidate;
   }
   return null;
 }
@@ -53,10 +79,11 @@ export function terminalProfiles(): TerminalProfile[] {
   if (profileCache) return profileCache;
   const profiles: TerminalProfile[] = [];
   if (process.platform === "win32") {
-    const pwsh = findOnPath("pwsh.exe");
-    // Store installs live under WindowsApps, which only allows launching through
-    // the app execution alias: start it by name and let PATH resolve it.
-    if (pwsh) profiles.push({ id: "pwsh", name: "PowerShell 7", file: pwsh.includes("WindowsApps") ? "pwsh.exe" : pwsh, args: ["-NoLogo"] });
+    // A full path: started by name, node-pty's own PATH lookup could pick the
+    // Store package folder (see isStorePackageDir) and fail with access denied.
+    const storeAlias = join(process.env.LOCALAPPDATA ?? "", "Microsoft", "WindowsApps", "pwsh.exe");
+    const pwsh = findOnPath("pwsh.exe") ?? (process.env.LOCALAPPDATA && pathExists(storeAlias) ? storeAlias : null);
+    if (pwsh) profiles.push({ id: "pwsh", name: "PowerShell 7", file: pwsh, args: ["-NoLogo"] });
     profiles.push({ id: "powershell", name: "Windows PowerShell", file: "powershell.exe", args: ["-NoLogo"] });
     profiles.push({ id: "cmd", name: "Command Prompt", file: process.env.ComSpec || "cmd.exe", args: [] });
     const gitBash = [
@@ -175,6 +202,7 @@ export class TerminalManager {
       id,
       cwd: workdir,
       shell: file,
+      label: spec?.shellPath ? (file.split(/[\\/]/).pop() ?? file) : profile.name,
       pty,
       alive: true,
       cols,
@@ -238,14 +266,20 @@ export class TerminalManager {
     }
   }
 
-  killAll() {
-    for (const id of [...this.sessions.keys()]) {
-      this.kill(id);
-    }
+  /** End every session; returns how many there were. */
+  killAll(): number {
+    const ids = [...this.sessions.keys()];
+    for (const id of ids) this.kill(id);
+    return ids.length;
   }
 
   list(): string[] {
     return [...this.sessions.keys()];
+  }
+
+  /** Shell process of each live terminal. */
+  processes(): { pid: number; label: string }[] {
+    return [...this.sessions.values()].filter((s) => s.alive).map((s) => ({ pid: s.pty.pid, label: s.label }));
   }
 }
 

@@ -150,6 +150,23 @@ export type AppInfo = {
   platform: string;
 };
 
+/** A row of the Process Explorer: a process of the app's tree, or a thread's JavaScript heap. */
+export type ProcessRow = {
+  id: string;
+  /** Row id of the parent; null for the app itself. */
+  parent: string | null;
+  /** null for thread rows. */
+  pid: number | null;
+  /** What the process is for ("WebView2: GPU", "Terminal: PowerShell 7"…). */
+  label: string;
+  kind: "app" | "thread" | "webview" | "terminal" | "process";
+  commandLine: string;
+  /** Bytes: the private working set (Windows) / resident set, or the JS heap in use for threads. */
+  memory: number;
+  /** Share of all cores (0–100); null when not measured yet or for threads. */
+  cpu: number | null;
+};
+
 /** Structural RPC schema for the Lumen Shell bridge (types only — no runtime import). */
 export type LumenRPC = {
   main: {
@@ -338,6 +355,16 @@ export type LumenRPC = {
         params: Record<string, never>;
         response: AppInfo;
       };
+      /** The app's processes (Process Explorer). CPU use is measured since the previous call. */
+      processList: {
+        params: Record<string, never>;
+        response: { rows: ProcessRow[] };
+      };
+      /** End a process of the app's tree (with its children); never the app itself. */
+      processKill: {
+        params: { pid: number };
+        response: { ok: boolean; error?: string };
+      };
       confirmClose: {
         params: { allow: boolean };
         response: { ok: boolean };
@@ -369,6 +396,14 @@ export type LumenRPC = {
       terminalKill: {
         params: { id: string };
         response: { ok: boolean };
+      };
+      /**
+       * End every shell session: sent by a freshly loaded page before it
+       * starts its own, so a reload does not leave the old page's shells running.
+       */
+      terminalReset: {
+        params: Record<string, never>;
+        response: { killed: number };
       };
       /* extensions */
       extensionsList: {

@@ -7,6 +7,8 @@ export type { DefineMainRPCOptions } from "./rpc.ts";
 export { dialog } from "./dialog.ts";
 export { Menu } from "./menu.ts";
 export { shell } from "./shell.ts";
+export { processTree } from "./process-info.ts";
+export type { ProcessInfo } from "./process-info.ts";
 export { assetRoot, assetUrl, startAssetServer } from "./assets.ts";
 export { platform } from "./native/index.ts";
 export type { MenuEntry, MenuGroup } from "./native/platform.ts";

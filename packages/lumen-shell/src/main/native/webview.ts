@@ -28,7 +28,44 @@ const symbols = {
   webview_bind: lib.func("void webview_bind(void *w, const char *name, LumenBindCallback *fn, void *arg)"),
   webview_unbind: lib.func("void webview_unbind(void *w, const char *name)"),
   webview_return: lib.func("void webview_return(void *w, const char *seq, int status, const char *result)"),
+  webview_get_native_handle: lib.func("void *webview_get_native_handle(void *w, int kind)"),
 };
+
+/* ── WebView2 COM (Windows) ───────────────────────────────────────────── */
+
+/** WEBVIEW_NATIVE_HANDLE_KIND_BROWSER_CONTROLLER: the ICoreWebView2Controller. */
+const NATIVE_HANDLE_BROWSER_CONTROLLER = 2;
+// vtable slots, counted in the WebView2 SDK's WebView2.h (IUnknown takes 0–2).
+const QUERY_INTERFACE = 0;
+const RELEASE = 2;
+const CONTROLLER_GET_CORE_WEBVIEW2 = 25;
+const WEBVIEW2_19_PUT_MEMORY_USAGE_TARGET_LEVEL = 120;
+/** A GUID struct (Data1–3 little-endian, Data4 as bytes) from its "xxxxxxxx-xxxx-…" form. */
+function guid(text: string): Buffer {
+  const hex = text.replace(/-/g, "");
+  const bytes = Buffer.alloc(16);
+  bytes.writeUInt32LE(Number.parseInt(hex.slice(0, 8), 16), 0);
+  bytes.writeUInt16LE(Number.parseInt(hex.slice(8, 12), 16), 4);
+  bytes.writeUInt16LE(Number.parseInt(hex.slice(12, 16), 16), 6);
+  Buffer.from(hex.slice(16), "hex").copy(bytes, 8);
+  return bytes;
+}
+
+const IID_ICOREWEBVIEW2_19 = guid("6921F954-79B0-437F-A997-C85811897C68");
+
+const ComQueryInterface = koffi.proto("int32_t __stdcall LumenComQueryInterface(void *self, const void *iid, _Out_ void **out)");
+const ComRelease = koffi.proto("uint32_t __stdcall LumenComRelease(void *self)");
+const ComGetPointer = koffi.proto("int32_t __stdcall LumenComGetPointer(void *self, _Out_ void **out)");
+const ComPutInt = koffi.proto("int32_t __stdcall LumenComPutInt(void *self, int value)");
+
+/** The function in slot `index` of a COM object's vtable. */
+function comMethod(object: NativeHandle, index: number, proto: ReturnType<typeof koffi.proto>): (...args: unknown[]) => unknown {
+  const vtable = new BigUint64Array(koffi.view(object, 8))[0]!;
+  const fn = new BigUint64Array(koffi.view(vtable, (index + 1) * 8))[index]!;
+  return koffi.decode(fn, proto) as (...args: unknown[]) => unknown;
+}
+
+export type MemoryUsageTargetLevel = "normal" | "low";
 
 /** Window size hints (mirrors `webview_hint_t`). */
 export const SizeHint = {
@@ -156,6 +193,36 @@ export class NativeWebview {
     const pointer = this.#callbacks.get(name);
     if (pointer !== undefined) koffi.unregister(pointer);
     this.#callbacks.delete(name);
+  }
+
+  /**
+   * WebView2 (Windows): "low" asks the browser to give back memory (drop
+   * caches, collect garbage, trim working sets) while the app is in the
+   * background; "normal" restores the default. Returns false where unsupported
+   * (other platforms, or a WebView2 runtime older than ICoreWebView2_19).
+   */
+  setMemoryUsageTargetLevel(level: MemoryUsageTargetLevel): boolean {
+    if (process.platform !== "win32" || !this.#handle) return false;
+    const controller = asPointer(symbols.webview_get_native_handle(this.#handle, NATIVE_HANDLE_BROWSER_CONTROLLER));
+    if (!controller) return false;
+    const core: unknown[] = [null];
+    if (comMethod(controller, CONTROLLER_GET_CORE_WEBVIEW2, ComGetPointer)(controller, core) !== 0) return false;
+    const webview = asPointer(core[0]);
+    if (!webview) return false;
+    const queried: unknown[] = [null];
+    try {
+      if (comMethod(webview, QUERY_INTERFACE, ComQueryInterface)(webview, IID_ICOREWEBVIEW2_19, queried) !== 0) return false;
+      const webview19 = asPointer(queried[0]);
+      if (!webview19) return false;
+      try {
+        const value = level === "low" ? 1 : 0; // COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW / _NORMAL
+        return comMethod(webview19, WEBVIEW2_19_PUT_MEMORY_USAGE_TARGET_LEVEL, ComPutInt)(webview19, value) === 0;
+      } finally {
+        comMethod(webview19, RELEASE, ComRelease)(webview19);
+      }
+    } finally {
+      comMethod(webview, RELEASE, ComRelease)(webview);
+    }
   }
 
   /** Ask the webview to leave its event loop (posts a quit message). */

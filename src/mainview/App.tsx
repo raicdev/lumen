@@ -83,6 +83,7 @@ import { OutlineView } from "./components/OutlineView";
 import { ScmView, gitDecoration } from "./components/ScmView";
 import { SettingsEditor } from "./components/SettingsEditor";
 import { ShortcutsEditor } from "./components/ShortcutsEditor";
+import { ProcessExplorer } from "./components/ProcessExplorer";
 import { Welcome } from "./components/Welcome";
 import { ExtensionsView, type ExtensionAction, type ExtensionTarget } from "./components/ExtensionsView";
 import { ExtensionDetails } from "./components/ExtensionDetails";
@@ -221,6 +222,7 @@ export function App() {
   const [quick, setQuick] = useState<QuickInputRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [processExplorerOpen, setProcessExplorerOpen] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, string>>(loadKeybindingOverrides);
   const [diagnostics, setDiagnostics] = useState<Map<string, Diagnostic[]>>(new Map());
   const [references, setReferences] = useState<ReferencesResult | null>(null);
@@ -2533,10 +2535,11 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.1.0", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.1.1", platform: navigator.platform }));
           await showAbout(info);
         },
       },
+      { id: "workbench.action.openProcessExplorer", title: "Open Process Explorer", category: "Developer", run: () => setProcessExplorerOpen(true) },
       { id: "workbench.action.reloadWindow", title: "Reload Window", category: "Developer", run: () => location.reload() },
       {
         id: "workbench.action.closeWindow",
@@ -4787,6 +4790,7 @@ export function App() {
           saveKeybindingOverrides(next);
         }}
       />
+      <ProcessExplorer open={processExplorerOpen} onClose={() => setProcessExplorerOpen(false)} />
     </div>
   );
 }

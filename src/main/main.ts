@@ -20,6 +20,7 @@ import { fsWorker, lspWorker } from "./workers.ts";
 import { WorkspaceStateStore } from "./workspace-state.ts";
 import { contributedThemes, loadColorTheme } from "./themes.ts";
 import { terminalProfiles, terminals } from "./terminal.ts";
+import { killProcess, listProcesses } from "./process-explorer.ts";
 import { CompatCache, ExtensionManager, analyzeVsix, compareVersions } from "./extensions/manager.ts";
 import { ExtensionHostClient, openExternal } from "./extensions/host-client.ts";
 import { downloadFromMarketplace, latestVersion, marketplaceDetails, searchMarketplace } from "./extensions/marketplace.ts";
@@ -27,7 +28,7 @@ import { WebviewResourceServer } from "./extensions/webview-server.ts";
 import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.1.1";
 const APP_NAME = "Lumen";
 
 let mainWindow: BrowserWindow<LumenRPC> | null = null;
@@ -182,7 +183,7 @@ const rpc = defineMainRPC<LumenRPC>({
 
       writeFile: async ({ path, content }) => {
         const result = await writeTextFile(path, content);
-        if (result.success) lspWorker.notify("change", path, content);
+        if (result.success) lspWorker.notifyIfRunning("change", path, content);
         return result;
       },
 
@@ -191,12 +192,12 @@ const rpc = defineMainRPC<LumenRPC>({
       createDir: ({ path }) => createDirectory(path),
 
       deletePath: ({ path }) => {
-        lspWorker.notify("close", path);
+        lspWorker.notifyIfRunning("close", path);
         return deletePath(path);
       },
 
       renamePath: ({ oldPath, newPath }) => {
-        lspWorker.notify("close", oldPath);
+        lspWorker.notifyIfRunning("close", oldPath);
         return renamePath(oldPath, newPath);
       },
 
@@ -223,12 +224,12 @@ const rpc = defineMainRPC<LumenRPC>({
       },
 
       lspChange: ({ path, content }) => {
-        lspWorker.notify("change", path, content);
+        lspWorker.notifyIfRunning("change", path, content);
         return { ok: true };
       },
 
       lspClose: ({ path }) => {
-        lspWorker.notify("close", path);
+        lspWorker.notifyIfRunning("close", path);
         return { ok: true };
       },
 
@@ -324,6 +325,19 @@ const rpc = defineMainRPC<LumenRPC>({
         platform: process.platform,
       }),
 
+      processList: async () => ({
+        rows: await listProcesses({
+          threads: [
+            { label: "Extension host", heapUsed: () => extensionHost.heapUsed() },
+            { label: "Language service", heapUsed: () => lspWorker.heapUsed() },
+            { label: "File search", heapUsed: () => fsWorker.heapUsed() },
+          ],
+          terminals: terminals.processes(),
+        }),
+      }),
+
+      processKill: ({ pid }) => killProcess(pid),
+
       confirmClose: ({ allow }) => {
         if (allow) void mainWindow?.requestClose();
         return { ok: true };
@@ -353,6 +367,8 @@ const rpc = defineMainRPC<LumenRPC>({
       terminalResize: ({ id, cols, rows }) => terminals.resize(id, cols, rows),
 
       terminalKill: ({ id }) => terminals.kill(id),
+
+      terminalReset: () => ({ killed: terminals.killAll() }),
 
       extensionsList: () => ({ extensions: extensionManager.list({ icons: true }), dir: extensionManager.dir }),
 

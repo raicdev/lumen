@@ -353,7 +353,11 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
       onStateChange: (state: WindowState) => {
         if (state === self.#state) return;
         const wasMaximized = self.#state === "maximized";
+        const wasMinimized = self.#state === "minimized";
         self.#state = state;
+        // A minimized window lets WebView2 give memory back until it is shown again.
+        if (state === "minimized") self.#native.setMemoryUsageTargetLevel("low");
+        else if (wasMinimized) self.#native.setMemoryUsageTargetLevel("normal");
         if (state === "maximized") self.events.emit("maximize");
         else if (wasMaximized && state === "normal") self.events.emit("unmaximize");
         self.#pushWindowState();
