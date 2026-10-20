@@ -43,4 +43,9 @@ export default {
       "src/mainview/modern.css",
     ],
   },
+  package: {
+    // Rendered from resources/icon.svg.
+    icon: "resources/icon.ico",
+    publisher: "Lumen Contributors",
+  },
 } satisfies LumenConfig;

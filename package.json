@@ -9,6 +9,7 @@
     "dev": "lumen-shell dev --watch",
     "build": "lumen-shell build",
     "package": "lumen-shell package",
+    "installer": "lumen-shell installer",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/*.test.ts\" \"test/features/*.test.ts\"",
     "ext:transpile": "node src/main/extensions/cli.ts"

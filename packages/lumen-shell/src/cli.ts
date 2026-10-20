@@ -5,15 +5,17 @@
  *   lumen-shell dev [--watch]   build the view, serve it, launch the main process
  *   lumen-shell build           production bundle (view + main) into .lumen/build
  *   lumen-shell package         standalone app directory in dist/<App>/
+ *   lumen-shell installer       Windows setup executable (NSIS) in dist/
  */
 import { spawnSync } from "child_process";
 import * as esbuild from "esbuild";
 import { existsSync, readFileSync, realpathSync, watch, type FSWatcher } from "fs";
-import { copyFile, cp, mkdir, readFile, rm, writeFile } from "fs/promises";
+import { copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from "fs/promises";
 import { createRequire } from "module";
 import { basename, dirname, join } from "path";
 import { pathToFileURL } from "url";
 import { nativeLibraryName, resolveNativeLibrary } from "./main/native/library.ts";
+import { brandExecutable, useWindowsSubsystem, versionParts } from "./win32-resources.ts";
 
 export type LumenConfig = {
   app?: { name?: string; version?: string; identifier?: string };
@@ -29,8 +31,14 @@ export type LumenConfig = {
     /** Extra files/directories copied into the assets directory. */
     assets?: string[];
   };
-  /** Extra files copied next to the packaged executable. */
-  package?: { extra?: string[]; icon?: string };
+  package?: {
+    /** Extra files copied next to the packaged executable. */
+    extra?: string[];
+    /** Windows .ico for the executable, its windows and the installer. */
+    icon?: string;
+    /** Shown in the executable's details and in Windows' installed apps list. */
+    publisher?: string;
+  };
 };
 
 const ROOT = process.cwd();
@@ -211,7 +219,7 @@ async function commandBuild(config: LumenConfig): Promise<void> {
   log(`built main → ${mainFile}`);
 }
 
-async function commandPackage(config: LumenConfig): Promise<void> {
+async function commandPackage(config: LumenConfig): Promise<string> {
   await commandBuild(config);
 
   const slug = appSlug(config);
@@ -233,9 +241,10 @@ async function commandPackage(config: LumenConfig): Promise<void> {
 
   // A Node single executable application (SEA) that loads main.mjs next to it.
   const exeName = `${slug}${process.platform === "win32" ? ".exe" : ""}`;
-  await buildExecutable(join(outDir, exeName));
+  await buildExecutable(config, join(outDir, exeName));
   log(`packaged → ${outDir}`);
   log(`run: ${join(outDir, exeName)}`);
+  return outDir;
 }
 
 async function copyWebviewLibrary(outDir: string): Promise<void> {
@@ -306,7 +315,7 @@ async function copyNativeModules(outDir: string): Promise<void> {
  * Build a Node single executable application: a copy of the running `node`
  * binary with a tiny launcher injected, which loads main.mjs from its directory.
  */
-async function buildExecutable(exePath: string): Promise<void> {
+async function buildExecutable(config: LumenConfig, exePath: string): Promise<void> {
   const work = join(ROOT, ".lumen", "sea");
   await rm(work, { recursive: true, force: true });
   await mkdir(work, { recursive: true });
@@ -316,9 +325,22 @@ async function buildExecutable(exePath: string): Promise<void> {
     launcher,
     [
       'const { createRequire } = require("node:module");',
-      'const { dirname, join } = require("node:path");',
-      'const main = join(dirname(process.execPath), "main.mjs");',
-      "createRequire(main)(main);",
+      'const { dirname, join, resolve } = require("node:path");',
+      // child_process.fork() re-runs this executable as `<exe> <exe> <script> ...args`
+      // (node-pty's helper when a terminal closes, extension language servers…):
+      // run that script the way node would instead of starting another app.
+      "let forked = null;",
+      "if (process.send && process.argv[2]) {",
+      // (The SEA's own require() only loads built-in modules.)
+      "  try { forked = createRequire(process.execPath).resolve(resolve(process.argv[2])); } catch {}",
+      "}",
+      "if (forked) {",
+      "  process.argv.splice(1, 2, forked);",
+      "  createRequire(forked)(forked);",
+      "} else {",
+      '  const main = join(dirname(process.execPath), "main.mjs");',
+      "  createRequire(main)(main);",
+      "}",
       "",
     ].join("\n"),
   );
@@ -330,6 +352,21 @@ async function buildExecutable(exePath: string): Promise<void> {
 
   await copyFile(process.execPath, exePath);
   if (process.platform === "darwin") run("codesign", ["--remove-signature", exePath], "removing the signature");
+  if (process.platform === "win32") {
+    const name = config.app?.name ?? "App";
+    const publisher = config.package?.publisher;
+    await brandExecutable(exePath, {
+      icon: config.package?.icon ? join(ROOT, config.package.icon) : undefined,
+      version: {
+        version: config.app?.version ?? "0.0.0",
+        productName: name,
+        fileDescription: name,
+        companyName: publisher,
+        copyright: publisher ? `Copyright (c) ${new Date().getFullYear()} ${publisher}` : undefined,
+        originalFilename: basename(exePath),
+      },
+    }).catch((error: unknown) => fail(`branding the executable failed: ${error instanceof Error ? error.message : error}`));
+  }
 
   const require = createRequire(import.meta.url);
   const { inject } = require("postject") as {
@@ -346,7 +383,152 @@ async function buildExecutable(exePath: string): Promise<void> {
   });
 
   if (process.platform === "darwin") run("codesign", ["--sign", "-", exePath], "ad-hoc signing");
+  if (process.platform === "win32") await useWindowsSubsystem(exePath);
   await rm(work, { recursive: true, force: true });
+}
+
+/* ------------------------------------------------------------- installer */
+
+function findMakensis(): string {
+  const candidates = [
+    process.env.NSIS_HOME && join(process.env.NSIS_HOME, "makensis.exe"),
+    join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "NSIS", "makensis.exe"),
+    join(process.env.ProgramFiles ?? "C:\\Program Files", "NSIS", "makensis.exe"),
+  ];
+  const found = candidates.find((path): path is string => Boolean(path && existsSync(path)));
+  if (found) return found;
+  const onPath = spawnSync("makensis", ["/VERSION"], { stdio: "ignore", windowsHide: true });
+  if (onPath.status === 0) return "makensis";
+  return fail("NSIS is not installed (winget install NSIS.NSIS), or set NSIS_HOME");
+}
+
+/** A quoted NSIS string; `$` still starts a variable ($INSTDIR…). */
+function nsisString(value: string): string {
+  return `"${value.replace(/"/g, '$\\"')}"`;
+}
+
+/** Plain text inside an NSIS string: `$` is literal. */
+function nsisText(value: string): string {
+  return value.replace(/\$/g, "$$$$");
+}
+
+/** Bytes used by a directory tree. */
+async function treeSize(path: string): Promise<number> {
+  const info = await stat(path);
+  if (!info.isDirectory()) return info.size;
+  let total = 0;
+  for (const entry of await readdir(path)) total += await treeSize(join(path, entry));
+  return total;
+}
+
+/**
+ * A per-user installer (no administrator rights, like VS Code's user setup):
+ * installs to %LOCALAPPDATA%\Programs\<App>, adds a Start menu shortcut and an
+ * entry in Windows' installed apps list.
+ */
+async function commandInstaller(config: LumenConfig): Promise<void> {
+  if (process.platform !== "win32") fail("installer is only supported on Windows");
+  const makensis = findMakensis();
+  const appDir = await commandPackage(config);
+
+  const slug = appSlug(config);
+  const rawVersion = config.app?.version ?? "0.0.0";
+  const outFile = join(ROOT, "dist", `${slug}-${rawVersion}-win32-${process.arch}-setup.exe`);
+  // Everything below is spliced into NSIS strings.
+  const name = nsisText(config.app?.name ?? "App");
+  const version = nsisText(rawVersion);
+  const publisher = nsisText(config.package?.publisher ?? config.app?.name ?? "App");
+  const exeName = nsisText(`${slug}.exe`);
+  const uninstaller = `Uninstall ${name}.exe`;
+  const uninstallKey = `Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${nsisText(config.app?.identifier ?? slug)}`;
+  const icon = config.package?.icon ? nsisText(join(ROOT, config.package.icon)) : null;
+
+  // Remove exactly what the app ships, never the whole folder the user picked.
+  const entries = await readdir(appDir, { withFileTypes: true });
+  const removeApp = entries
+    .map((entry) => (entry.isDirectory() ? "RMDir /r " : "Delete ") + nsisString(`$INSTDIR\\${nsisText(entry.name)}`))
+    .map((line) => `  ${line}`)
+    .join("\n");
+  const sizeKb = Math.ceil((await treeSize(appDir)) / 1024);
+
+  const script = `Unicode true
+ManifestDPIAware true
+SetCompressor /SOLID lzma
+RequestExecutionLevel user
+!include "MUI2.nsh"
+
+Name ${nsisString(name)}
+OutFile ${nsisString(nsisText(outFile))}
+InstallDir ${nsisString(`$LOCALAPPDATA\\Programs\\${name}`)}
+InstallDirRegKey HKCU ${nsisString(uninstallKey)} "InstallLocation"
+BrandingText ${nsisString(`${name} ${version}`)}
+
+VIProductVersion "${versionParts(rawVersion).join(".")}"
+VIAddVersionKey /LANG=1033 "ProductName" ${nsisString(name)}
+VIAddVersionKey /LANG=1033 "FileDescription" ${nsisString(`${name} Setup`)}
+VIAddVersionKey /LANG=1033 "FileVersion" ${nsisString(version)}
+VIAddVersionKey /LANG=1033 "ProductVersion" ${nsisString(version)}
+VIAddVersionKey /LANG=1033 "CompanyName" ${nsisString(publisher)}
+VIAddVersionKey /LANG=1033 "LegalCopyright" ${nsisString(`Copyright (c) ${new Date().getFullYear()} ${publisher}`)}
+${icon ? `!define MUI_ICON ${nsisString(icon)}\n!define MUI_UNICON ${nsisString(icon)}\n` : ""}
+!define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_RUN ${nsisString(`$INSTDIR\\${exeName}`)}
+!define MUI_FINISHPAGE_SHOWREADME ""
+!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "$(DesktopShortcut)"
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
+
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+
+!insertmacro MUI_LANGUAGE "English"
+!insertmacro MUI_LANGUAGE "Japanese"
+LangString DesktopShortcut \${LANG_ENGLISH} "Create a desktop shortcut"
+LangString DesktopShortcut \${LANG_JAPANESE} "デスクトップにショートカットを作成"
+
+Function CreateDesktopShortcut
+  CreateShortcut ${nsisString(`$DESKTOP\\${name}.lnk`)} ${nsisString(`$INSTDIR\\${exeName}`)}
+FunctionEnd
+
+Section
+  SetOutPath "$INSTDIR"
+  ; Drop the previous version's files so nothing stale is left behind.
+${removeApp}
+  File /r ${nsisString(`${nsisText(appDir)}\\*`)}
+  WriteUninstaller ${nsisString(`$INSTDIR\\${uninstaller}`)}
+  CreateShortcut ${nsisString(`$SMPROGRAMS\\${name}.lnk`)} ${nsisString(`$INSTDIR\\${exeName}`)}
+
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "DisplayName" ${nsisString(name)}
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "DisplayVersion" ${nsisString(version)}
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "Publisher" ${nsisString(publisher)}
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "DisplayIcon" ${nsisString(`$INSTDIR\\${exeName}`)}
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU ${nsisString(uninstallKey)} "UninstallString" ${nsisString(`"$INSTDIR\\${uninstaller}"`)}
+  WriteRegDWORD HKCU ${nsisString(uninstallKey)} "EstimatedSize" ${sizeKb}
+  WriteRegDWORD HKCU ${nsisString(uninstallKey)} "NoModify" 1
+  WriteRegDWORD HKCU ${nsisString(uninstallKey)} "NoRepair" 1
+SectionEnd
+
+Section "Uninstall"
+${removeApp}
+  Delete ${nsisString(`$INSTDIR\\${uninstaller}`)}
+  RMDir "$INSTDIR"
+  Delete ${nsisString(`$SMPROGRAMS\\${name}.lnk`)}
+  Delete ${nsisString(`$DESKTOP\\${name}.lnk`)}
+  DeleteRegKey HKCU ${nsisString(uninstallKey)}
+SectionEnd
+`;
+
+  const work = join(ROOT, ".lumen", "installer");
+  await mkdir(work, { recursive: true });
+  const scriptPath = join(work, "installer.nsi");
+  await writeFile(scriptPath, script);
+  run(makensis, ["/V2", "/INPUTCHARSET", "UTF8", scriptPath], "building the installer");
+  log(`installer → ${outFile}`);
 }
 
 function run(command: string, args: string[], what: string): void {
@@ -372,6 +554,9 @@ async function main(): Promise<void> {
     case "package":
       await commandPackage(config);
       break;
+    case "installer":
+      await commandInstaller(config);
+      break;
     case "help":
     case "--help":
     case "-h":
@@ -382,6 +567,7 @@ async function main(): Promise<void> {
           "  dev [--watch]   build the view, serve it, launch the app",
           "  build           production bundle into .lumen/build",
           "  package         standalone app directory in dist/",
+          "  installer       Windows setup executable (NSIS) in dist/",
         ].join("\n"),
       );
       break;

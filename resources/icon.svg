@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2f5c"/>
+      <stop offset="1" stop-color="#0e1024"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffcf6b" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#ff9d4d" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff9d4d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="star" x1="0.2" y1="0.1" x2="0.8" y2="0.9">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="0.5" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#ff9447"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="55.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <circle class="detail" cx="128" cy="132" r="104" fill="url(#glow)"/>
+  <path d="M128 40 Q137 123 216 132 Q137 141 128 224 Q119 141 40 132 Q119 123 128 40 Z" fill="url(#star)"/>
+  <path class="detail" d="M190 50 Q193 69 210 72 Q193 75 190 94 Q187 75 170 72 Q187 69 190 50 Z" fill="#fff3d6" fill-opacity="0.9"/>
+</svg>

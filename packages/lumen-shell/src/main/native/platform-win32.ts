@@ -76,6 +76,12 @@ function loadUser32() {
     ),
     TrackMouseEvent: user32.func("int __stdcall TrackMouseEvent(void *event)"),
     LoadCursorW: user32.func("void *__stdcall LoadCursorW(void *instance, uintptr_t name)"),
+    LoadImageW: user32.func(
+      "void *__stdcall LoadImageW(void *instance, uintptr_t name, uint32_t type, int cx, int cy, uint32_t flags)",
+    ),
+    SendMessageW: user32.func(
+      "intptr_t __stdcall SendMessageW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
+    ),
   };
 }
 
@@ -179,8 +185,19 @@ const TME_LEAVE = 0x2;
 const TME_NONCLIENT = 0x10;
 const IDC_ARROW = 32512;
 
+const WM_SETICON = 0x0080;
+const ICON_SMALL = 0;
+const ICON_BIG = 1;
+const IMAGE_ICON = 1;
+/** The executable's main icon group (what `lumen-shell package` writes). */
+const APP_ICON_ID = 1;
+
 const SM_CXSCREEN = 0;
 const SM_CYSCREEN = 1;
+const SM_CXICON = 11;
+const SM_CYICON = 12;
+const SM_CXSMICON = 49;
+const SM_CYSMICON = 50;
 
 const MF_STRING = 0x00000000;
 const MF_POPUP = 0x00000010;
@@ -337,7 +354,21 @@ function setDwmFlag(handle: NativeHandle, attribute: number, enabled: boolean): 
   graphics().DwmSetWindowAttribute(handle, attribute, value, 4);
 }
 
+/** Title bar, taskbar and Alt+Tab use the executable's own icon. */
+function applyAppIcon(handle: NativeHandle): void {
+  const api = symbols();
+  const instance = loadKernel32().GetModuleHandleW(null);
+  for (const [kind, cx, cy] of [
+    [ICON_BIG, SM_CXICON, SM_CYICON],
+    [ICON_SMALL, SM_CXSMICON, SM_CYSMICON],
+  ]) {
+    const icon = api.LoadImageW(instance, APP_ICON_ID, IMAGE_ICON, api.GetSystemMetrics(cx), api.GetSystemMetrics(cy), 0);
+    if (icon) api.SendMessageW(handle, WM_SETICON, kind, asPointer(icon));
+  }
+}
+
 function applyWindowStyle(handle: NativeHandle, entry: WindowEntry, style: WindowStyle): void {
+  applyAppIcon(handle);
   const color = parseColor(style.backgroundColor);
   if (color) {
     const brush = graphics().CreateSolidBrush(color.r | (color.g << 8) | (color.b << 16));

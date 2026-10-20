@@ -33,7 +33,8 @@ without a giant framework.
 | Stable origin | the asset server prefers a port derived from the app identifier, so `localStorage` survives restarts |
 | No startup flash | the window is DWM-cloaked until the page reports its first painted frame; `backgroundColor` also feeds WebView2's default background and the window class brush |
 | Bundling | esbuild for the view and the main process; in dev the main process runs from source (Node type stripping) |
-| Packaging | `lumen-shell package` bundles both sides, builds a Node [single executable](https://nodejs.org/api/single-executable-applications.html) launcher and copies the native libraries/addons next to it |
+| Packaging | `lumen-shell package` bundles both sides, builds a Node [single executable](https://nodejs.org/api/single-executable-applications.html) launcher and copies the native libraries/addons next to it; on Windows the executable gets the `package.icon`, version info and the GUI subsystem (no console window) |
+| Installer | `lumen-shell installer` wraps the packaged app in a per-user NSIS setup (Start menu shortcut, uninstaller, installed apps entry) |
 
 ## API
 
@@ -97,6 +98,7 @@ rpc.send.log({ msg: "hello main" });
 lumen-shell dev [--watch]   # build the view, serve it, launch the app (--watch rebuilds + reloads)
 lumen-shell build           # production bundles → .lumen/build
 lumen-shell package         # standalone app → dist/<App>/<App>.exe
+lumen-shell installer       # Windows setup → dist/<App>-<version>-win32-<arch>-setup.exe (needs NSIS)
 ```
 
 Configured by `lumen.config.ts` in the project root (`app`, `main`, `view`).

@@ -70,6 +70,7 @@ pnpm start          # or: pnpm dev   (rebuild + reload on change)
 | `pnpm dev` | Dev with view watching (`src/`, `packages/`) and live reload |
 | `pnpm build` | Production bundles into `.lumen/build` |
 | `pnpm package` | Standalone app (`dist/Lumen/Lumen.exe`, a Node single executable) |
+| `pnpm installer` | Windows setup (`dist/Lumen-<version>-win32-x64-setup.exe`, per-user, needs [NSIS](https://nsis.sourceforge.io): `winget install NSIS.NSIS`) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Extension tests (transpiler, VSIX reader, API surface, extension host end to end) |
 | `pnpm ext:transpile <file.vsix \| folder> [--out dir]` | Convert a VS Code extension to a Lumen extension and print its compatibility report |

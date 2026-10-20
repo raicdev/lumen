@@ -587,5 +587,4 @@ app.on("before-quit", () => {
 // Last chance for queued layout writes (e.g. the process is asked to exit).
 process.on("exit", () => workspaceState.flush());
 
-console.log(`✦ ${APP_NAME} v${APP_VERSION} starting (Lumen Shell)`);
 void app.run();
