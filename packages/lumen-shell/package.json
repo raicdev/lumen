@@ -1,0 +1,23 @@
+{
+  "name": "@lumen/shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lumen Shell — a tiny Electron-like desktop shell for Node.js: native OS WebView, own event loop, typed IPC, no bundled browser.",
+  "exports": {
+    ".": "./src/main/index.ts",
+    "./main": "./src/main/index.ts",
+    "./view": "./src/view/index.ts",
+    "./shared": "./src/shared/index.ts",
+    "./prelude": "./src/view/prelude.ts",
+    "./cli": "./src/cli.ts"
+  },
+  "bin": {
+    "lumen-shell": "./src/cli.ts"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "koffi": "^3.3.3",
+    "postject": "1.0.0-alpha.6"
+  }
+}

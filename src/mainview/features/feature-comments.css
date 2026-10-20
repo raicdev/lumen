@@ -1,0 +1,204 @@
+/* Styles of the "comments" area. */
+
+.cm-comment-gutter {
+  width: 16px;
+}
+.cm-comment-gutter:not(:has(.cm-comment-add)) {
+  display: none;
+}
+.cm-comment-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-comment-add {
+  width: 14px;
+  height: 14px;
+  line-height: 13px;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-dim);
+  opacity: 0;
+}
+.cm-comment-gutter .cm-gutterElement:hover .cm-comment-add {
+  opacity: 1;
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.cm-comment-thread {
+  margin: 4px 24px 6px 48px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  box-shadow: var(--shadow);
+}
+.cm-comment-thread.resolved {
+  border-left-color: var(--success);
+  opacity: 0.85;
+}
+.cm-comment-thread-header,
+.cm-comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.cm-comment-thread-title,
+.cm-comment-author {
+  font-weight: 600;
+}
+.cm-comment-count,
+.cm-comment-time {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.cm-comment-chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--bg-active);
+  font-size: 11px;
+}
+.cm-comment-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+.cm-comment-toggle,
+.cm-comment-link-button {
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 4px;
+  font: inherit;
+}
+.cm-comment-toggle:hover,
+.cm-comment-link-button:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.cm-comment-thread-body {
+  border-top: 1px solid var(--border-soft);
+  padding: 4px 0 8px;
+}
+.cm-comment {
+  padding: 2px 0;
+}
+.cm-comment-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.cm-comment-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-active);
+  font-size: 11px;
+  font-weight: 600;
+}
+.cm-comment-body {
+  padding: 0 8px 2px 36px;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.cm-comment-body p {
+  margin: 2px 0;
+}
+.cm-comment-body pre {
+  margin: 4px 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-mono);
+}
+.cm-comment-body code {
+  font-family: var(--font-mono);
+}
+.cm-comment-link {
+  color: var(--info);
+  cursor: pointer;
+}
+.cm-comment-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 8px 2px 36px;
+}
+.cm-comment-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.cm-comment-reaction img {
+  width: 12px;
+  height: 12px;
+}
+.cm-comment-reaction.reacted {
+  background: var(--bg-active);
+}
+.cm-comment-reply {
+  padding: 6px 8px 0;
+}
+.cm-comment-input {
+  box-sizing: border-box;
+  width: 100%;
+  resize: none;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.cm-comment-input:focus {
+  border-color: var(--accent-hi);
+}
+.cm-comment-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cm-comment-button {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.cm-comment-button.primary {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+  color: var(--bg);
+}
+.cm-comment-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cm-comment-hint {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}

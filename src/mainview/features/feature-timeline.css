@@ -1,0 +1,83 @@
+/* ── Timeline (Explorer section) ── */
+
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 20px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.timeline-row.clickable {
+  cursor: pointer;
+}
+
+.timeline-row:hover {
+  background: var(--bg-hover);
+}
+
+.timeline-icon {
+  display: inline-flex;
+  width: 14px;
+  flex: none;
+}
+
+.timeline-icon img {
+  width: 14px;
+  height: 14px;
+}
+
+.timeline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-description {
+  color: var(--text-dim);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-inline {
+  margin-left: auto;
+  visibility: hidden;
+}
+
+.timeline-row:hover .timeline-inline {
+  visibility: visible;
+}
+
+.timeline-time {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+  flex: none;
+}
+
+.timeline-inline + .timeline-time {
+  margin-left: 0;
+}
+
+.timeline-empty {
+  padding: 6px 20px;
+  font-size: 12px;
+}
+
+.timeline-more {
+  margin: 4px 20px;
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground, var(--accent));
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+}

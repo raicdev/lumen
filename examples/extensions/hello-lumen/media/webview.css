@@ -1,0 +1,33 @@
+/* Loaded through webview.asWebviewUri (the webview resource server). */
+body {
+  padding: 12px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.count {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--vscode-textLink-foreground);
+}
+
+button {
+  padding: 4px 12px;
+  border: 1px solid var(--vscode-button-border);
+  border-radius: 2px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.muted {
+  color: var(--vscode-descriptionForeground);
+}

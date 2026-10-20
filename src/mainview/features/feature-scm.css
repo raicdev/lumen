@@ -1,0 +1,147 @@
+/* Styles of the "scm" area: extension source controls in the Source Control view and the quick diff gutter. */
+.scm-ext {
+  position: relative;
+  border-top: 1px solid var(--border);
+}
+
+.scm-ext-control + .scm-ext-control {
+  border-top: 1px solid var(--border);
+}
+
+.scm-ext-header {
+  font-weight: 600;
+}
+
+.scm-ext-status {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.scm-ext-status-btn {
+  max-width: 120px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.scm-ext-status-btn:hover {
+  background: rgba(128, 128, 128, 0.2);
+  color: var(--text);
+}
+
+.scm-faded {
+  opacity: 0.6;
+}
+
+.scm-validation {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.scm-validation-1 {
+  color: #cca700;
+}
+
+.scm-validation-2 {
+  color: var(--danger);
+}
+
+.scm-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+}
+
+.scm-progress::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  background: var(--vscode-focusBorder, #0078d4);
+  animation: scm-progress 1.2s linear infinite;
+}
+
+@keyframes scm-progress {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.cm-scm-gutter {
+  width: 4px;
+  margin-right: 2px;
+}
+
+/* No changed line: no gutter. */
+.cm-scm-gutter:not(:has(.scm-quickdiff)) {
+  display: none;
+}
+
+.cm-scm-gutter .cm-gutterElement {
+  padding: 0;
+}
+
+.scm-quickdiff {
+  width: 3px;
+  height: 100%;
+}
+
+.scm-quickdiff-added {
+  background: var(--vscode-editorGutter-addedBackground, #2ea043);
+}
+
+.scm-quickdiff-modified {
+  background: var(--vscode-editorGutter-modifiedBackground, #1b81a8);
+}
+
+.scm-quickdiff-deleted {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 4px solid var(--vscode-editorGutter-deletedBackground, #f85149);
+}
+
+.scm-root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.scm-root > .scm-view {
+  flex: none;
+  overflow: visible;
+}
+
+/* Contributed inline actions of rows and group headers (scm/resourceState/context, scm/resourceGroup/context): shown on hover. */
+.scm-row-actions {
+  margin-left: auto;
+  visibility: hidden;
+}
+
+.scm-row:hover .scm-row-actions,
+.scm-section-header:hover .scm-row-actions,
+.scm-row:focus-within .scm-row-actions {
+  visibility: visible;
+}

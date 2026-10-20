@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.lumen/
+build/
+artifacts/
+*.log
+.DS_Store
+Thumbs.db

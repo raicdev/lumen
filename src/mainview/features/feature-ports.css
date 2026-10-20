@@ -1,0 +1,61 @@
+/* ── Ports panel ── */
+
+.ports-panel {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 12px;
+}
+
+.ports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ports-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ports-table td {
+  padding: 3px 8px;
+}
+
+.ports-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.ports-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ports-port {
+  font-family: var(--font-mono);
+}
+
+.ports-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ports-inline,
+.ports-actions .icon-btn {
+  visibility: hidden;
+}
+
+.ports-table tbody tr:hover .ports-inline,
+.ports-table tbody tr:hover .ports-actions .icon-btn {
+  visibility: visible;
+}
+
+.ports-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}

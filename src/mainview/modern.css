@@ -1,0 +1,710 @@
+/* ─────────────────────────────────────────────
+   Lumen — modern workbench look
+   Loaded after every other stylesheet. The layout stays as it is; the parts
+   (side bars, editor area, panel) float as rounded cards on the shell color
+   that the title bar, activity bar and status bar share.
+   ───────────────────────────────────────────── */
+
+:root {
+  --shell: var(--vscode-titleBar-activeBackground);
+  --gap: 6px;
+  --card-radius: 10px;
+  --card-border: color-mix(in srgb, var(--vscode-foreground) 9%, transparent);
+  --hairline: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
+  --fill-hover: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+  --fill-active: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
+  --radius: 6px;
+  --shadow: 0 12px 32px -8px var(--vscode-widget-shadow), 0 4px 12px -4px var(--vscode-widget-shadow);
+  --shadow-lg: 0 24px 64px -12px var(--vscode-widget-shadow), 0 8px 24px -8px var(--vscode-widget-shadow);
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  --toolbar-h: 40px;
+  --statusbar-h: 26px;
+  --tabs-h: 38px;
+}
+
+html,
+body,
+.app {
+  background: var(--shell);
+}
+
+:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--vscode-keybindingLabel-border);
+  border-bottom-width: 2px;
+  background: var(--vscode-keybindingLabel-background);
+  color: var(--vscode-keybindingLabel-foreground);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/* ── Title bar ── */
+
+.titlebar {
+  border-bottom: none;
+  padding-left: 10px;
+}
+
+.menubar {
+  gap: 1px;
+}
+
+.menubar-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.menubar-btn:hover,
+.menubar-btn.open {
+  background: var(--fill-active);
+}
+
+.toolbar-search {
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--fill-hover);
+}
+
+.toolbar-search:hover {
+  border-color: color-mix(in srgb, var(--vscode-foreground) 18%, transparent);
+  background: var(--fill-active);
+}
+
+.ghost-btn {
+  border-radius: 7px;
+  border-color: var(--card-border);
+  background: var(--fill-hover);
+}
+
+.ghost-btn:hover {
+  border-color: color-mix(in srgb, var(--vscode-foreground) 18%, transparent);
+  background: var(--fill-active);
+}
+
+/* ── Menus ── */
+
+.menu-dropdown,
+.ctx-menu {
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid var(--vscode-menu-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.menu-dropdown {
+  top: calc(100% + 4px);
+}
+
+.menu-item,
+.ctx-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.ctx-item {
+  color: var(--vscode-menu-foreground);
+}
+
+.menu-accel {
+  white-space: nowrap;
+}
+
+.menu-sep,
+.ctx-sep {
+  margin: 5px 8px;
+  background: var(--hairline);
+}
+
+/* ── Workspace: cards on the shell ── */
+
+.workspace {
+  padding: 0 var(--gap) var(--gap) 0;
+  background: var(--shell);
+}
+
+.workspace:not(:has(> .activity-bar)) {
+  padding-left: var(--gap);
+}
+
+.app.zen .workspace {
+  padding: var(--gap);
+}
+
+.sidebar,
+.aux-sidebar,
+.editor-area,
+.panel-container,
+.main .panel-container,
+.main.panel-at-left .panel-container,
+.main.panel-at-right .panel-container {
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  /* Keeps z-indexes inside a card (CodeMirror's panels use 300) below the
+     palette, menus and dialogs. */
+  isolation: isolate;
+}
+
+.main {
+  background: transparent;
+}
+
+.editor-area {
+  background: var(--vscode-editor-background);
+}
+
+.panel-container {
+  background: var(--vscode-panel-background);
+}
+
+/* Resizers are the gaps between the cards; a thin line shows while hovering. */
+.resizer {
+  width: var(--gap);
+  min-width: var(--gap);
+  flex-shrink: 0;
+}
+
+.panel-resizer {
+  height: var(--gap);
+}
+
+.main.panel-at-right .panel-resizer,
+.main.panel-at-left .panel-resizer {
+  width: var(--gap);
+}
+
+.resizer:hover,
+.resizer.dragging,
+.panel-resizer:hover,
+.panel-resizer.dragging {
+  background: transparent;
+}
+
+.resizer::after,
+.panel-resizer::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: var(--vscode-sash-hoverBorder);
+  opacity: 0;
+  transition: opacity 0.12s 0.08s;
+}
+
+.panel-resizer {
+  position: relative;
+}
+
+.resizer::after {
+  top: 12px;
+  bottom: 12px;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+.panel-resizer::after {
+  left: 12px;
+  right: 12px;
+  top: calc(50% - 1px);
+  height: 2px;
+}
+
+.main.panel-at-right .panel-resizer::after,
+.main.panel-at-left .panel-resizer::after {
+  left: calc(50% - 1px);
+  right: auto;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  height: auto;
+}
+
+.resizer:hover::after,
+.resizer.dragging::after,
+.panel-resizer:hover::after,
+.panel-resizer.dragging::after {
+  opacity: 1;
+}
+
+/* ── Activity bar ── */
+
+.activity-bar {
+  gap: 4px;
+  padding: 4px 0 8px;
+  border-right: none;
+}
+
+.activity-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+
+.activity-btn:hover {
+  background: color-mix(in srgb, var(--vscode-activityBar-foreground) 8%, transparent);
+}
+
+.activity-btn.active {
+  background: color-mix(in srgb, var(--vscode-activityBar-foreground) 12%, transparent);
+}
+
+.activity-btn.active::before {
+  left: -6px;
+  width: 3px;
+  height: 16px;
+  border-radius: 0 3px 3px 0;
+}
+
+.activity-badge {
+  right: 1px;
+  bottom: 2px;
+  box-shadow: 0 0 0 2px var(--vscode-activityBar-background);
+}
+
+/* ── Side bars ── */
+
+.sidebar-header,
+.aux-sidebar-header {
+  min-height: 38px;
+}
+
+.sidebar-header {
+  padding: 0 8px 0 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.view-section-header {
+  text-transform: none;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.view-section + .view-section,
+.explorer-views,
+.feature-explorer-sections {
+  border-top-color: var(--hairline);
+}
+
+.workspace-label {
+  font-size: 12.5px;
+}
+
+.icon-btn {
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.icon-btn:hover {
+  background: var(--fill-active);
+}
+
+.file-tree {
+  padding: 0 6px 12px;
+}
+
+.tree-item {
+  height: 26px;
+  border-radius: 6px;
+}
+
+.file-tree:focus .tree-item.selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  outline-color: transparent;
+}
+
+.tree-item.active {
+  background: var(--fill-active);
+}
+
+/* Secondary side bar tabs */
+.aux-sidebar-tabs {
+  gap: 2px;
+}
+
+.aux-sidebar-tab {
+  height: 26px;
+  padding: 0 10px;
+  border-bottom: none;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.aux-sidebar-tab:hover {
+  background: var(--fill-hover);
+}
+
+.aux-sidebar-tab.active {
+  background: var(--fill-active);
+}
+
+/* ── Editor tabs ── */
+
+.tabs {
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tab {
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-right: none;
+  border-radius: 7px;
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tab:hover {
+  background: var(--fill-hover);
+}
+
+.tab.active {
+  background: var(--fill-active);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+.tab.active::after {
+  display: none;
+}
+
+.editor-group:not(.active):not(.single) .tab.active {
+  background: var(--fill-hover);
+  box-shadow: none;
+}
+
+.tab-name {
+  font-size: 12.5px;
+}
+
+.tab-close {
+  border-radius: 5px;
+}
+
+.tab-close:hover {
+  background: var(--fill-active);
+}
+
+.tab.drop-target {
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+
+.breadcrumbs {
+  height: 26px;
+  min-height: 26px;
+  background: var(--vscode-editor-background);
+}
+
+.crumb {
+  padding: 1px 4px;
+  border-radius: 5px;
+}
+
+.editor-root .cm-gutters {
+  border-right-color: transparent !important;
+}
+
+.editor-root .cm-gutters.cm-minimap-gutter {
+  border-left-color: var(--hairline) !important;
+}
+
+.editor-root .cm-activeLineGutter {
+  background: transparent !important;
+  color: var(--vscode-editorLineNumber-activeForeground);
+}
+
+.editor-root .cm-tooltip {
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.editor-root .cm-tooltip-autocomplete ul {
+  padding: 4px !important;
+}
+
+.editor-root .cm-tooltip-autocomplete ul li {
+  border-radius: 5px;
+}
+
+.cm-panels.cm-panels-top,
+.cm-panels.cm-panels-bottom {
+  border-color: var(--hairline) !important;
+}
+
+.cm-panel input[type="text"],
+.cm-panel .cm-textfield {
+  border-radius: 6px;
+}
+
+.cm-panel button,
+.cm-panel .cm-button {
+  border-radius: 6px;
+  background-image: none !important;
+}
+
+.editor-split-sash {
+  background: var(--hairline);
+}
+
+.editor-drop-highlight {
+  border-radius: 8px;
+}
+
+/* ── Panel ── */
+
+.panel-header {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 6px 0 8px;
+}
+
+.panel-tabs {
+  align-items: center;
+  gap: 2px;
+}
+
+.panel-tab {
+  height: 26px;
+  padding: 0 10px;
+  border-bottom: none;
+  border-radius: 7px;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.panel-tab:hover {
+  background: var(--fill-hover);
+}
+
+.panel-tab.active {
+  background: var(--fill-active);
+}
+
+.panel-group-header,
+.panel-row {
+  height: 24px;
+}
+
+.panel-container.terminal-drop {
+  outline-offset: -2px;
+  border-radius: var(--card-radius);
+}
+
+/* ── Status bar ── */
+
+.status-bar {
+  padding: 0 calc(var(--gap) + 2px) 2px;
+  border-top: none;
+}
+
+.status-bar .status-btn {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+}
+
+/* ── Quick input / command palette ── */
+
+.palette-overlay {
+  padding-top: 48px;
+}
+
+.palette {
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.palette-input-wrap {
+  padding: 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.palette-input-wrap input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--fill-hover);
+  font-size: 13.5px;
+}
+
+.palette-input-wrap input:focus {
+  border-color: color-mix(in srgb, var(--vscode-focusBorder) 60%, transparent);
+  box-shadow: var(--focus-ring);
+}
+
+.palette-results {
+  padding: 6px;
+}
+
+.quick-row {
+  height: 30px;
+  border-radius: 7px;
+}
+
+.quick-separator {
+  border-top-color: var(--hairline);
+}
+
+/* ── Inputs ── */
+
+.search-field,
+.modal-input,
+.scm-message,
+.settings-filter,
+.search-details input,
+.settings-editor input[type="text"],
+.settings-editor input[type="number"],
+.settings-editor select {
+  border-radius: 7px;
+  border-color: var(--vscode-input-border);
+  background: var(--vscode-input-background);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.search-field:focus-within,
+.modal-input:focus,
+.scm-message:focus,
+.settings-filter:focus,
+.search-details input:focus,
+.settings-editor input[type="text"]:focus,
+.settings-editor input[type="number"]:focus,
+.settings-editor select:focus {
+  border-color: color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.search-toggle {
+  border-radius: 5px;
+}
+
+/* ── Buttons ── */
+
+.primary-btn,
+.secondary-btn,
+.modal-btn,
+.scm-commit-btn,
+.ext-install {
+  border-radius: 7px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.primary-btn,
+.modal-btn.primary {
+  border: 1px solid transparent;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.primary-btn:hover,
+.modal-btn.primary:hover {
+  border-color: transparent;
+  background: var(--vscode-button-hoverBackground);
+}
+
+.secondary-btn,
+.modal-btn:not(.primary):not(.danger) {
+  border: 1px solid var(--card-border);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.secondary-btn:hover,
+.modal-btn:not(.primary):not(.danger):hover {
+  border-color: var(--card-border);
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.ext-install {
+  height: 22px;
+  padding: 0 10px;
+}
+
+.badge {
+  border-radius: 999px;
+}
+
+/* ── Dialogs, toasts, overlays ── */
+
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  padding: 20px 20px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border-color: var(--card-border);
+  box-shadow: var(--shadow);
+}
+
+.settings-editor {
+  border-radius: 14px;
+  border-color: var(--card-border);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ── Scrollbars: slim, rounded ── */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Menu bar submenus ── */
+
+.menu-submenu-anchor {
+  position: relative;
+}
+
+.menu-dropdown.menu-submenu {
+  top: -6px;
+  left: calc(100% + 4px);
+}
+
+.menu-submenu-arrow {
+  display: flex;
+  color: var(--text-muted);
+}

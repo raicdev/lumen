@@ -1,0 +1,1629 @@
+/* Extensions: the Extensions view, extension details, extension output,
+   status bar items, notifications, quick input modes and rendered Markdown. */
+
+/* ── Extensions view ── */
+
+.extensions-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.ext-search {
+  position: relative;
+  padding: 2px 12px 8px;
+}
+
+.ext-search-icon {
+  position: absolute;
+  left: 20px;
+  top: 9px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.ext-search input {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px 0 26px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+  user-select: text;
+}
+
+.ext-search input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.ext-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
+.ext-row {
+  display: flex;
+  gap: 10px;
+  padding: 7px 10px 7px 14px;
+  cursor: pointer;
+}
+
+.ext-row:hover {
+  background: var(--bg-hover);
+}
+
+.ext-row.disabled .ext-icon,
+.ext-row.disabled .ext-name {
+  opacity: 0.55;
+}
+
+.ext-icon {
+  flex-shrink: 0;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.ext-icon.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.ext-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ext-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ext-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ext-version,
+.ext-downloads {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.ext-downloads {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.ext-error {
+  display: inline-flex;
+  color: var(--warning);
+}
+
+.ext-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.ext-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  font-size: 11.5px;
+}
+
+.ext-publisher {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* Verified publisher (Open VSX), next to the publisher name */
+.ext-verified {
+  display: inline-flex;
+  flex: none;
+  margin-left: 3px;
+  vertical-align: -2px;
+  color: var(--info);
+}
+
+.ext-details-publisher {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ext-gear {
+  margin-left: auto;
+  opacity: 0;
+}
+
+/* After an Update button (which takes the free space), the gear sits right next to it. */
+.ext-gear.after-action {
+  margin-left: 4px;
+}
+
+.ext-row:hover .ext-gear,
+.ext-gear:focus-visible {
+  opacity: 1;
+}
+
+.ext-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.ext-badge.compat-full {
+  border-color: color-mix(in srgb, var(--vscode-charts-green) 30%, transparent);
+  color: var(--vscode-charts-green);
+}
+
+.ext-badge.compat-partial {
+  border-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 30%, transparent);
+  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.ext-badge.compat-limited {
+  border-color: color-mix(in srgb, var(--vscode-errorForeground) 30%, transparent);
+  color: var(--vscode-errorForeground);
+}
+
+.ext-install {
+  margin-left: auto;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--vscode-extensionButton-prominentBackground);
+  border-radius: 2px;
+  background: var(--vscode-extensionButton-prominentBackground);
+  color: var(--vscode-extensionButton-prominentForeground);
+  font-size: 11.5px;
+}
+
+.ext-install:hover {
+  background: var(--vscode-extensionButton-prominentHoverBackground);
+  border-color: var(--vscode-extensionButton-prominentHoverBackground);
+}
+
+.ext-installing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+.ext-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 10px 22px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ext-empty.error {
+  color: var(--vscode-errorForeground);
+}
+
+.ext-crashed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--vscode-errorForeground) 35%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--vscode-errorForeground) 8%, var(--bg));
+  color: color-mix(in srgb, var(--vscode-errorForeground) 60%, var(--text));
+  font-size: 12px;
+}
+
+/* ── extension details ── */
+
+.ext-details {
+  width: min(980px, calc(100% - 48px));
+}
+
+.ext-details-header {
+  position: relative;
+  display: flex;
+  gap: 18px;
+  padding: 18px 20px 12px;
+}
+
+.ext-details-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.ext-details-heading h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.ext-details-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.ext-details-id code {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.ext-details-description {
+  margin: 8px 0 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ext-details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ext-details-actions .ext-install {
+  margin-left: 0;
+  height: 28px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.ext-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font-size: 12px;
+}
+
+.ext-link:hover {
+  text-decoration: underline;
+}
+
+.ext-details-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.ext-details-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ext-details-body {
+  padding-top: 14px;
+}
+
+.ext-details-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ext-details-empty p {
+  margin: 0;
+}
+
+.ext-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+}
+
+.ext-table th,
+.ext-table td {
+  padding: 5px 10px 5px 0;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ext-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ext-table code,
+.ext-chips code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ext-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ext-chips code {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+}
+
+.ext-features h4,
+.ext-compat h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ext-status {
+  font-weight: 500;
+}
+
+.ext-status.supported {
+  color: var(--vscode-charts-green);
+}
+
+.ext-status.partial {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.ext-status.unsupported {
+  color: var(--vscode-errorForeground);
+}
+
+.ext-status-note {
+  color: var(--text-muted);
+}
+
+.ext-compat-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.ext-compat-summary.compat-full {
+  border-left-color: var(--vscode-charts-green);
+}
+
+.ext-compat-summary.compat-partial {
+  border-left-color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.ext-compat-summary.compat-limited {
+  border-left-color: var(--vscode-errorForeground);
+}
+
+.ext-compat-note {
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+
+.ext-compat-warnings {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  font-size: 12.5px;
+}
+
+.ext-runtime-error {
+  color: var(--vscode-errorForeground);
+  white-space: pre-wrap;
+}
+
+/* ── rendered Markdown (READMEs, hovers, completion docs) ── */
+
+.markdown-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.markdown-body h1,
+.markdown-body h2 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.markdown-body h1 {
+  font-size: 22px;
+}
+
+.markdown-body h2 {
+  font-size: 18px;
+}
+
+.markdown-body h3 {
+  font-size: 15px;
+}
+
+.markdown-body img {
+  max-width: 100%;
+}
+
+.markdown-body [data-href] {
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+}
+
+.markdown-body [data-href]:hover {
+  text-decoration: underline;
+}
+
+.markdown-body code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.markdown-body pre {
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--bg-panel);
+  overflow: auto;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: none;
+}
+
+.markdown-body blockquote {
+  margin: 0;
+  padding: 0 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-dim);
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 4px 10px;
+  border: 1px solid var(--border-soft);
+}
+
+.cm-ext-hover {
+  max-width: 520px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  white-space: normal;
+}
+
+.cm-tooltip-hover div + .cm-ext-hover {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.cm-ext-hover p,
+.cm-ext-doc p {
+  margin: 0 0 4px;
+}
+
+.cm-ext-doc {
+  max-width: 420px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.cm-ext-signature {
+  max-width: 480px;
+  padding: 2px 4px;
+  font-size: 12.5px;
+}
+
+.cm-ext-signature-label {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.cm-ext-signature-index {
+  float: right;
+  margin-left: 12px;
+  color: var(--text-dim);
+}
+
+.cm-ext-signature-doc {
+  margin-top: 4px;
+  color: var(--text-dim);
+}
+
+.cm-ext-signature-doc p {
+  margin: 0 0 4px;
+}
+
+.cm-ext-decoration-text {
+  pointer-events: none;
+}
+
+/* Code lenses from languages.registerCodeLensProvider. */
+.cm-ext-codelens {
+  padding: 0 0 1px 2px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.cm-ext-codelens-item {
+  cursor: pointer;
+}
+
+.cm-ext-codelens-item:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Lightbulb of code actions (languages.registerCodeActionsProvider). */
+.cm-code-action-gutter {
+  cursor: pointer;
+}
+
+.cm-code-action-lightbulb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.cm-code-action-lightbulb:hover {
+  opacity: 1;
+}
+
+/* Document highlights from languages.registerDocumentHighlightProvider. */
+.cm-ext-highlight {
+  background: var(--vscode-editor-wordHighlightBackground);
+  border-radius: 2px;
+}
+
+.cm-ext-highlight-write {
+  background: var(--vscode-editor-wordHighlightStrongBackground);
+  border-radius: 2px;
+}
+
+/* Ghost text of languages.registerInlineCompletionItemProvider. */
+.cm-inline-completion-ghost {
+  color: var(--text-dim);
+  opacity: 0.65;
+  white-space: pre;
+  pointer-events: none;
+}
+
+/* Document links from languages.registerDocumentLinkProvider (Ctrl held). */
+.cm-ext-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Colour swatches from languages.registerColorProvider. */
+.cm-ext-color-swatch {
+  position: relative;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.6);
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.cm-ext-color-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Inlay hints from languages.registerInlayHintsProvider. */
+.cm-ext-inlay-hint {
+  color: var(--text-dim);
+  opacity: 0.7;
+  font-size: 0.9em;
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--vscode-editorInlayHint-background);
+  pointer-events: none;
+}
+
+.cm-ext-inlay-hint-pad-left {
+  padding-left: 4px;
+}
+
+.cm-ext-inlay-hint-pad-right {
+  padding-right: 4px;
+}
+
+/* ── output panel ── */
+
+.output-view {
+  height: 100%;
+  margin: 0;
+  padding: 6px 14px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.output-select {
+  height: 22px;
+  max-width: 200px;
+  margin-right: 4px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* ── status bar items of extensions ── */
+
+.status-ext,
+.status-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codicon.spin {
+  animation: codicon-spin 1.2s linear infinite;
+}
+
+@keyframes codicon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── notifications (extension messages, progress) ── */
+
+.toast.notification {
+  pointer-events: auto;
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  padding: 0;
+  font-size: 12.5px;
+}
+
+.notification-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.notification-icon.info {
+  color: var(--info);
+}
+
+.notification-icon.warning {
+  color: var(--warning);
+}
+
+.notification-icon.error {
+  color: var(--danger);
+}
+
+.notification-message {
+  flex: 1;
+  min-width: 0;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.notification-close {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 16px;
+}
+
+.notification-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.notification-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 10px 34px;
+}
+
+.notification-source {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.notification-action {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.notification-action.primary {
+  border-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.notification-action:hover {
+  filter: brightness(1.15);
+}
+
+.notification-spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border: 2px solid var(--text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: codicon-spin 0.9s linear infinite;
+}
+
+.notification-bar {
+  height: 2px;
+  overflow: hidden;
+}
+
+.notification-bar > div {
+  height: 100%;
+  background: var(--vscode-progressBar-background);
+  transition: width 0.2s ease;
+}
+
+.notification-bar.indeterminate > div {
+  width: 30%;
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* ── quick input: extension pickers and input boxes ── */
+
+.palette-title {
+  padding: 6px 10px 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.palette-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 6px 0;
+}
+
+.palette-titlebar .palette-title {
+  flex: 1;
+  padding: 0;
+}
+
+.palette-titlebar-left,
+.palette-titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 22px;
+}
+
+.quick-input-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.quick-input-button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.quick-input-button img {
+  width: 14px;
+  height: 14px;
+}
+
+.quick-item-buttons {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.quick-row:hover .quick-item-buttons,
+.quick-row.active .quick-item-buttons {
+  display: flex;
+}
+
+.palette-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.palette-input-wrap input:not([type="checkbox"]) {
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-input-wrap.invalid input:not([type="checkbox"]) {
+  border-color: var(--danger);
+}
+
+.palette-check-all,
+.quick-check {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--vscode-focusBorder);
+}
+
+.palette-busy {
+  height: 2px;
+  margin: 0 6px;
+  background: linear-gradient(90deg, transparent, var(--vscode-progressBar-background), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: palette-busy 1s linear infinite;
+}
+
+@keyframes palette-busy {
+  from {
+    background-position: -50% 0;
+  }
+  to {
+    background-position: 150% 0;
+  }
+}
+
+.quick-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.quick-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quick-row.with-detail {
+  height: 38px;
+}
+
+.quick-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.quick-row.input-hint,
+.quick-row.input-error {
+  height: auto;
+  min-height: 24px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  white-space: normal;
+  cursor: default;
+}
+
+.quick-row.input-hint.active,
+.quick-row.input-error.active {
+  background: transparent;
+}
+
+.quick-row.input-error .quick-label {
+  color: var(--vscode-errorForeground);
+}
+
+.palette-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.palette-ok {
+  height: 24px;
+  padding: 0 14px;
+  border: 1px solid var(--vscode-button-background);
+  border-radius: 2px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+/* ── extension settings ── */
+
+.setting-json {
+  width: 100%;
+  max-width: 560px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  user-select: text;
+  resize: vertical;
+}
+
+.setting-json:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.setting-json.invalid {
+  border-color: var(--danger);
+}
+
+/* ── webviews ── */
+
+/* Every webview iframe lives here and is placed over the slot showing it. */
+.webview-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.webview-frame {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  color-scheme: dark;
+}
+
+.lumen-dragging .webview-frame,
+.lumen-resizing .webview-frame {
+  pointer-events: none;
+}
+
+.webview-slot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.webview-slot-placeholder {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.editor-webview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--bg);
+}
+
+.editor-feature {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.editor-feature-missing {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.panel-extension {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-extension[hidden] {
+  display: none !important;
+}
+
+.view-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.view-section.open {
+  flex: 1;
+}
+
+.view-section + .view-section {
+  border-top: 1px solid var(--border-soft);
+}
+
+.view-section-header {
+  flex-shrink: 0;
+  width: 100%;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.view-section-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* Views extensions add to the Explorer. */
+.explorer-views {
+  flex: 0 0 40%;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* All of them collapsed: their headers sit at the bottom and the files take the rest. */
+.explorer-views:not(:has(.view-section.open)) {
+  flex: none !important;
+  min-height: 0;
+}
+
+/* Between the files and the views (dragged to resize them). */
+.explorer-views-sash {
+  height: 4px;
+  margin-bottom: -4px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  cursor: row-resize;
+}
+
+.explorer-views-sash:hover {
+  background: var(--vscode-sash-hoverBorder);
+}
+
+.sidebar-panel:not(:has(.explorer-views .view-section.open)) > .explorer-views-sash {
+  display: none;
+}
+
+/* Activity bar icons of view containers (image files are used as masks, so they take the theme color). */
+.container-icon {
+  width: 22px;
+  height: 22px;
+  background-color: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.container-icon-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Tree views of extensions ── */
+
+.ext-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 4px 8px;
+  outline: none;
+}
+
+.ext-tree-message {
+  padding: 4px 14px 6px 22px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ext-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding-right: 6px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ext-tree-row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ext-tree-row.selected {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.ext-tree-row.drop-target {
+  background: var(--bg-active);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.ext-tree:focus-visible .ext-tree-row.focused,
+.ext-tree:focus .ext-tree-row.focused {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.ext-tree-row .chevron {
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.1s ease;
+}
+
+.ext-tree-row .chevron.open {
+  transform: rotate(90deg);
+}
+
+.ext-tree-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.ext-tree-checkbox {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.ext-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.ext-tree-label mark {
+  background: none;
+  color: var(--info);
+  font-weight: 600;
+}
+
+.ext-tree-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ext-tree-actions {
+  display: none;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ext-tree-row:hover .ext-tree-actions,
+.ext-tree-row.selected .ext-tree-actions {
+  display: inline-flex;
+}
+
+/* A MarkdownString tooltip (TreeItem.tooltip / resolveTreeItem), near the hovered row. */
+.ext-tree-tooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 460px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  box-shadow: 0 2px 12px var(--vscode-widget-shadow);
+  pointer-events: none;
+}
+
+.ext-tree-tooltip p {
+  margin: 0 0 6px;
+}
+
+.ext-tree-tooltip p:last-child {
+  margin-bottom: 0;
+}
+
+.ext-tree-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 20px 12px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.ext-tree-welcome p {
+  margin: 0;
+}
+
+.ext-tree-welcome a {
+  color: var(--info);
+  text-decoration: none;
+}
+
+.ext-tree-welcome a:hover {
+  text-decoration: underline;
+}
+
+.ext-tree-welcome-button {
+  width: 100%;
+  height: 28px;
+}
+
+/* view/title actions: in a section header, or a bar above a container's only view. */
+.view-title-actions {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  text-transform: none;
+  font-weight: 400;
+}
+
+.view-section-header:not(:hover):not(:focus-within) .view-title-actions {
+  visibility: hidden;
+}
+
+.view-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+
+.view-toolbar:empty {
+  display: none;
+}
+
+.view-action {
+  width: 22px;
+  height: 22px;
+}
+
+.view-action.text {
+  width: auto;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.view-action-image {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* VS Code compatibility: a colored VS Code logo before the name, details on hover */
+.ext-compat-icon {
+  display: inline-flex;
+  flex: none;
+  cursor: help;
+}
+
+.ext-compat-icon.compat-full,
+.ext-compat-card.compat-full .ext-compat-card-title svg {
+  color: var(--vscode-charts-green);
+}
+
+.ext-compat-icon.compat-partial,
+.ext-compat-card.compat-partial .ext-compat-card-title svg {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.ext-compat-icon.compat-limited,
+.ext-compat-card.compat-limited .ext-compat-card-title svg {
+  color: var(--vscode-errorForeground);
+}
+
+.ext-compat-card {
+  position: fixed;
+  z-index: 1000;
+  width: 320px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.ext-compat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.ext-compat-card p {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.ext-compat-card b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ext-compat-card-warning {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground) !important;
+}
+
+.ext-compat-card-hint {
+  color: var(--text-muted) !important;
+  font-style: italic;
+}
+
+/* ── Secondary side bar (right; view containers contributed to `secondarySidebar`) ── */
+
+.aux-sidebar {
+  min-width: 200px;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-sideBar-foreground);
+  border-left: 1px solid var(--vscode-sideBar-border);
+}
+
+.aux-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 35px;
+  padding: 0 8px 0 12px;
+  flex-shrink: 0;
+}
+
+.aux-sidebar-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.aux-sidebar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 5px;
+  border-bottom: 1px solid transparent;
+  color: var(--vscode-panelTitle-inactiveForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.aux-sidebar-tab:hover {
+  color: var(--vscode-panelTitle-activeForeground);
+}
+
+.aux-sidebar-tab.active {
+  color: var(--vscode-panelTitle-activeForeground);
+  border-bottom-color: var(--vscode-panelTitle-activeBorder);
+}
+
+/* Features' sections at the bottom of the Explorer (Timeline): headers stay, an open body scrolls. */
+.feature-explorer-sections {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-soft);
+  max-height: 45%;
+}
+
+.feature-explorer-section.open {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.feature-explorer-section-body {
+  overflow: auto;
+  min-height: 60px;
+  max-height: 300px;
+}
+
+/* Open VSX facts above the README of an extension that is not installed */
+.ext-listing-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 16px 0 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+
+.ext-listing-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-listing-label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.ext-listing-tags {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ext-compat-error {
+  color: var(--vscode-errorForeground, var(--text));
+}
+
+.ext-compat-checked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

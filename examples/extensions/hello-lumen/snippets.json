@@ -1,0 +1,13 @@
+{
+  // Snippet files may contain comments, like in VS Code.
+  "Log to the console": {
+    "prefix": "log",
+    "body": ["console.log(\"${1:message}\", $2);", "$0"],
+    "description": "console.log with a placeholder"
+  },
+  "Arrow function": {
+    "prefix": "afn",
+    "body": "const ${1:name} = (${2:args}) => {\n\t$0\n};",
+    "description": "An arrow function",
+  }
+}

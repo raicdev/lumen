@@ -1,0 +1,287 @@
+/* Styles of the "menus-walkthroughs" area: submenus, editor title strip, Welcome walkthroughs, the walkthrough page. */
+
+/* ── context menu fly-outs ── */
+
+.ctx-submenu-host {
+  position: relative;
+}
+
+.ctx-item-submenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ctx-submenu-arrow {
+  opacity: 0.7;
+}
+
+.ctx-menu.ctx-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -5px;
+}
+
+.ctx-submenu-host:hover > .ctx-submenu {
+  display: block;
+}
+
+/* ── editor/title strip (CodeMirror top panel) ── */
+
+.cm-title-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.cm-title-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.cm-title-action {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.cm-title-action img {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Welcome: walkthrough list ── */
+
+.welcome-walkthroughs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.welcome-walkthrough {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  text-align: left;
+  color: var(--text);
+}
+
+.welcome-walkthrough:hover {
+  background: var(--bg-hover);
+}
+
+.welcome-walkthrough-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.welcome-walkthrough-title svg {
+  color: var(--success);
+}
+
+.welcome-walkthrough-description {
+  font-size: 12px;
+}
+
+.welcome-walkthrough-bar {
+  display: block;
+  height: 2px;
+  margin-top: 3px;
+  border-radius: 1px;
+  background: var(--border-soft);
+}
+
+.welcome-walkthrough-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--vscode-textLink-foreground);
+}
+
+/* ── the walkthrough page ── */
+
+.welcome-page.welcome-page-wide {
+  width: min(1040px, calc(100% - 64px));
+  padding-top: 5vh;
+}
+
+.walkthrough {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 24px 32px;
+  height: 100%;
+  overflow: auto;
+}
+
+.welcome-page-wide .walkthrough {
+  padding: 0;
+  height: auto;
+}
+
+.walkthrough-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.walkthrough-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.walkthrough-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.walkthrough-progress {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.walkthrough-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) 3fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.walkthrough-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.walkthrough-step {
+  padding: 6px 8px;
+  border-radius: var(--radius);
+}
+
+.walkthrough-step.active {
+  background: var(--bg-elevated);
+}
+
+.walkthrough-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.walkthrough-check {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.walkthrough-step.done .walkthrough-check {
+  color: var(--success);
+}
+
+.walkthrough-step-title {
+  flex: 1;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.walkthrough-description {
+  margin: 6px 0 4px 24px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.walkthrough-description p {
+  margin: 6px 0;
+}
+
+.walkthrough-description a {
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+}
+
+.walkthrough-description .walkthrough-button a {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 2px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  text-decoration: none;
+}
+
+.walkthrough-description .walkthrough-button a:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.walkthrough-media {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  overflow: auto;
+}
+
+.walkthrough-media img {
+  max-width: 100%;
+  max-height: 60vh;
+}
+
+.walkthrough-media.markdown-body {
+  place-items: start;
+}
+
+.walkthrough-media.empty {
+  font-size: 12px;
+}
+
+.walkthrough-missing {
+  padding: 32px;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .walkthrough-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── contributed action bars (MenuActions) ── */
+
+.menu-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}

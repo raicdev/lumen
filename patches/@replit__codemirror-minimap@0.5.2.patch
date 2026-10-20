@@ -1,0 +1,121 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 3f0c98aba65c44b0ff033dd299649985cfc7951c..177572499718cf1bee5779cc20ba01b12aa4a01c 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -8,7 +8,6 @@ var crelt = require('crelt');
+ var lint = require('@codemirror/lint');
+ var language = require('@codemirror/language');
+ var highlight = require('@lezer/highlight');
+-var common = require('@lezer/common');
+ 
+ function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+ 
+@@ -678,6 +677,10 @@ class TextState extends LineBasedState {
+         if (foldsChanged(update.transactions)) {
+             return true;
+         }
++        // If the editor's (lazy, background) parser advanced
++        if (language.syntaxTree(update.state) !== language.syntaxTree(update.startState)) {
++            return true;
++        }
+         return false;
+     }
+     update(update) {
+@@ -689,10 +692,9 @@ class TextState extends LineBasedState {
+                 ? cancelIdleCallback(this._highlightingCallbackId)
+                 : clearTimeout(this._highlightingCallbackId);
+         }
+-        this.updateImpl(update.state, update.changes);
++        this.updateImpl(update.state);
+     }
+-    updateImpl(state, changes) {
+-        var _a;
++    updateImpl(state) {
+         this.map.clear();
+         /* Store display text setting for rendering */
+         this._displayText = state.facet(Config).displayText;
+@@ -700,19 +702,9 @@ class TextState extends LineBasedState {
+         if (this.themeChanged()) {
+             this._fontInfoMap.clear();
+         }
+-        /* Incrementally parse the tree based on previous tree + changes */
+-        let treeFragments = undefined;
+-        if (this._previousTree && changes) {
+-            const previousFragments = common.TreeFragment.addTree(this._previousTree);
+-            const changedRanges = [];
+-            changes.iterChangedRanges((fromA, toA, fromB, toB) => changedRanges.push({ fromA, toA, fromB, toB }));
+-            treeFragments = common.TreeFragment.applyChanges(previousFragments, changedRanges);
+-        }
+-        /* Parse the document into a lezer tree */
+-        const docToString = state.doc.toString();
+-        const parser = (_a = state.facet(language.language)) === null || _a === void 0 ? void 0 : _a.parser;
+-        const tree = parser ? parser.parse(docToString, treeFragments) : undefined;
+-        this._previousTree = tree;
++        /* Reuse the editor's syntax tree: it is parsed lazily (viewport first, the rest in the
++           background), whereas parsing the whole document here blocks opening large files. */
++        const tree = language.syntaxTree(state);
+         /* Highlight the document, and store the text and tags for each line */
+         const highlighter = {
+             style: (tags) => language.highlightingFor(state, tags),
+diff --git a/dist/index.js b/dist/index.js
+index c7c9a0406e1cfa2277ab6324fe47f70dd577e7c1..039a868bc2314e437872c222240bce7cc2211519 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -2,9 +2,8 @@ import { Facet, combineConfig, StateField } from '@codemirror/state';
+ import { EditorView, ViewPlugin } from '@codemirror/view';
+ import crelt from 'crelt';
+ import { setDiagnosticsEffect, diagnosticCount, forEachDiagnostic } from '@codemirror/lint';
+-import { foldEffect, unfoldEffect, foldedRanges, language, highlightingFor } from '@codemirror/language';
++import { foldEffect, unfoldEffect, foldedRanges, syntaxTree, highlightingFor } from '@codemirror/language';
+ import { highlightTree } from '@lezer/highlight';
+-import { TreeFragment } from '@lezer/common';
+ 
+ var __rest = (undefined && undefined.__rest) || function (s, e) {
+     var t = {};
+@@ -670,6 +669,10 @@ class TextState extends LineBasedState {
+         if (foldsChanged(update.transactions)) {
+             return true;
+         }
++        // If the editor's (lazy, background) parser advanced
++        if (syntaxTree(update.state) !== syntaxTree(update.startState)) {
++            return true;
++        }
+         return false;
+     }
+     update(update) {
+@@ -681,10 +684,9 @@ class TextState extends LineBasedState {
+                 ? cancelIdleCallback(this._highlightingCallbackId)
+                 : clearTimeout(this._highlightingCallbackId);
+         }
+-        this.updateImpl(update.state, update.changes);
++        this.updateImpl(update.state);
+     }
+-    updateImpl(state, changes) {
+-        var _a;
++    updateImpl(state) {
+         this.map.clear();
+         /* Store display text setting for rendering */
+         this._displayText = state.facet(Config).displayText;
+@@ -692,19 +694,9 @@ class TextState extends LineBasedState {
+         if (this.themeChanged()) {
+             this._fontInfoMap.clear();
+         }
+-        /* Incrementally parse the tree based on previous tree + changes */
+-        let treeFragments = undefined;
+-        if (this._previousTree && changes) {
+-            const previousFragments = TreeFragment.addTree(this._previousTree);
+-            const changedRanges = [];
+-            changes.iterChangedRanges((fromA, toA, fromB, toB) => changedRanges.push({ fromA, toA, fromB, toB }));
+-            treeFragments = TreeFragment.applyChanges(previousFragments, changedRanges);
+-        }
+-        /* Parse the document into a lezer tree */
+-        const docToString = state.doc.toString();
+-        const parser = (_a = state.facet(language)) === null || _a === void 0 ? void 0 : _a.parser;
+-        const tree = parser ? parser.parse(docToString, treeFragments) : undefined;
+-        this._previousTree = tree;
++        /* Reuse the editor's syntax tree: it is parsed lazily (viewport first, the rest in the
++           background), whereas parsing the whole document here blocks opening large files. */
++        const tree = syntaxTree(state);
+         /* Highlight the document, and store the text and tags for each line */
+         const highlighter = {
+             style: (tags) => highlightingFor(state, tags),

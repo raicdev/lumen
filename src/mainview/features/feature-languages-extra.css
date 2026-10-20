@@ -1,0 +1,163 @@
+/* Styles of the "languages-extra" area: hierarchy panel, inline values, debug hover. */
+
+.lx-hierarchy {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.lx-title {
+  flex: 1;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.lx-toggle,
+.lx-clear {
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.lx-clear {
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lx-toggle:hover,
+.lx-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.lx-toggle.active {
+  color: var(--text);
+  border-color: var(--accent-hi);
+}
+
+.lx-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.lx-row {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding-right: 12px;
+}
+
+.lx-row:hover {
+  background: var(--bg-hover);
+}
+
+.lx-twisty {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.lx-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.lx-kind {
+  flex: none;
+  min-width: 14px;
+  color: var(--accent-hi);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.lx-name {
+  flex: none;
+}
+
+.lx-deprecated {
+  text-decoration: line-through;
+}
+
+.lx-detail,
+.lx-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.lx-file {
+  margin-left: auto;
+  flex: none;
+}
+
+.lx-note {
+  height: 20px;
+  line-height: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.lx-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.cm-inline-value {
+  margin-left: 12px;
+  padding: 0 4px;
+  color: var(--vscode-editorCodeLens-foreground, var(--text-muted));
+  background: var(--vscode-editor-inlineValuesBackground, transparent);
+  font-style: italic;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.cm-debug-hover {
+  max-width: 520px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cm-debug-hover-value {
+  color: var(--accent-hi);
+}
+
+.cm-debug-hover-type {
+  color: var(--text-muted);
+}

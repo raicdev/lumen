@@ -1,0 +1,18 @@
+/* Styles of the "icon-themes" area. */
+.file-type-icon.themed-icon {
+  display: inline-block;
+  height: 16px;
+  line-height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  color: inherit;
+}
+
+.codicon.product-icon {
+  display: inline-block;
+  font-style: normal;
+  font-weight: normal;
+  text-align: center;
+  vertical-align: text-bottom;
+}

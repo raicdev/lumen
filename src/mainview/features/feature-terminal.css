@@ -1,0 +1,37 @@
+/* Styles of the "terminal" area. */
+
+.terminal-link-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 420px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: 12px var(--font-ui);
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+
+/* Terminal tab icons that extensions set (TerminalOptions.iconPath / color). */
+.terminal-ext-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.terminal-ext-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+img.terminal-ext-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* The default icon steps aside when the extension's codicon is known. */
+.terminal-ext-icon:not(:empty) + .terminal-default-icon {
+  display: none;
+}

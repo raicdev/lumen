@@ -1,0 +1,12 @@
+packages:
+  - "packages/*"
+
+# pnpm blocks lifecycle scripts by default; these are needed for binary/native
+# dependencies (esbuild ships its binary, koffi its FFI addon, node-pty its PTY addon).
+allowBuilds:
+  esbuild: true
+  koffi: true
+  node-pty: true
+
+patchedDependencies:
+  '@replit/codemirror-minimap@0.5.2': patches/@replit__codemirror-minimap@0.5.2.patch

@@ -1,0 +1,415 @@
+/* Styles of the "notebooks" area. */
+
+.notebook-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.notebook-editor.nb-loading,
+.notebook-editor.nb-error-view {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.nb-error-view pre {
+  max-width: 80%;
+  white-space: pre-wrap;
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.nb-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.nb-toolbar-spacer {
+  flex: 1;
+}
+
+.nb-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.nb-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.nb-button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.nb-cells {
+  padding: 8px 12px 64px 8px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.nb-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+/* Insert buttons between cells: visible on hover */
+.nb-insert {
+  height: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.nb-slot:hover > .nb-insert,
+.nb-insert:hover,
+.nb-insert:focus-within {
+  opacity: 1;
+}
+
+.nb-insert button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.nb-insert button:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.nb-cell {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.nb-cell.selected {
+  border-left-color: var(--accent-hi);
+}
+
+.nb-cell.running {
+  border-left-color: var(--info);
+}
+
+.nb-cell-gutter {
+  flex: 0 0 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.nb-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: pre;
+}
+
+.nb-run {
+  color: var(--text-dim);
+}
+
+.nb-spin {
+  animation: nb-spin 1s linear infinite;
+}
+
+@keyframes nb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.nb-cell-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.nb-cell-actions {
+  position: absolute;
+  top: -10px;
+  right: 6px;
+  z-index: 2;
+  display: none;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 2px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.nb-cell:hover .nb-cell-actions,
+.nb-cell.selected .nb-cell-actions {
+  display: flex;
+}
+
+.nb-cell-actions .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.nb-cell-actions .icon-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.nb-cell-actions .nb-lang {
+  width: auto;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.nb-cell-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--vscode-notebook-cellEditorBackground, var(--bg));
+}
+
+.nb-cell.selected .nb-cell-input {
+  border-color: var(--vscode-focusBorder, var(--accent-hi));
+}
+
+.nb-cell-editor .cm-editor {
+  min-height: 22px;
+}
+
+.nb-markdown {
+  padding: 4px 8px;
+  min-height: 22px;
+  cursor: text;
+  outline: none;
+  overflow-wrap: anywhere;
+}
+
+.nb-markdown:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, var(--accent-hi));
+}
+
+.nb-markdown :first-child {
+  margin-top: 0;
+}
+
+.nb-markdown img {
+  max-width: 100%;
+}
+
+.nb-cell-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.nb-status-spacer {
+  flex: 1;
+}
+
+.nb-status-item {
+  color: var(--text-dim);
+}
+
+.nb-status-item.clickable:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.nb-result.ok {
+  color: var(--success);
+}
+
+.nb-result.failed {
+  color: var(--danger);
+}
+
+.nb-outputs {
+  margin-top: 4px;
+  padding-left: 4px;
+}
+
+.nb-output {
+  min-width: 0;
+  overflow: auto;
+}
+
+.nb-output-text {
+  margin: 0;
+  padding: 2px 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.nb-output-text.nb-stderr {
+  color: var(--danger);
+}
+
+.nb-output-error {
+  padding: 2px 4px;
+  color: var(--danger);
+}
+
+.nb-output-error .nb-output-text {
+  color: inherit;
+}
+
+.nb-output-html {
+  padding: 2px 4px;
+  overflow: auto;
+  user-select: text;
+}
+
+.nb-output-html table {
+  border-collapse: collapse;
+}
+
+.nb-output-html th,
+.nb-output-html td {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+}
+
+.nb-output-image {
+  display: block;
+  max-width: 100%;
+  background: #fff;
+}
+
+.nb-output-unsupported {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ── Notebook Variables panel ── */
+
+.nbv-panel {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.nbv-placeholder {
+  padding: 8px 16px;
+  color: var(--text-dim);
+}
+
+.nbv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.nbv-row:hover {
+  background: var(--bg-hover);
+}
+
+.nbv-chevron {
+  flex: none;
+  transition: transform 0.1s;
+}
+
+.nbv-chevron.open {
+  transform: rotate(90deg);
+}
+
+.nbv-chevron.hidden {
+  visibility: hidden;
+}
+
+.nbv-name {
+  color: var(--vscode-debugTokenExpression-name, var(--text));
+}
+
+.nbv-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.nbv-type {
+  margin-left: auto;
+  padding-right: 12px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.nbv-empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ── Interactive Window input box ── */
+
+.notebook-editor .nb-interactive-input {
+  flex: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-elevated);
+}
+
+.nb-interactive-input.focused {
+  border-top-color: var(--vscode-focusBorder, var(--accent));
+}
+
+.nb-interactive-editor {
+  flex: 1;
+  min-width: 0;
+  max-height: 40vh;
+  overflow: auto;
+}

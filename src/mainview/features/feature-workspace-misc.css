@@ -1,0 +1,31 @@
+/* Styles of the "workspace-misc" area: input box validation severity (Info / Warning; Error is the existing .invalid / .input-error). */
+.quick-row.input-info,
+.quick-row.input-warning {
+  height: auto;
+  min-height: 24px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  white-space: normal;
+  cursor: default;
+}
+
+.quick-row.input-info.active,
+.quick-row.input-warning.active {
+  background: transparent;
+}
+
+.quick-row.input-info .quick-label {
+  color: var(--info, var(--text-muted));
+}
+
+.quick-row.input-warning .quick-label {
+  color: var(--warning, #cca700);
+}
+
+.palette-input-wrap.sev-info input:not([type="checkbox"]) {
+  border-color: var(--info, var(--text-muted));
+}
+
+.palette-input-wrap.sev-warning input:not([type="checkbox"]) {
+  border-color: var(--warning, #cca700);
+}
