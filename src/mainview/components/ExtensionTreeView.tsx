@@ -241,6 +241,8 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
   const info = trees.get(viewId);
   const ref = useRef<HTMLDivElement>(null);
   const anchor = useRef<string | null>(null);
+  // The tree state changes in place; its version says when.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const rows = useMemo(() => rowsOf(state), [state, state.version]);
   const itemMenu = (item: HostTreeItem) =>
     treeService.menu("view/item/context", (key) =>

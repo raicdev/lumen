@@ -1,4 +1,4 @@
-import type { Envelope, MsgEnvelope, Namespace, ReqEnvelope, ResEnvelope, RpcApi, RpcHandlers, RpcHandlersOf, RPCSchema } from "./protocol.ts";
+import type { Envelope, MsgEnvelope, Namespace, ReqEnvelope, ResEnvelope, RpcApi, RpcHandlers, RPCSchema } from "./protocol.ts";
 
 /**
  * Outbound transport.

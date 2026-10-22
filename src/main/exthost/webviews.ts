@@ -207,7 +207,7 @@ export class WebviewManager {
     });
     host.post({
       type: "webviewCreate",
-      webview: { id, kind: "panel", extensionId, viewType, title, options: parts.options(), ...(custom ?? {}) },
+      webview: { id, kind: "panel", extensionId, viewType, title, options: parts.options(), ...custom },
       reveal: restoreId ? undefined : { preserveFocus, beside: column === T.ViewColumn.Beside },
     });
     return panel;

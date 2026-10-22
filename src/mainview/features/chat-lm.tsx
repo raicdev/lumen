@@ -259,7 +259,7 @@ function ParticipantIconView({ icon }: { icon?: ParticipantIcon }) {
   return <img className="chat-participant-icon" src={src} alt="" draggable={false} />;
 }
 
-function Tree({ nodes, base, dir }: { nodes: ChatWireTreeNode[]; base: string; dir: string }) {
+function Tree({ nodes, dir }: { nodes: ChatWireTreeNode[]; dir: string }) {
   return (
     <ul className="chat-tree">
       {nodes.map((node) => {
@@ -272,7 +272,7 @@ function Tree({ nodes, base, dir }: { nodes: ChatWireTreeNode[]; base: string; d
                   <ChevronRight size={12} />
                   {node.name}
                 </span>
-                <Tree nodes={node.children} base={base} dir={path} />
+                <Tree nodes={node.children} dir={path} />
               </>
             ) : (
               <button type="button" className="chat-link" onClick={() => void api?.openFile(path)}>
@@ -323,7 +323,7 @@ function Part({ part }: { part: ChatWirePart }) {
         </button>
       );
     case "filetree":
-      return <Tree nodes={part.tree} base={part.baseDir} dir={part.baseDir} />;
+      return <Tree nodes={part.tree} dir={part.baseDir} />;
     case "toolcall":
       return (
         <details className={`chat-tool chat-tool-${part.status}`}>

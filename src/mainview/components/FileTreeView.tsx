@@ -154,7 +154,7 @@ async function contextMenuFor(entry: FileEntry, x: number, y: number, options: M
 }
 
 function TreeNode(props: NodeProps) {
-  const { entry, depth, expanded, setExpanded, refreshKey, virtualKey } = props;
+  const { entry, depth, expanded, setExpanded, refreshKey, virtualKey, onPaths } = props;
   const [children, setChildren] = useState<FileEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isOpen = entry.isDirectory && expanded.has(key(entry.path));
@@ -176,12 +176,12 @@ function TreeNode(props: NodeProps) {
       if (cancelled) return;
       setChildren(entries);
       setError(failure ?? null);
-      props.onPaths(entries.map((child) => child.path));
+      onPaths(entries.map((child) => child.path));
     });
     return () => {
       cancelled = true;
     };
-  }, [entry.path, isOpen, refreshKey, virtualKey, provider, props.onPaths]);
+  }, [entry.path, isOpen, refreshKey, virtualKey, provider, onPaths]);
 
   const toggle = () =>
     setExpanded((prev) => {
@@ -318,7 +318,7 @@ function parentDirs(root: string, path: string): string[] {
 }
 
 export function FileTreeView(props: Props) {
-  const { workspaceRoot, refreshKey, reveal, collapseToken } = props;
+  const { workspaceRoot, refreshKey, reveal, collapseToken, onPaths } = props;
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -374,13 +374,13 @@ export function FileTreeView(props: Props) {
       const { entries: list, error: err } = await api().request.readDir({ path: workspaceRoot, depth: 1 });
       setError(err ?? null);
       setEntries(list);
-      props.onPaths(list.map((entry) => entry.path));
+      onPaths(list.map((entry) => entry.path));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [workspaceRoot, props.onPaths]);
+  }, [workspaceRoot, onPaths]);
 
   useEffect(() => {
     void load();

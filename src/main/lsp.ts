@@ -344,7 +344,7 @@ function yamlDiagnostics(path: string, content: string): Diagnostic[] {
   const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (/^\t/.test(line)) {
+    if (line.startsWith("\t")) {
       diags.push({
         path,
         message: "YAML does not allow tabs for indentation",

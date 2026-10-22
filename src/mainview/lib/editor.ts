@@ -43,8 +43,6 @@ import {
   deleteLine,
   insertBlankLine,
   selectLine,
-  selectParentSyntax,
-  simplifySelection,
   cursorMatchingBracket,
   indentMore,
   indentLess,
@@ -85,7 +83,6 @@ import { css } from "@codemirror/lang-css";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { rust } from "@codemirror/lang-rust";
-import { tags } from "@lezer/highlight";
 import { api } from "./rpc";
 import { getSettings, onSettingsChange, type Settings } from "./settings";
 import { isDarkTheme, onColorThemeChange, themeHighlighter } from "./theme";

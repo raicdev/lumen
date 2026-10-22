@@ -158,21 +158,23 @@ export function DebugView({ workspaceRoot, onStart, onOpenLaunchJson, onReveal }
 function VariablesSection({ generation }: { generation: number }) {
   const { focused } = useDebugUi();
   const [scopes, setScopes] = useState<HostDebugScope[] | null>(null);
+  const sessionId = focused?.sessionId;
+  const frameId = focused?.frameId;
 
   useEffect(() => {
-    if (!focused) {
+    if (sessionId === undefined || frameId === undefined) {
       setScopes(null);
       return;
     }
     let cancelled = false;
     debugService
-      .scopes(focused.sessionId, focused.frameId)
+      .scopes(sessionId, frameId)
       .then((result) => !cancelled && setScopes(result))
       .catch(() => !cancelled && setScopes([]));
     return () => {
       cancelled = true;
     };
-  }, [focused?.sessionId, focused?.frameId, generation]);
+  }, [sessionId, frameId, generation]);
 
   if (!focused) return <div className="dbg-placeholder">Not paused.</div>;
   if (!scopes) return null;
@@ -206,23 +208,23 @@ function WatchSection() {
     return () => window.removeEventListener("lumen:debug-add-watch", onAdd);
   }, []);
 
+  const sessionId = focused?.sessionId;
+  const frameId = focused?.frameId;
   useEffect(() => {
-    if (!focused) {
+    if (sessionId === undefined || frameId === undefined) {
       setResults([]);
       return;
     }
     let cancelled = false;
     void Promise.all(
       watches.map((expression) =>
-        debugService
-          .evaluate(focused.sessionId, expression, focused.frameId, "watch")
-          .catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) })),
+        debugService.evaluate(sessionId, expression, frameId, "watch").catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) })),
       ),
     ).then((values) => !cancelled && setResults(values));
     return () => {
       cancelled = true;
     };
-  }, [watches, focused?.sessionId, focused?.frameId, generation]);
+  }, [watches, sessionId, frameId, generation]);
 
   const commit = (index: number | "new", value: string) => {
     setEditing(null);
@@ -497,6 +499,8 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
   const filters = debug.capabilities && session && debug.capabilities.sessionId === session.id ? debug.capabilities.exceptionBreakpointFilters : [];
   const [enabledFilters, setEnabledFilters] = useState<Set<string>>(new Set());
 
+  // `filters` is rebuilt on every render: the session and how many filters it has say when they changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setEnabledFilters(new Set(filters.filter((f) => f.default).map((f) => f.filter))), [session?.id, filters.length]);
 
   const toggleFilter = (filter: string, on: boolean) => {

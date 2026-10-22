@@ -24,8 +24,6 @@ const MIME_ERROR = "application/vnd.code.notebook.error";
 
 /* ── model ──────────────────────────────────────────────────────────────── */
 
-type OutputItemLike = { mime: string; data: Uint8Array };
-
 export type Serializer = {
   deserializeNotebook(content: Uint8Array, token: T.CancellationToken): NotebookData | PromiseLike<NotebookData>;
   serializeNotebook(data: NotebookData, token: T.CancellationToken): Uint8Array | PromiseLike<Uint8Array>;
@@ -61,7 +59,7 @@ class Cell {
     this.id = `W${(++cellSeq).toString(36)}`;
     this.doc = doc;
     this.kind = data.kind === NotebookCellKind.Code ? NotebookCellKind.Code : NotebookCellKind.Markup;
-    this.metadata = { ...(data.metadata ?? {}) };
+    this.metadata = { ...data.metadata };
     this.outputs = (data.outputs ?? []).map(normalizeOutput);
     const summary = (data as unknown as { executionSummary?: Cell["summary"] }).executionSummary;
     this.summary = summary ? { ...summary } : undefined;
@@ -578,7 +576,7 @@ export class NotebookService {
   }
 
   /** Replace `deleteCount` cells at `start` with cells (new ones from data, or existing ones that move). */
-  splice(doc: Doc, start: number, deleteCount: number, insert: (NotebookCellData | Cell)[], options: { keepStatus?: boolean } = {}): void {
+  splice(doc: Doc, start: number, deleteCount: number, insert: (NotebookCellData | Cell)[]): void {
     const first = Math.max(0, Math.min(start, doc.cells.length));
     const count = Math.max(0, Math.min(deleteCount, doc.cells.length - first));
     const added = insert.map((item) => (item instanceof Cell ? item : new Cell(doc, item)));
@@ -958,7 +956,9 @@ export class NotebookService {
       },
       selection: {
         get: () => state.selections[0],
-        set: (value: NotebookRange) => ((state.api as { selections: NotebookRange[] }).selections = [value]),
+        set: (value: NotebookRange) => {
+          (state.api as { selections: NotebookRange[] }).selections = [value];
+        },
         enumerable: true,
       },
       visibleRanges: { get: () => state.visibleRanges, enumerable: true },

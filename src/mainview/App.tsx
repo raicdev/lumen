@@ -21,9 +21,9 @@ import {
   SquareSplitHorizontal,
   Trash2,
 } from "lucide-react";
-import { commandExecuted, evaluateCompletion, refreshContext, setContextLookup, setVisibleViews } from "./features/menus-walkthroughs/state";
+import { commandExecuted, refreshContext, setContextLookup, setVisibleViews } from "./features/menus-walkthroughs/state";
 import { ModalEditorTitleActions } from "./features/menus-walkthroughs/MenuActions";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeSet } from "@codemirror/state";
 import { api, setCloseCheckHandler } from "./lib/rpc";
 import { diffTabPath, isDiffTab, parseDiffTab } from "./lib/diff-tab";
@@ -81,7 +81,6 @@ import {
   loadEditorSession,
   loadLayout,
   recentFolders,
-  saveEditorSession,
   saveLayout,
   type Layout,
   type SavedTerminal,
@@ -399,14 +398,6 @@ export function App() {
   const activeGroup = groups[activeGroupId] ?? Object.values(groups)[0]!;
   const tabs = activeGroup.tabs;
   const activePath = activeGroup.activePath;
-  const tabsRef = useMemo(
-    () => ({
-      get current(): TabInfo[] {
-        return groupsRef.current[activeGroupIdRef.current]?.tabs ?? [];
-      },
-    }),
-    [],
-  );
   const activePathRef = useMemo(
     () => ({
       get current(): string | null {
@@ -563,14 +554,14 @@ export function App() {
     mru.current = [path, ...mru.current.filter((p) => p !== path)];
   };
 
-  const currentLocation = (): Location | null => {
+  const currentLocation = useCallback((): Location | null => {
     const path = editorRef.current?.getCurrent()?.path;
     if (!path) return null;
     return { path, ...editorRef.current!.getCursor() };
-  };
+  }, [editorRef]);
 
   /** Remember where we are before jumping somewhere else (Go Back / Forward). */
-  const pushNavigation = () => {
+  const pushNavigation = useCallback(() => {
     const location = currentLocation();
     if (!location) return;
     const last = navBack.current[navBack.current.length - 1];
@@ -578,7 +569,7 @@ export function App() {
     navBack.current.push(location);
     if (navBack.current.length > 50) navBack.current.shift();
     navForward.current = [];
-  };
+  }, [currentLocation]);
 
   const loadGitBase = useCallback(async (path: string) => {
     const root = workspaceRootRef.current;
@@ -797,7 +788,7 @@ export function App() {
       if (getSettings()["explorer.autoReveal"] && !isUntitled(path)) setTreeReveal({ path, token: Date.now() });
       return true;
     },
-    [docContent, isDocDirty, loadGitBase, focusGroup, waitForEditor, setTabs, setActivePath],
+    [docContent, isDocDirty, loadGitBase, focusGroup, waitForEditor, setTabs, setActivePath, pushNavigation, ensureModalGroup],
   );
 
   /** Read either side of a diff: an open document's editor state, or the file / virtual document on disk. */
@@ -876,7 +867,7 @@ export function App() {
       extensionService.documentOpened(modified);
       return true;
     },
-    [focusGroup, isDocDirty, setActivePath, setTabs, waitForEditor],
+    [focusGroup, isDocDirty, setActivePath, setTabs, waitForEditor, splitGroup],
   );
 
   /** Keep the modified side of a diff tab in the document model (dirty dot, extensions, saving). */
@@ -905,7 +896,7 @@ export function App() {
       setTabs((prev) => [...prev, { path, name, dirty: content !== "", preview: false }]);
       await openFile(path);
     },
-    [openFile],
+    [openFile, setTabs],
   );
 
   /** Save a document; returns false when cancelled or failed. */
@@ -994,7 +985,8 @@ export function App() {
       extensionService.documentSaved(target);
       return true;
     },
-    [docContent, refreshTabDirty, syncDirtyState],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- renameEverywhere is a plain function that works through refs; listing it would rebuild this on every render
+    [docContent, refreshTabDirty, syncDirtyState, editorRef],
   );
   saveDocRef.current = saveDoc;
 
@@ -1146,7 +1138,7 @@ export function App() {
       syncDirtyState();
       return true;
     },
-    [isDocDirty, openFile, saveDoc, syncDirtyState, updateGroups, pruneGroup],
+    [isDocDirty, openFile, saveDoc, syncDirtyState, updateGroups, pruneGroup, activePathRef],
   );
 
   /**
@@ -1154,39 +1146,42 @@ export function App() {
    * documents and files on disk. A lone snippet edit for the document in the
    * active editor is inserted as a snippet (tab stops); other snippets become text.
    */
-  const applyWorkspaceEdits = useCallback(async (fileEdits: FileEdits[]) => {
-    let changed = 0;
-    for (const { path, edits: given, eol } of fileEdits) {
-      const openPath = [...docs.current.keys()].find((p) => sameDocumentKey(p, path));
-      if (openPath && eol) docs.current.get(openPath)!.eol = eol;
-      const active = editorRef.current;
-      if (openPath && given.length === 1 && given[0]!.snippet && active?.getCurrent()?.path === openPath) {
-        if (active.insertSnippet(given[0]!.newText, [given[0]!])) changed++;
-        continue;
+  const applyWorkspaceEdits = useCallback(
+    async (fileEdits: FileEdits[]) => {
+      let changed = 0;
+      for (const { path, edits: given, eol } of fileEdits) {
+        const openPath = [...docs.current.keys()].find((p) => sameDocumentKey(p, path));
+        if (openPath && eol) docs.current.get(openPath)!.eol = eol;
+        const active = editorRef.current;
+        if (openPath && given.length === 1 && given[0]!.snippet && active?.getCurrent()?.path === openPath) {
+          if (active.insertSnippet(given[0]!.newText, [given[0]!])) changed++;
+          continue;
+        }
+        const edits = given.map((edit) => (edit.snippet ? { ...edit, newText: snippetToText(edit.newText), snippet: undefined } : edit));
+        if (openPath && editorHolding(openPath)?.applyEditsToDocument(openPath, edits)) {
+          changed++;
+          continue;
+        }
+        if (openPath) {
+          const doc = docs.current.get(openPath)!;
+          doc.content = applyTextEdits(doc.content, edits);
+          editorDirty.current.set(openPath, doc.content !== doc.savedContent);
+          extensionService.documentChanged(openPath);
+          changed++;
+          continue;
+        }
+        const file = await readDocument(path);
+        if ("error" in file) continue;
+        const crlf = eol ? eol === "CRLF" : file.content.includes("\r\n");
+        let text = applyTextEdits(file.content.replace(/\r\n/g, "\n"), edits);
+        if (crlf) text = text.replace(/\n/g, "\r\n");
+        const result = await writeDocument(path, text);
+        if (result.success) changed++;
       }
-      const edits = given.map((edit) => (edit.snippet ? { ...edit, newText: snippetToText(edit.newText), snippet: undefined } : edit));
-      if (openPath && editorHolding(openPath)?.applyEditsToDocument(openPath, edits)) {
-        changed++;
-        continue;
-      }
-      if (openPath) {
-        const doc = docs.current.get(openPath)!;
-        doc.content = applyTextEdits(doc.content, edits);
-        editorDirty.current.set(openPath, doc.content !== doc.savedContent);
-        extensionService.documentChanged(openPath);
-        changed++;
-        continue;
-      }
-      const file = await readDocument(path);
-      if ("error" in file) continue;
-      const crlf = eol ? eol === "CRLF" : file.content.includes("\r\n");
-      let text = applyTextEdits(file.content.replace(/\r\n/g, "\n"), edits);
-      if (crlf) text = text.replace(/\n/g, "\r\n");
-      const result = await writeDocument(path, text);
-      if (result.success) changed++;
-    }
-    return changed;
-  }, []);
+      return changed;
+    },
+    [editorRef],
+  );
 
   /* ── workspace ────────────────────────────────────────────────────────── */
 
@@ -1354,12 +1349,15 @@ export function App() {
     }
     const list = extractSymbols(current.language, editor.getContent());
     return list.length || ["markdown", "python", "rust", "go", "css", "yaml", "shell"].includes(current.language) ? list : null;
-  }, []);
+  }, [editorRef]);
 
-  const revealSymbol = useCallback((symbol: DocumentSymbol) => {
-    pushNavigation();
-    editorRef.current?.revealPosition(symbol.line, symbol.character);
-  }, []);
+  const revealSymbol = useCallback(
+    (symbol: DocumentSymbol) => {
+      pushNavigation();
+      editorRef.current?.revealPosition(symbol.line, symbol.character);
+    },
+    [editorRef, pushNavigation],
+  );
 
   /** Open a workspace symbol; its location is resolved first when the provider only reported the file. */
   const gotoWorkspaceSymbol = useCallback(
@@ -1389,7 +1387,7 @@ export function App() {
     setReferences({ title: word || "symbol", locations });
     setPanelTab("references");
     setPanelVisible(true);
-  }, []);
+  }, [editorRef]);
 
   const renameSymbol = useCallback(async () => {
     const editor = editorRef.current;
@@ -1451,7 +1449,7 @@ export function App() {
       return;
     }
     await applyRenameEdits(result.edits);
-  }, [applyWorkspaceEdits, refreshTabDirty, syncDirtyState]);
+  }, [applyWorkspaceEdits, refreshTabDirty, syncDirtyState, editorRef]);
 
   const formatDocument = useCallback(async () => {
     const editor = editorRef.current;
@@ -1463,7 +1461,7 @@ export function App() {
     }
     const ok = await editor.format().catch(() => false);
     if (!ok) toast("Formatting failed (is the document valid?)", "error");
-  }, []);
+  }, [editorRef]);
 
   const navigate = useCallback(
     async (direction: "back" | "forward") => {
@@ -1475,7 +1473,7 @@ export function App() {
       if (here) to.push(here);
       await openFile(target.path, { line: target.line, character: target.character, recordNav: false });
     },
-    [openFile],
+    [openFile, currentLocation],
   );
 
   const diagnosticsRef = useRef(allDiagnostics);
@@ -1496,7 +1494,7 @@ export function App() {
         void openFile(next[0], { line: first.startLine, character: first.startCharacter });
       }
     },
-    [openFile],
+    [openFile, editorRef],
   );
 
   /* ── pickers ──────────────────────────────────────────────────────────── */
@@ -1542,7 +1540,7 @@ export function App() {
       },
       current.language,
     );
-  }, [pick]);
+  }, [pick, editorRef]);
 
   const indentationPicker = useCallback(() => {
     const s = getSettings();
@@ -1605,7 +1603,7 @@ export function App() {
       },
       doc.eol,
     );
-  }, [pick, refreshTabDirty, syncDirtyState]);
+  }, [pick, refreshTabDirty, syncDirtyState, editorRef]);
 
   /* ── git (source control) ─────────────────────────────────────────────── */
 
@@ -1639,7 +1637,7 @@ export function App() {
       if (content === null) toast(`${basename(file.path)} is new — there is nothing to compare.`, "info");
       else editorRef.current?.showInlineDiff(content);
     },
-    [openFile],
+    [openFile, editorRef],
   );
 
   const toggleInlineDiff = useCallback(async () => {
@@ -1654,7 +1652,7 @@ export function App() {
     const { content } = await api().request.gitShowHead({ root, path: current.path });
     if (content === null) toast("This file is not tracked by git.", "info");
     else editor.showInlineDiff(content);
-  }, []);
+  }, [editorRef]);
 
   /* ── views ────────────────────────────────────────────────────────────── */
 
@@ -1664,22 +1662,25 @@ export function App() {
     setZenMode(false);
   }, []);
 
-  const showPanel = useCallback((tab: PanelTab, toggle = false) => {
-    const { panelVisible: visible, panelTab: current } = stateRef.current;
-    if (toggle && visible && current === tab) {
-      setPanelVisible(false);
-      editorRef.current?.focus();
-      return;
-    }
-    setPanelTab(tab);
-    setPanelVisible(true);
-    setZenMode(false);
-    if (tab === "terminal") {
-      // Opening the terminal panel with no terminal creates one (like VS Code).
-      if (!terminalService.getSnapshot().groups.length) createTerminal();
-      else terminalService.focus(terminalService.getSnapshot().activeId);
-    }
-  }, []);
+  const showPanel = useCallback(
+    (tab: PanelTab, toggle = false) => {
+      const { panelVisible: visible, panelTab: current } = stateRef.current;
+      if (toggle && visible && current === tab) {
+        setPanelVisible(false);
+        editorRef.current?.focus();
+        return;
+      }
+      setPanelTab(tab);
+      setPanelVisible(true);
+      setZenMode(false);
+      if (tab === "terminal") {
+        // Opening the terminal panel with no terminal creates one (like VS Code).
+        if (!terminalService.getSnapshot().groups.length) createTerminal();
+        else terminalService.focus(terminalService.getSnapshot().activeId);
+      }
+    },
+    [editorRef],
+  );
 
   const focusSearch = useCallback(
     (replace = false) => {
@@ -1688,7 +1689,7 @@ export function App() {
       setSearchFocus((n) => n + 1);
       if (replace) setSearchReplace((n) => n + 1);
     },
-    [showView],
+    [showView, editorRef],
   );
 
   /** New file / folder through a prompt (explorer and File menu). */
@@ -1998,14 +1999,17 @@ export function App() {
     [openFile, setTabs],
   );
 
-  const setDocumentLanguage = useCallback((path: string, language: string) => {
-    const doc = docs.current.get(path);
-    if (!doc) return;
-    doc.language = language;
-    for (const editor of editors.current.values()) if (editor.getCurrent()?.path === path) editor.setLanguage(language);
-    if (activePathRef.current === path) setActiveLanguage(language);
-    extensionService.documentLanguageChanged(path);
-  }, []);
+  const setDocumentLanguage = useCallback(
+    (path: string, language: string) => {
+      const doc = docs.current.get(path);
+      if (!doc) return;
+      doc.language = language;
+      for (const editor of editors.current.values()) if (editor.getCurrent()?.path === path) editor.setLanguage(language);
+      if (activePathRef.current === path) setActiveLanguage(language);
+      extensionService.documentLanguageChanged(path);
+    },
+    [activePathRef],
+  );
 
   /** Revert a file to what is on disk (workbench.action.files.revert). */
   const revertDocument = useCallback(async (path: string) => {
@@ -2124,7 +2128,7 @@ export function App() {
             },
       });
     },
-    [pick],
+    [pick, editorRef],
   );
 
   /** Open .vscode/launch.json, creating it from the installed debuggers' initial configurations. */
@@ -2150,7 +2154,7 @@ export function App() {
       await api().request.createFile({ path: file, content: `${JSON.stringify({ version: "0.2.0", configurations }, null, 2)}\n` });
     }
     await openFile(file);
-  }, [openFile]);
+  }, [openFile, editorRef]);
 
   // Reveal where the debugger stopped; show the debug view when a session starts.
   useEffect(() => {
@@ -2899,74 +2903,77 @@ export function App() {
       { id: "workbench.action.quit", title: "Quit", category: "File", run: () => api().request.quitApp({}) },
     ];
     return new Map(list.map((command) => [command.id, command]));
-  }, []);
+  }, [focusGroup, updateGrid, setTabs, editorRef]);
 
   /** Context keys for when clauses (extension keybindings, menus, enablement). */
-  const contextKey = useCallback((key: string): unknown => {
-    const st = stateRef.current;
-    const focus = focusContext();
-    const path = activePathRef.current;
-    const isFile = !!path && !isTerminalTab(path);
-    switch (key) {
-      case "editorTextFocus":
-      case "editorFocus":
-        return focus === "editor";
-      case "textInputFocus":
-      case "inputFocus":
-        return focus === "editor" || focus === "input";
-      case "terminalFocus":
-        return focus === "terminal";
-      case "explorerFocus":
-      case "filesExplorerFocus":
-        return focus === "explorer";
-      case "editorLangId":
-      case "resourceLangId":
-        return isFile ? docs.current.get(path!)?.language : undefined;
-      case "resourceExtname":
-        return isFile ? (/(\.[^./\\]+)$/.exec(path!)?.[1] ?? "") : undefined;
-      case "resourceFilename":
-        return isFile ? basename(path!) : undefined;
-      case "resourceDirname":
-        return isFile ? dirname(path!) : undefined;
-      case "resource":
-      case "resourcePath":
-        return isFile ? path : undefined;
-      case "resourceScheme":
-        return isFile ? (isUntitled(path!) ? "untitled" : "file") : undefined;
-      case "editorHasSelection":
-        return isFile && !!editorRef.current?.selectedText();
-      case "editorHasMultipleSelections":
-        return isFile && (editorRef.current?.getSelections().length ?? 0) > 1;
-      case "editorIsOpen":
-        return isFile;
-      case "editorReadonly":
-        return false;
-      case "activeEditor":
-        return isFile ? "workbench.editors.files.textFileEditor" : isTerminalTab(path) ? "terminalEditor" : undefined;
-      case "isWindows":
-        return navigator.platform.startsWith("Win");
-      case "isMac":
-        return navigator.platform.startsWith("Mac");
-      case "isLinux":
-        return /linux/i.test(navigator.platform);
-      case "isWeb":
-        return false;
-      case "sideBarVisible":
-        return st.sidebarVisible;
-      case "panelVisible":
-        return st.panelVisible;
-      case "explorerViewletVisible":
-        return st.sidebarVisible && st.sideView === "explorer";
-      case "workspaceFolderCount":
-        return workspaceRootRef.current ? 1 : 0;
-      case "workbenchState":
-        return workspaceRootRef.current ? "folder" : "empty";
-      case "inQuickOpen":
-        return quickOpenRef.current;
-      default:
-        return undefined;
-    }
-  }, []);
+  const contextKey = useCallback(
+    (key: string): unknown => {
+      const st = stateRef.current;
+      const focus = focusContext();
+      const path = activePathRef.current;
+      const isFile = !!path && !isTerminalTab(path);
+      switch (key) {
+        case "editorTextFocus":
+        case "editorFocus":
+          return focus === "editor";
+        case "textInputFocus":
+        case "inputFocus":
+          return focus === "editor" || focus === "input";
+        case "terminalFocus":
+          return focus === "terminal";
+        case "explorerFocus":
+        case "filesExplorerFocus":
+          return focus === "explorer";
+        case "editorLangId":
+        case "resourceLangId":
+          return isFile ? docs.current.get(path!)?.language : undefined;
+        case "resourceExtname":
+          return isFile ? (/(\.[^./\\]+)$/.exec(path!)?.[1] ?? "") : undefined;
+        case "resourceFilename":
+          return isFile ? basename(path!) : undefined;
+        case "resourceDirname":
+          return isFile ? dirname(path!) : undefined;
+        case "resource":
+        case "resourcePath":
+          return isFile ? path : undefined;
+        case "resourceScheme":
+          return isFile ? (isUntitled(path!) ? "untitled" : "file") : undefined;
+        case "editorHasSelection":
+          return isFile && !!editorRef.current?.selectedText();
+        case "editorHasMultipleSelections":
+          return isFile && (editorRef.current?.getSelections().length ?? 0) > 1;
+        case "editorIsOpen":
+          return isFile;
+        case "editorReadonly":
+          return false;
+        case "activeEditor":
+          return isFile ? "workbench.editors.files.textFileEditor" : isTerminalTab(path) ? "terminalEditor" : undefined;
+        case "isWindows":
+          return navigator.platform.startsWith("Win");
+        case "isMac":
+          return navigator.platform.startsWith("Mac");
+        case "isLinux":
+          return /linux/i.test(navigator.platform);
+        case "isWeb":
+          return false;
+        case "sideBarVisible":
+          return st.sidebarVisible;
+        case "panelVisible":
+          return st.panelVisible;
+        case "explorerViewletVisible":
+          return st.sidebarVisible && st.sideView === "explorer";
+        case "workspaceFolderCount":
+          return workspaceRootRef.current ? 1 : 0;
+        case "workbenchState":
+          return workspaceRootRef.current ? "folder" : "empty";
+        case "inQuickOpen":
+          return quickOpenRef.current;
+        default:
+          return undefined;
+      }
+    },
+    [activePathRef, editorRef],
+  );
 
   // Walkthrough `when` clauses and onContext events see the window's context keys too.
   useEffect(() => setContextLookup(contextKey), [contextKey]);
@@ -3031,12 +3038,15 @@ export function App() {
   allCommandsRef.current = allCommands;
 
   /** Run an extension command; the host first gets the current selection. */
-  const runExtensionCommand = useCallback((id: string, args: unknown[]) => {
-    const path = activePathRef.current;
-    const editor = editorRef.current;
-    if (path && editor?.getCurrent()?.path === path) extensionService.selectionChanged(path, editor.getSelections());
-    extensionService.executeCommand(id, args);
-  }, []);
+  const runExtensionCommand = useCallback(
+    (id: string, args: unknown[]) => {
+      const path = activePathRef.current;
+      const editor = editorRef.current;
+      if (path && editor?.getCurrent()?.path === path) extensionService.selectionChanged(path, editor.getSelections());
+      extensionService.executeCommand(id, args);
+    },
+    [editorRef, activePathRef],
+  );
 
   const runCommand = useCallback(
     (id: string, fromPalette = false, args?: unknown) => {
@@ -3128,7 +3138,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [runCommand]);
+  }, [runCommand, contextKey]);
 
   /* ── extension host bridge ────────────────────────────────────────────── */
 
@@ -3400,7 +3410,7 @@ export function App() {
       return true;
     });
     return () => setCustomEditorRoleHandler(null);
-  }, []);
+  }, [activePathRef]);
 
   /* ── webviews ─────────────────────────────────────────────────────────── */
 
@@ -4249,6 +4259,7 @@ export function App() {
       }
       setTreeRefresh((n) => n + 1);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- followFileOperation is a plain function that works through refs; listing it would rebuild this on every render
     [applyWorkspaceEdits],
   );
 
@@ -4328,7 +4339,8 @@ export function App() {
           break;
       }
     },
-    [openFile, closeTabs, createEntry, applyWorkspaceEdits, focusSearch, showPanel, relativeToRoot],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- followFileOperation is a plain function that works through refs; listing it would rebuild this on every render
+    [openFile, createEntry, applyWorkspaceEdits, focusSearch, relativeToRoot],
   );
 
   const handleTabAction = useCallback(
@@ -4499,7 +4511,6 @@ export function App() {
   const errorCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "error").length, 0);
   const warningCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "warning").length, 0);
   const activeDoc = activePath ? docs.current.get(parseDiffTab(activePath)?.modified ?? activePath) : undefined;
-  const activeTerminalTab = isTerminalTab(activePath) ? terminalIdOf(activePath) : null;
   const editorActive = !!activePath && !isSpecialTab(activePath);
   const paletteCommands = useMemo(() => [...allCommands.values()], [allCommands]);
   const visiblePaletteCommands = quick ? paletteCommands.filter((command) => command.enabled?.() !== false) : paletteCommands;

@@ -61,8 +61,14 @@ export function readZip(buffer: Buffer): ZipEntry[] {
       const length = buffer.readUInt16LE(extra + 2);
       if (id === 0x0001) {
         let field = extra + 4;
-        if (size === 0xffffffff) ((size = Number(buffer.readBigUInt64LE(field))), (field += 8));
-        if (compressed === 0xffffffff) ((compressed = Number(buffer.readBigUInt64LE(field))), (field += 8));
+        if (size === 0xffffffff) {
+          size = Number(buffer.readBigUInt64LE(field));
+          field += 8;
+        }
+        if (compressed === 0xffffffff) {
+          compressed = Number(buffer.readBigUInt64LE(field));
+          field += 8;
+        }
         if (local === 0xffffffff) local = Number(buffer.readBigUInt64LE(field));
       }
       extra += 4 + length;

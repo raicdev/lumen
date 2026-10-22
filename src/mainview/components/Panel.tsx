@@ -252,7 +252,6 @@ export function Panel(props: Props) {
       else if (action) props.onMove(action as PanelPosition);
     });
 
-  const vertical = props.position !== "bottom";
   const tabsRef = useRef<HTMLDivElement>(null);
   // Keep the active tab in view when the strip is scrolled
   useEffect(() => {

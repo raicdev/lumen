@@ -93,7 +93,7 @@ function VariableRow({ api, path, node, depth, version }: { api: ViewFeatureApi;
         {node.kind === "variable" && node.variable.type && <span className="nbv-type">{node.variable.type}</span>}
       </div>
       {open &&
-        children?.map((child, index) => (
+        children?.map((child) => (
           <VariableRow
             key={child.kind === "variable" ? child.variable.handle : `r${child.start}`}
             api={api}

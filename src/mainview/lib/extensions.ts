@@ -303,7 +303,8 @@ class ExtensionService {
   /** Listeners hear about changes once per frame, however many messages the host sent. */
   #update(patch: Partial<ExtensionsSnapshot>) {
     this.#snapshot = { ...this.#snapshot, ...patch };
-    this.#notifyFrame ||= requestAnimationFrame(() => {
+    if (this.#notifyFrame) return;
+    this.#notifyFrame = requestAnimationFrame(() => {
       this.#notifyFrame = 0;
       for (const listener of this.#listeners) listener();
     });
@@ -318,7 +319,8 @@ class ExtensionService {
 
   #updateOutputs(active = this.#outputsSnapshot.active) {
     this.#outputsSnapshot = { channels: [...this.#outputs.values()], active };
-    this.#outputsFrame ||= requestAnimationFrame(() => {
+    if (this.#outputsFrame) return;
+    this.#outputsFrame = requestAnimationFrame(() => {
       this.#outputsFrame = 0;
       for (const listener of this.#outputListeners) listener();
     });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeSet } from "@codemirror/state";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
@@ -31,7 +31,9 @@ export function DiffEditor({ original, modified, language, readOnly, initialSele
   const mergeRef = useRef<MergeView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const callbacks = useRef({ onEdit, onFocus, load });
-  callbacks.current = { onEdit, onFocus, load };
+  useLayoutEffect(() => {
+    callbacks.current = { onEdit, onFocus, load };
+  });
 
   useEffect(() => {
     let disposed = false;

@@ -417,6 +417,8 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
     return () => {
       cancelled = true;
     };
+    // Keyed on what identifies the extension: the objects are rebuilt whenever the lists refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [installed?.id, installed?.manifest.version, marketplace?.namespace, marketplace?.name, marketplace?.version]);
 
   useEffect(() => {

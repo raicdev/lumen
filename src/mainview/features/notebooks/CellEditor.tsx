@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Annotation, Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, drawSelection, keymap, placeholder } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
@@ -75,7 +75,10 @@ export function CellEditor(props: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const latest = useRef(props);
-  latest.current = props;
+  // Before any effect runs, so the editor's handlers always see the current props.
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
   const language = useRef(new Compartment());
   const theme = useRef(new Compartment());
   const first = useRef(true);

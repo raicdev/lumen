@@ -7,7 +7,7 @@ import * as T from "../types.ts";
 import { encodeValidation } from "../../../shared/workspace-misc.ts";
 import type { FeatureContext, HostFeature } from "./contract.ts";
 import { NOT_HANDLED } from "./contract.ts";
-import { decodeBytes, encodeText, normalizeEncoding } from "./workspace-misc/encoding.ts";
+import { decodeBytes, encodeText } from "./workspace-misc/encoding.ts";
 import { WorkspaceFolders } from "./workspace-misc/folders.ts";
 
 /**

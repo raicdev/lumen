@@ -425,7 +425,7 @@ export function updateSetting<K extends SettingKey>(key: K, value: Settings[K]):
 /** Sets a value in the `[language]` scope (undefined removes the override). */
 export function updateLanguageSetting<K extends SettingKey>(languageId: string, key: K, value: Settings[K] | undefined): void {
   const language = languageId.toLowerCase();
-  const scope = { ...(languageSettings[language] ?? {}) };
+  const scope = { ...languageSettings[language] };
   if (value === undefined || JSON.stringify(value) === JSON.stringify(defaultSettings(language)[key])) delete scope[key];
   else (scope as Record<string, unknown>)[key] = value;
   if (Object.keys(scope).length) languageSettings[language] = scope;
@@ -442,7 +442,7 @@ export function resetSetting(key: SettingKey): void {
 
 export function resetLanguageSetting(languageId: string, key: SettingKey): void {
   const language = languageId.toLowerCase();
-  const scope = { ...(languageSettings[language] ?? {}) };
+  const scope = { ...languageSettings[language] };
   delete scope[key];
   if (Object.keys(scope).length) languageSettings[language] = scope;
   else delete languageSettings[language];

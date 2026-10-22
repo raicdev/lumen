@@ -68,7 +68,8 @@ class DebugService {
 
   #update(patch: Partial<DebugSnapshot>) {
     this.#snapshot = { ...this.#snapshot, ...patch };
-    this.#frame ||= requestAnimationFrame(() => {
+    if (this.#frame) return;
+    this.#frame = requestAnimationFrame(() => {
       this.#frame = 0;
       for (const listener of this.#listeners) listener();
     });

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { EditorController, type EditorDocument } from "../lib/editor";
 
 type Props = {
@@ -13,7 +13,9 @@ type Props = {
 export function CodeMirrorEditor({ onReady, onDispose, hidden }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const callbacks = useRef({ onReady, onDispose });
-  callbacks.current = { onReady, onDispose };
+  useLayoutEffect(() => {
+    callbacks.current = { onReady, onDispose };
+  });
 
   useEffect(() => {
     if (!hostRef.current) return;

@@ -84,6 +84,7 @@ function stateOf(host: ExtensionHost): QuickFixState {
 const MAX_ACTIONS = 200;
 
 /** Terminal escape sequences (OSC, CSI) that output matchers should not see. */
+// eslint-disable-next-line no-control-regex -- escape sequences start with ESC
 const ESCAPES = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 /** The output split into lines, escape sequences removed (what a line matcher is tested against). */

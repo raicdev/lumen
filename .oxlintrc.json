@@ -4,7 +4,15 @@
   "categories": {
     "correctness": "warn"
   },
-  "rules": {},
+  "rules": {
+    // `[...set]` in a loop is a snapshot: listeners may (un)subscribe while being called, loops await
+    // or delete what they walk, and live DOM collections change under them.
+    "unicorn/no-useless-spread": "off",
+    // Facade objects use getters (`get all() { return model.all; }`), which cannot be arrow functions.
+    "typescript/no-this-alias": "off",
+    // Effects reset state when their inputs change and clear it before loading; that is how the views are written.
+    "react/set-state-in-effect": "off"
+  },
   "env": {
     "builtin": true
   },

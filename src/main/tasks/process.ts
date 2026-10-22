@@ -177,6 +177,7 @@ export function runProcess(spec: RunSpec, onOutput: (text: string) => void, onSt
   };
 }
 
+// eslint-disable-next-line no-control-regex -- escape sequences start with ESC
 const ANSI = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[()][A-Za-z0-9]/g;
 
 /** Output without colour codes and carriage returns, for matching and display. */

@@ -163,6 +163,8 @@ export function SettingsEditor({ open, onClose }: Props) {
     const ids = new Set([...configurationDefaultLanguages(), ...configurationLanguageOverrides()]);
     for (const contributed of extensionService.contributedLanguages()) ids.add(contributed.id.toLowerCase());
     return [...ids].sort();
+    // The languages come from the extension service: `extensions` says when they changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensions]);
 
   // Only on open: onClose is a new function on every App render (any settings change),

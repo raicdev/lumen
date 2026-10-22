@@ -776,7 +776,7 @@ export class ChatLmState {
       return { type: "stdio", command: definition.command, args: (definition.args ?? []).map(String), env, cwd };
     }
     if (definition.uri)
-      return { type: "http", url: Uri.isUri(definition.uri) ? definition.uri.toString() : String(definition.uri), headers: { ...(definition.headers ?? {}) } };
+      return { type: "http", url: Uri.isUri(definition.uri) ? definition.uri.toString() : String(definition.uri), headers: { ...definition.headers } };
     throw new Error("an MCP server definition needs a command or a uri");
   }
 

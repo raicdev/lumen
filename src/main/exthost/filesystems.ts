@@ -313,7 +313,7 @@ export class FileSystems {
     let expression: RegExp;
     try {
       expression = searchExpression(query, options);
-    } catch (error) {
+    } catch {
       return { matches, truncated };
     }
     for (const root of roots) {
@@ -417,7 +417,7 @@ export class FileSystems {
           if (!count) return;
           try {
             await entry.provider.writeFile(child, new TextEncoder().encode(next), { create: false, overwrite: true });
-          } catch (error) {
+          } catch {
             return;
           }
           replacements += count;

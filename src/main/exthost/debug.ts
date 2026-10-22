@@ -6,7 +6,6 @@ import { homedir } from "os";
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "path";
 import type {
   HostDebugBreakpoint,
-  HostDebugCapabilities,
   HostDebugCompound,
   HostDebugConfiguration,
   HostDebugConfigurations,
@@ -20,7 +19,6 @@ import type {
   HostDebugStackFrame,
   HostDebugThread,
   HostDebugVariable,
-  HostToView,
 } from "../../shared/extensions.ts";
 import { normalizeKey } from "./documents.ts";
 import type { ExtensionHost, ExtensionRuntime } from "./host.ts";
@@ -257,7 +255,7 @@ export class DapConnection {
 
 /** A child process speaking DAP on its stdio. */
 export function executableTransport(descriptor: T.DebugAdapterExecutable, onStderr: (text: string) => void): DapTransport {
-  const env = { ...process.env, ...(descriptor.options?.env ?? {}) };
+  const env = { ...process.env, ...descriptor.options?.env };
   const child = spawn(descriptor.command, descriptor.args, {
     cwd: descriptor.options?.cwd,
     env,
@@ -1489,7 +1487,7 @@ export class DebugSessionManager {
       case "startDebugging": {
         try {
           const args = message.arguments ?? {};
-          const childConfiguration = { ...(args.configuration ?? {}), type: args.configuration?.type ?? session.type };
+          const childConfiguration = { ...args.configuration, type: args.configuration?.type ?? session.type };
           void this.start(childConfiguration, session.folder, session).catch((error: unknown) =>
             this.#host.log("error", `child debug session failed: ${error instanceof Error ? error.message : String(error)}`),
           );

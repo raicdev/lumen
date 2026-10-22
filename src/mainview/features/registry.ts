@@ -132,10 +132,6 @@ export async function saveFeatureEditor(tabPath: string): Promise<boolean> {
 
 const apis = new Map<string, ViewFeatureApi>();
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function featureApi(area: string): ViewFeatureApi {
   let value = apis.get(area);
   if (value) return value;

@@ -1,13 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type {
-  ExtensionManifest,
-  HostToView,
-  HostTreeItem,
-  HostTreeTooltip,
-  HostTreeView,
-  MenuContribution,
-  ViewWelcomeContribution,
-} from "../../shared/extensions";
+import type { ExtensionManifest, HostToView, HostTreeItem, HostTreeTooltip, HostTreeView, ViewWelcomeContribution } from "../../shared/extensions";
 import { extensionService } from "./extensions";
 import { resolveContributedMenu } from "../features/menus-walkthroughs/menus";
 import type { ResolvedMenuItem } from "../../shared/menus-walkthroughs";
@@ -64,8 +56,6 @@ function emptyState(): TreeState {
     version: 0,
   };
 }
-
-const titleOf = (value: unknown) => (typeof value === "string" ? value : ((value as { value?: string } | undefined)?.value ?? ""));
 
 class TreeService {
   #trees = new Map<string, TreeState>();
@@ -380,7 +370,7 @@ ${handle ?? ROOT}`);
     const target = path.at(-1);
     if (!target) return;
     for (const listener of this.#revealListeners) listener(viewId, message.focus);
-    const expand = [...path.slice(0, -1)];
+    const expand = path.slice(0, -1);
     if (message.expand) expand.push(target);
     for (const [index, handle] of expand.entries()) {
       await this.#ensureLoaded(viewId, index ? path[index - 1]! : null);

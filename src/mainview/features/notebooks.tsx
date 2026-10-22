@@ -11,7 +11,7 @@ import { interactiveInputs } from "./notebooks/state";
 /** The area's API (the Notebook Variables panel asks the host through it). */
 let notebooksApi: ViewFeatureApi | null = null;
 import { activePath, call, docs, hostEpoch, loadDoc, onHostMessage, pickController, runCells, selectCell, selectedCell } from "./notebooks/state";
-import { matchingNotebooks, opensAsNotebook } from "./notebooks/contributions";
+import { opensAsNotebook } from "./notebooks/contributions";
 import type { NotebookContribution } from "./notebooks/contributions";
 
 /**

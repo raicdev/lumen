@@ -332,7 +332,9 @@ export function NotebookEditor({ path, api, interactive = false }: { path: strin
       focusCellDom(root.current, cell.id);
       setFocusIndex(null);
     }
-  }, [cells.length, focusIndex]);
+    // `cells` is a new array on every render; the inserted cell arrives when the count changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cells.length, focusIndex, path]);
 
   // NotebookEditor.visibleRanges
   const cellsKey = cells.map((cell) => cell.id).join();

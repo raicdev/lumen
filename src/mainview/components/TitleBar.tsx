@@ -180,6 +180,8 @@ function MenuBar({ commands, keys }: { commands: Map<string, Command>; keys: Map
       window.removeEventListener("blur", close);
       window.removeEventListener("resize", close);
     };
+    // The items are resolved on every render (their checked / enabled state is live), so the keys follow them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openIndex, activeItem, items, subOpen, subActive, subItems, close, open, openSub, run]);
 
   const renderItem = (item: ResolvedItem, itemIndex: number, active: boolean, onHover: () => void, onClick: (el: Element) => void) =>

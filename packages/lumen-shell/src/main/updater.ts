@@ -99,6 +99,7 @@ export function releaseUpdate(release: GitHubRelease, current: string, assetPatt
 /** Asset names end up in a file path: nothing but a plain file name. */
 function safeFileName(name: string): string {
   const base = basename(name.replace(/\\/g, "/"));
+  // eslint-disable-next-line no-control-regex -- control characters are what it rejects
   if (!base || base === "." || base === ".." || /[<>:"|?*\x00-\x1f]/.test(base)) throw new Error(`unexpected asset name "${name}"`);
   return base;
 }

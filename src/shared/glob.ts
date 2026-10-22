@@ -1,7 +1,7 @@
 import type { HostDocumentFilter } from "./extensions.ts";
 
 /**
- * Glob patterns as VS Code uses them (`**​/*.{ts,tsx}`, `src/**`, `[abc]`, `?`),
+ * Glob patterns as VS Code uses them (`*.{ts,tsx}` in any folder, `src/**`, `[abc]`, `?`),
  * matched against `/`-separated paths. Shared by the extension host
  * (findFiles, watchers, document selectors) and the view (selectors).
  */

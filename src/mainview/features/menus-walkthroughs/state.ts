@@ -235,6 +235,7 @@ export function useWalkthroughs(): Walkthrough[] {
   return useMemo(
     () => orderWalkthroughs(parseWalkthroughs(sourcesOf(snapshot.extensions), whenClause), (walkthrough) => featured.has(walkthrough.key.toLowerCase())),
     // The snapshot covers extension context keys, `version` the window's own keys; `featured` the workspace files.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [snapshot, featured, version],
   );
 }

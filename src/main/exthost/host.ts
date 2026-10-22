@@ -4,7 +4,7 @@ import Module from "module";
 import { ChildProcess } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
-import { readdir, stat } from "fs/promises";
+import { readdir } from "fs/promises";
 import { hostname, userInfo } from "os";
 import { dirname, join, relative, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -30,12 +30,9 @@ import type {
   HostInlayHint,
   HostInlineCompletionItem,
   HostLanguageConfiguration,
-  HostLinkedEditingRanges,
   HostLocation,
   HostMethods,
-  HostPrepareRename,
   HostProvider,
-  HostRenameEdits,
   HostSelection,
   HostSemanticToken,
   HostSignatureHelp,

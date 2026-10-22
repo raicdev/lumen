@@ -31,6 +31,7 @@ const PRIORITY = [
 const MAX_TEXT = 200_000;
 
 /** Color escape sequences of terminals do not belong into a notebook's text. */
+// eslint-disable-next-line no-control-regex -- escape sequences start with ESC
 const stripAnsi = (text: string) => text.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "");
 
 function pickItem(output: NbWireOutput): NbWireOutputItem | undefined {

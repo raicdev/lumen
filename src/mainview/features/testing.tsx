@@ -221,9 +221,7 @@ function applyEvent(event: TestingHostEvent | ContinuousEvent): void {
 /* ── actions ─────────────────────────────────────────────────────────────── */
 
 function profilesFor(controller: TestWireController, kind: number, items: TestWireItem[]): TestWireProfile[] {
-  return controller.profiles.filter(
-    (profile) => profile.kind === kind && (!profile.tag || items.length === 0 || items.every((item) => item.tags.includes(profile.tag!))),
-  );
+  return controller.profiles.filter((profile) => profile.kind === kind && (!profile.tag || items.every((item) => item.tags.includes(profile.tag!))));
 }
 
 /** Run (or debug, or cover) tests; no ids means everything. Asks which profile when there is no default one. */
@@ -284,9 +282,7 @@ function failedLeafIds(): string[] {
 
 /** Profiles that can continuously run these items (empty items = the whole controller). */
 function continuousProfilesFor(controller: TestWireController, items: TestWireItem[]): TestWireProfile[] {
-  return controller.profiles.filter(
-    (profile) => profile.supportsContinuousRun && (!profile.tag || items.length === 0 || items.every((item) => item.tags.includes(profile.tag!))),
-  );
+  return controller.profiles.filter((profile) => profile.supportsContinuousRun && (!profile.tag || items.every((item) => item.tags.includes(profile.tag!))));
 }
 
 /** Active continuous runs covering an item: runs of everything and runs that include it. */

@@ -988,7 +988,7 @@ export class TestingModel {
         if (owners.size && !owners.has(controller)) continue;
         const mine = include.filter((item) => item.controller === controller);
         const fitting = controller.profiles.filter(
-          (profile) => profile.kind === args.kind && (!profile.tag || mine.length === 0 || mine.every((item) => hasTag(item, profile.tag!))),
+          (profile) => profile.kind === args.kind && (!profile.tag || mine.every((item) => hasTag(item, profile.tag!))),
         );
         const defaults = fitting.filter((profile) => profile.isDefault);
         profiles.push(...(defaults.length ? defaults : fitting.slice(0, 1)));

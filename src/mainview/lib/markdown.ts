@@ -23,6 +23,7 @@ function inline(text: string): string {
     .replace(/~~(?=\S)([\s\S]*?\S)~~/g, "<del>$1</del>")
     .replace(/ {2,}\n/g, "<br>")
     .replace(/\$\(([a-z0-9-]+)(~spin)?\)/g, "");
+  // eslint-disable-next-line no-control-regex -- NUL marks the code spans set aside above
   return out.replace(/\u0000(\d+)\u0000/g, (_m, index: string) => codes[Number(index)]!);
 }
 
