@@ -8,7 +8,7 @@ export default {
   app: {
     name: "Lumen",
     identifier: "dev.lumen.editor",
-    version: "0.2.2-beta.2",
+    version: "0.2.2-beta.3",
   },
   main: "src/main/index.ts",
   view: {
