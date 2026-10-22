@@ -121,6 +121,7 @@ export const COLOR_DEFAULTS: Record<string, [string, string]> = {
   "editor.findMatchHighlightBackground": ["#ea5c0054", "#ea5c0055"],
   "editor.wordHighlightBackground": ["#78aaff29", "#57575740"],
   "editor.wordHighlightStrongBackground": ["#ffaa5a38", "#0e639c40"],
+  "editor.linkedEditingBackground": ["#f14c4c33", "#e5140026"],
   "editor.stackFrameHighlightBackground": ["#ffcc0024", "#ffff6673"],
   "editor.focusedStackFrameHighlightBackground": ["#89d1851f", "#cee7ce73"],
   "editorError.foreground": ["#f14c4c", "#e51400"],

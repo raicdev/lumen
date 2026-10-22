@@ -977,7 +977,9 @@ test("language providers registered by extensions are called by the host", async
   });
   languages.registerOnTypeFormattingEditProvider("plaintext", { provideOnTypeFormattingEdits: () => [TextEdit.insert(new Position(1, 0), "  ")] }, ";");
   languages.registerInlineCompletionItemProvider("plaintext", { provideInlineCompletionItems: () => [new InlineCompletionItem("bar)")] });
-  languages.registerLinkedEditingRangeProvider("plaintext", { provideLinkedEditingRanges: () => new LinkedEditingRanges([here(0, 0, 3), here(1, 0, 3)]) });
+  languages.registerLinkedEditingRangeProvider("plaintext", {
+    provideLinkedEditingRanges: () => new LinkedEditingRanges([here(0, 0, 3), here(1, 0, 3)], /[a-z]+/iu),
+  });
   languages.registerWorkspaceSymbolProvider({ provideWorkspaceSymbols: () => [new SymbolInformation("foo", SymbolKind.Function, "", loc())] });
   const legend = new SemanticTokensLegend(["function", "variable"], ["readonly"]);
   languages.registerDocumentSemanticTokensProvider(
@@ -1018,7 +1020,9 @@ test("language providers registered by extensions are called by the host", async
   assert.equal((await m.provideCodeActions(path, { startLine: 0, startCharacter: 0, endLine: 0, endCharacter: 0 }, []))[0]?.title, "Fix it");
   assert.equal((await m.provideOnTypeFormatting(path, 0, 8, ";", { tabSize: 2, insertSpaces: true })).length, 1);
   assert.equal((await m.provideInlineCompletions(path, 0, 4, 0))[0]?.insertText, "bar)");
-  assert.equal((await m.provideLinkedEditingRanges(path, 0, 1))?.ranges.length, 2);
+  const linked = await m.provideLinkedEditingRanges(path, 0, 1);
+  assert.equal(linked?.ranges.length, 2);
+  assert.deepEqual(linked?.wordPattern, { source: "[a-z]+", flags: "iu" });
   assert.equal((await m.provideWorkspaceSymbols("fo"))[0]?.name, "foo");
   const tokens = await m.provideSemanticTokens(path);
   assert.deepEqual(

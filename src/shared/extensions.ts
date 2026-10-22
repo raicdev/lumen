@@ -352,7 +352,7 @@ export type HostWorkspaceSymbol = {
 };
 
 /** The ranges that mirror each other around a position (languages.registerLinkedEditingRangeProvider). */
-export type HostLinkedEditingRanges = { ranges: TextRange[]; wordPattern?: string };
+export type HostLinkedEditingRanges = { ranges: TextRange[]; wordPattern?: { source: string; flags: string } };
 
 /** A link in a document (languages.registerDocumentLinkProvider); `target` is missing until it is resolved. */
 export type HostDocumentLink = { range: TextRange; target?: string; tooltip?: string };
@@ -1106,7 +1106,7 @@ function regexSource(value: RegexLike): string | undefined {
   return undefined;
 }
 
-function wireRegex(value: RegexLike): { source: string; flags: string } | undefined {
+export function wireRegex(value: RegexLike): { source: string; flags: string } | undefined {
   if (value instanceof RegExp) return { source: value.source, flags: value.flags };
   if (typeof value === "string") return { source: value, flags: "" };
   return undefined;

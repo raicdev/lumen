@@ -283,6 +283,7 @@ const BASE_API_TYPES = [
   "SemanticTokensEdit",
   "SemanticTokensEdits",
   "SelectionRange",
+  "LinkedEditingRanges",
   "SignatureHelpTriggerKind",
   "EnvironmentVariableMutatorType",
   "TerminalExitReason",
@@ -309,7 +310,7 @@ const BASE_API_TYPES = [
  * Classes and enums that are data-only stand-ins (editor tab input types, …),
  * exported so libraries that reference them (vscode-languageclient, …) still load.
  */
-const BASE_API_TYPES_COMPAT: string[] = ["LinkedEditingRanges"];
+const BASE_API_TYPES_COMPAT: string[] = [];
 
 /**
  * Classes and enums of the `vscode` module that Lumen does not export at all:

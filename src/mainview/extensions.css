@@ -656,6 +656,12 @@
   border-radius: 2px;
 }
 
+/* Ranges that mirror each other (languages.registerLinkedEditingRangeProvider). */
+.cm-ext-linked-editing {
+  background: var(--vscode-editor-linkedEditingBackground);
+  border-radius: 2px;
+}
+
 /* Ghost text of languages.registerInlineCompletionItemProvider. */
 .cm-inline-completion-ghost {
   color: var(--text-dim);

@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { matchesSelector, matchGlob } from "../../shared/glob.ts";
 import { parseJsonc } from "../../shared/jsonc.ts";
 import type { ColorThemeKind } from "../../shared/color-theme.ts";
-import { customEditorContributions, wireLanguageConfiguration } from "../../shared/extensions.ts";
+import { customEditorContributions, wireLanguageConfiguration, wireRegex } from "../../shared/extensions.ts";
 import type {
   ConfigSnapshot,
   ExtensionDescription,
@@ -1534,7 +1534,7 @@ export class ExtensionHost {
             | null
             | undefined;
           if (!result?.ranges?.length) continue;
-          return { ranges: result.ranges.map(wireRange), wordPattern: result.wordPattern?.source };
+          return { ranges: result.ranges.map(wireRange), wordPattern: wireRegex(result.wordPattern) };
         } catch (error) {
           this.log("error", `linked editing provider failed: ${errorMessage(error)}`, entry.extensionId);
         }

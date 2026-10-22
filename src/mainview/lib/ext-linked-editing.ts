@@ -1,5 +1,5 @@
 import { EditorState, StateEffect, StateField, type Extension, type Text, type Transaction } from "@codemirror/state";
-import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import type { HostLinkedEditingRanges } from "../../shared/extensions";
 import type { TextRange } from "../../shared/types";
 import { extensionService } from "./extensions";
@@ -10,7 +10,9 @@ import { getSettings } from "./settings";
  * the ranges that mirror each other (HTML/JSX open and close tags, for example)
  * are requested once the cursor rests in a word; while the cursor stays inside
  * one of them, typing or deleting mirrors the same change into the others as a
- * single transaction.
+ * single transaction. The ranges are highlighted while they are linked, and an
+ * edit that leaves the range no longer matching the word pattern (the
+ * provider's, else the language's) ends linked editing, like VS Code.
  */
 
 /** The document the editor is showing (null when none). */
@@ -18,18 +20,47 @@ export type LinkedEditingSource = () => { path: string; language: string } | nul
 
 type Range = { from: number; to: number };
 type Change = { from: number; to: number; insert: string };
+type Linked = { ranges: Range[]; wordPattern: RegExp | null };
 
-const setLinkedRanges = StateEffect.define<Range[] | null>();
+const setLinkedRanges = StateEffect.define<Linked | null>();
 
-const linkedRangesField = StateField.define<Range[] | null>({
+const linkedMark = Decoration.mark({ class: "cm-ext-linked-editing" });
+
+const linkedRangesField = StateField.define<Linked | null>({
   create: () => null,
   update(value, tr) {
     for (const effect of tr.effects) if (effect.is(setLinkedRanges)) return effect.value;
     if (!value || !tr.docChanged) return value;
     // An edit at a boundary extends the range to include the new text.
-    return value.map((range) => ({ from: tr.changes.mapPos(range.from, -1), to: tr.changes.mapPos(range.to, 1) }));
+    return { ...value, ranges: value.ranges.map((range) => mapRange(tr, range)) };
   },
+  provide: (field) =>
+    EditorView.decorations.from(field, (value) =>
+      Decoration.set(
+        (value?.ranges ?? []).filter((range) => range.to > range.from).map((range) => linkedMark.range(range.from, range.to)),
+        true,
+      ),
+    ),
 });
+
+function mapRange(tr: Transaction, range: Range): Range {
+  return { from: tr.changes.mapPos(range.from, -1), to: tr.changes.mapPos(range.to, 1) };
+}
+
+/** A word pattern from the host, made safe to reuse (no global / sticky state). */
+function compilePattern(pattern: { source: string; flags: string } | undefined): RegExp | null {
+  if (!pattern) return null;
+  try {
+    return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""));
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the first match of the pattern covers the whole text (VS Code's test). */
+function matchesWhole(text: string, pattern: RegExp): boolean {
+  return (pattern.exec(text)?.[0].length ?? 0) === text.length;
+}
 
 /** Offset of a 0-based line / character position. */
 function offsetAt(doc: Text, line: number, character: number): number {
@@ -49,13 +80,8 @@ function changeSpecs(tr: Transaction): Change[] {
   return changes;
 }
 
-/** The same changes applied to every other linked range (empty when the edit is not linked). */
-function mirrorChanges(tr: Transaction, ranges: Range[]): Change[] {
-  const changes = changeSpecs(tr);
-  if (!changes.length) return [];
-  // The whole edit has to sit inside one linked range (usually a single character).
-  const source = ranges.find((range) => changes.every((change) => change.from >= range.from && change.to <= range.to));
-  if (!source) return [];
+/** The same changes applied to every other linked range. */
+function mirrorChanges(changes: Change[], ranges: Range[], source: Range): Change[] {
   const mirrored: Change[] = [];
   for (const range of ranges) {
     if (range === source) continue;
@@ -72,10 +98,19 @@ export function linkedEditingExtension(source: LinkedEditingSource): Extension {
     EditorState.transactionFilter.of((tr) => {
       if (!tr.docChanged || (!tr.isUserEvent("input") && !tr.isUserEvent("delete"))) return tr;
       if (!getSettings()["editor.linkedEditing"]) return tr;
-      const ranges = tr.startState.field(linkedRangesField, false);
-      if (!ranges || ranges.length < 2) return tr;
-      const changes = mirrorChanges(tr, ranges);
-      return changes.length ? [tr, { changes }] : tr;
+      const linked = tr.startState.field(linkedRangesField, false);
+      if (!linked || linked.ranges.length < 2) return tr;
+      const changes = changeSpecs(tr);
+      if (!changes.length) return tr;
+      // The whole edit has to sit inside one linked range (usually a single character).
+      const edited = linked.ranges.find((range) => changes.every((change) => change.from >= range.from && change.to <= range.to));
+      if (!edited) return tr;
+      if (linked.wordPattern) {
+        const after = mapRange(tr, edited);
+        // A space typed into a tag name, for example: stop mirroring.
+        if (!matchesWhole(tr.newDoc.sliceString(after.from, after.to), linked.wordPattern)) return [tr, { effects: setLinkedRanges.of(null) }];
+      }
+      return [tr, { changes: mirrorChanges(changes, linked.ranges, edited) }];
     }),
     ViewPlugin.fromClass(
       class {
@@ -115,10 +150,10 @@ export function linkedEditingExtension(source: LinkedEditingSource): Extension {
         }
 
         private inside(): boolean {
-          const ranges = this.view.state.field(linkedRangesField, false);
-          if (!ranges) return false;
+          const linked = this.view.state.field(linkedRangesField, false);
+          if (!linked) return false;
           const head = this.view.state.selection.main.head;
-          return ranges.some((range) => head >= range.from && head <= range.to);
+          return linked.ranges.some((range) => head >= range.from && head <= range.to);
         }
 
         /** Drop the ranges (and any in-flight request). */
@@ -161,7 +196,8 @@ export function linkedEditingExtension(source: LinkedEditingSource): Extension {
           const current = source();
           if (!current || current.path !== target.path || !this.available(current)) return;
           const ranges = result?.ranges?.map((range) => offsetsOf(view.state.doc, range)).filter((range) => range.to > range.from) ?? [];
-          view.dispatch({ effects: setLinkedRanges.of(ranges.length > 1 ? ranges : null) });
+          const wordPattern = compilePattern(result?.wordPattern ?? extensionService.languageConfiguration(current.language)?.wordPattern);
+          view.dispatch({ effects: setLinkedRanges.of(ranges.length > 1 ? { ranges, wordPattern } : null) });
         }
       },
     ),
