@@ -85,6 +85,7 @@ import { python } from "@codemirror/lang-python";
 import { rust } from "@codemirror/lang-rust";
 import { api } from "./rpc";
 import { getSettings, onSettingsChange, type Settings } from "./settings";
+import { indentationFor, rememberIndentation } from "./indentation";
 import { isDarkTheme, onColorThemeChange, themeHighlighter } from "./theme";
 import { applyTextEdits, offsetOf } from "./text-edits";
 import { extensionService } from "./extensions";
@@ -321,11 +322,13 @@ export function noLanguageService(path: string) {
 
 /* ── settings-driven extensions ─────────────────────────────────────────── */
 
-function settingsExtensions(s: Settings): Extension[] {
-  const tabSize = Math.max(1, Math.min(16, Math.round(s["editor.tabSize"])));
+/** `path`: the document, whose own indentation (see indentation.ts) wins over the settings. */
+function settingsExtensions(s: Settings, path?: string | null): Extension[] {
+  const indentation = indentationFor(path, s);
+  const tabSize = Math.max(1, Math.min(16, Math.round(indentation.tabSize)));
   return [
     EditorState.tabSize.of(tabSize),
-    indentUnit.of(s["editor.insertSpaces"] ? " ".repeat(tabSize) : "\t"),
+    indentUnit.of(indentation.insertSpaces ? " ".repeat(tabSize) : "\t"),
     s["editor.wordWrap"] === "on" ? EditorView.lineWrapping : [],
     s["editor.lineNumbers"] === "off" ? [] : lineNumbers(),
     s["editor.renderWhitespace"] === "all" ? highlightWhitespace() : [],
@@ -575,7 +578,7 @@ export class EditorController {
     this.unsubscribeSettings = onSettingsChange(() => {
       this.settingsVersion++;
       if (!this.view) return;
-      this.view.dispatch({ effects: settingsConf.reconfigure(settingsExtensions(getSettings())) });
+      this.view.dispatch({ effects: settingsConf.reconfigure(settingsExtensions(getSettings(), this.current?.path)) });
     });
     this.unsubscribeTheme = onColorThemeChange(() => {
       this.view?.dispatch({ effects: themeConf.reconfigure(themeExtensions()) });
@@ -851,11 +854,12 @@ export class EditorController {
       effects.push(readOnlyConf.reconfigure(readOnlyExtensions(!!doc.readOnly)));
       effects.push(themeConf.reconfigure(themeExtensions()));
       if (cached.settingsVersion !== this.settingsVersion) {
-        effects.push(settingsConf.reconfigure(settingsExtensions(getSettings())));
+        effects.push(settingsConf.reconfigure(settingsExtensions(getSettings(), doc.path)));
       }
       if (cached.scroll) effects.push(cached.scroll);
       if (effects.length) this.view.dispatch({ effects });
     } else {
+      rememberIndentation(doc.path, doc.content);
       this.view.setState(EditorState.create({ doc: doc.content, extensions: this.buildExtensions(doc.language, doc.path) }));
       const effects: StateEffect<unknown>[] = [readOnlyConf.reconfigure(readOnlyExtensions(!!doc.readOnly))];
       const base = this.gitBases.get(doc.path);
@@ -921,6 +925,11 @@ export class EditorController {
     this.saved.set(path, content);
     const current = this.getDocumentContent(path);
     this.setDirty(path, current !== null && current !== content);
+  }
+
+  /** The active document's indentation changed (the status bar picker): edit with it from now on. */
+  refreshIndentation(): void {
+    this.view?.dispatch({ effects: settingsConf.reconfigure(settingsExtensions(getSettings(), this.current?.path)) });
   }
 
   setLanguage(language: string) {
@@ -1023,15 +1032,10 @@ export class EditorController {
   async format(): Promise<boolean> {
     if (!this.view || !this.current) return false;
     const { language, path } = this.current;
-    const settings = getSettings();
+    const { tabSize, insertSpaces } = indentationFor(path, getSettings());
     // An extension formatter (Prettier, …) wins over the built-in ones.
     if (this.hasExtensionFormatter()) {
-      const edits = await extensionService.call(
-        "provideFormatting",
-        path,
-        { tabSize: settings["editor.tabSize"], insertSpaces: settings["editor.insertSpaces"] },
-        null,
-      );
+      const edits = await extensionService.call("provideFormatting", path, { tabSize, insertSpaces }, null);
       if (edits && this.current?.path === path) {
         this.applyEdits(edits);
         return true;
@@ -1040,7 +1044,7 @@ export class EditorController {
     if (language === "json") {
       try {
         const text = this.getContent();
-        const indent = settings["editor.insertSpaces"] ? settings["editor.tabSize"] : "\t";
+        const indent = insertSpaces ? tabSize : "\t";
         const formatted = JSON.stringify(JSON.parse(text), null, indent) + (text.endsWith("\n") ? "\n" : "");
         if (formatted !== text) {
           this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: formatted } });
@@ -1054,8 +1058,8 @@ export class EditorController {
     await this.pushLspChange(this.getContent());
     const { edits } = await api().request.lspFormat({
       path,
-      tabSize: settings["editor.tabSize"],
-      insertSpaces: settings["editor.insertSpaces"],
+      tabSize,
+      insertSpaces,
     });
     this.applyEdits(edits);
     return true;
@@ -1590,7 +1594,7 @@ export class EditorController {
     return [
       // Before the line numbers: the breakpoint gutter sits at the far left.
       debugEditorExtension(() => self.current?.path ?? null),
-      settingsConf.of(settingsExtensions(getSettings())),
+      settingsConf.of(settingsExtensions(getSettings(), path)),
       gitGutter,
       foldGutter(),
       foldingExtension(() => self.current),

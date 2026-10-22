@@ -41,7 +41,7 @@ export type ShellBridge = {
 declare global {
   interface Window {
     __lumen?: ShellBridge;
-    __lumen_invoke?: (channel: string, data: string) => Promise<unknown>;
+    __lumen_invoke?: (channel: string, data: string, token: string) => Promise<unknown>;
   }
 }
 

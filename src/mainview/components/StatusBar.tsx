@@ -45,6 +45,8 @@ export type StatusInfo = {
   /** "Spaces: 2" / "Tab Size: 4" */
   indentation: string | null;
   eol: "LF" | "CRLF" | null;
+  /** The short encoding name ("UTF-8", "Shift JIS"); null for documents without one. */
+  encoding: string | null;
   language: string | null;
   lsp: { text: string; active: boolean } | null;
   message: string | null;
@@ -57,6 +59,7 @@ type Props = StatusInfo & {
   onGotoLine: () => void;
   onIndentation: () => void;
   onEol: () => void;
+  onEncoding: () => void;
   onLanguage: () => void;
   onToggleTerminal: () => void;
   terminalActive: boolean;
@@ -138,7 +141,11 @@ export function StatusBar(props: Props) {
             {props.indentation}
           </button>
         )}
-        {props.language && <span className="status-item">UTF-8</span>}
+        {props.encoding && (
+          <button type="button" className="status-btn" title="Select Encoding" onClick={props.onEncoding}>
+            {props.encoding}
+          </button>
+        )}
         {props.eol && (
           <button type="button" className="status-btn" title="Select End of Line Sequence" onClick={props.onEol}>
             {props.eol}

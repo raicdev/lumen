@@ -55,12 +55,27 @@ function quoteWith(value: string, quoting: number, flavor: ShellFlavor, options:
   }
 }
 
+/** Tokens that chain or redirect commands on purpose: they stay raw. */
+const OPERATOR_TOKENS = new Set(["&&", "||", "|", "&", ";", ">", ">>", "<", "2>&1"]);
+
+/**
+ * What would split an argument into several commands or run something:
+ * separators, redirections, command substitution and stray quotes (and
+ * whitespace). Globs and variables (`src/*.js`, `$HOME`, `%TEMP%`) stay as
+ * they are: tasks use them on purpose.
+ */
+const METACHARACTERS = /[\s&|<>;`"']|\$\(/;
+const CMD_METACHARACTERS = /[\s&|<>"^]/;
+
 function quotedPart(part: string | ShellQuotedString, flavor: ShellFlavor, options: ShellExecution["options"]): string {
   if (typeof part !== "string") return quoteWith(part.value, part.quoting, flavor, options);
-  // Plain strings are quoted only when the shell would otherwise split them.
-  // Only when the quotes are balanced: `"a" & calc & "b"` is not one quoted word.
+  // Already quoted (and only that): `"a" & calc & "b"` is not one quoted word.
   if (/^("(?:[^"\\]|\\.)*"|'[^']*')$/.test(part)) return part;
-  return part === "" || /\s/.test(part) ? quoteWith(part, 2, flavor, options) : part;
+  // Operators a task uses to chain commands are meant to be raw.
+  if (OPERATOR_TOKENS.has(part)) return part;
+  // Anything else the shell would split or interpret is quoted strongly, so
+  // a path like `D:\repos\a&b\file.ts` stays one argument.
+  return part === "" || (flavor === "cmd" ? CMD_METACHARACTERS : METACHARACTERS).test(part) ? quoteWith(part, 2, flavor, options) : part;
 }
 
 /** The shell and the command line a ShellExecution runs. */

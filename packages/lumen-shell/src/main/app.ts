@@ -5,6 +5,9 @@ import { platform } from "./native/index.ts";
 import { setTimeout as sleep } from "timers/promises";
 import { assetRoot, assetUrl, stablePort, startAssetServer } from "./assets.ts";
 
+/** The longest the process waits for onShutdown tasks before it exits. */
+const SHUTDOWN_TIMEOUT_MS = 4000;
+
 export type AppEvents = {
   ready: [];
   "window-all-closed": [];
@@ -34,6 +37,7 @@ class LumenApp {
   #quitRequested = false;
   #running = false;
   #exitOnLastWindowClosed = true;
+  #shutdownTasks: (() => Promise<unknown>)[] = [];
 
   configure(config: AppConfig): void {
     Object.assign(this.#config, config);
@@ -110,15 +114,26 @@ class LumenApp {
     }
   }
 
-  /** Ask every window to close (running its close guard) and stop the loop. */
+  /**
+   * Ask every window to close (running its close guard) and stop the loop.
+   * `before-quit` comes only once every window agreed: a cancelled quit tears nothing down.
+   */
   async quit(): Promise<void> {
     if (this.#quitRequested) return;
-    this.events.emit("before-quit");
     for (const window of this.windows) {
       const closed = await window.requestClose();
       if (!closed) return; // user cancelled (unsaved changes)
     }
+    this.events.emit("before-quit");
     this.#quitRequested = true;
+  }
+
+  /**
+   * Work the process waits for before it exits (extensions deactivating, files
+   * being written), at most SHUTDOWN_TIMEOUT_MS in all.
+   */
+  onShutdown(task: () => Promise<unknown>): void {
+    this.#shutdownTasks.push(task);
   }
 
   /** Terminate immediately (no guards). */
@@ -145,6 +160,7 @@ class LumenApp {
     this.events.emit("quit");
 
     if (this.#exitOnLastWindowClosed) {
+      await Promise.race([Promise.allSettled(this.#shutdownTasks.map((task) => task())), sleep(SHUTDOWN_TIMEOUT_MS)]);
       // Give `quit` listeners a chance to flush (kill PTYs, close handles…).
       await sleep(50);
       process.exit(0);

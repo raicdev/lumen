@@ -1,6 +1,6 @@
 import { CaseSensitive, ChevronRight, ChevronsUpDown, ListCollapse, Ellipsis, Regex, ReplaceAll, WholeWord } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { SearchMatch } from "../../shared/types";
+import type { SearchMatch, SearchOptions } from "../../shared/types";
 import { api } from "../lib/rpc";
 import { extensionService } from "../lib/extensions";
 import { showDialog } from "../lib/dialog";
@@ -17,7 +17,17 @@ type Props = {
   /** Prefill (e.g. the editor selection) when focusing. */
   initialQuery: string;
   onOpenResult: (target: { path: string; line: number; column: number; length: number }) => void;
-  /** Called after Replace All so open editors can reload. */
+  /**
+   * Replace in the files that are open in editors (as undoable edits that stay unsaved, like VS Code);
+   * returns the paths it handled, which are left out of the replacement on disk.
+   */
+  replaceInOpenDocuments: (
+    paths: string[],
+    query: string,
+    replacement: string,
+    options: SearchOptions,
+  ) => Promise<{ paths: string[]; files: number; replacements: number }>;
+  /** Called after Replace All so the explorer can refresh. */
   onReplaced: () => void;
 };
 
@@ -29,7 +39,7 @@ function Toggle({ active, title, label, onClick }: { active: boolean; title: str
   );
 }
 
-export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceToken, initialQuery, onOpenResult, onReplaced }: Props) {
+export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceToken, initialQuery, onOpenResult, replaceInOpenDocuments, onReplaced }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -46,6 +56,12 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
   const [searching, setSearching] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [version, setVersion] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  // The inputs the shown results were found with: Replace All only acts on results of the current inputs.
+  const searchKey = JSON.stringify([query, caseSensitive, wholeWord, regex, include, exclude]);
+  const [resultsKey, setResultsKey] = useState("");
+  const generation = useRef(0);
+  const resultsCurrent = !searching && resultsKey === searchKey;
 
   useEffect(() => {
     if (focusToken > 0) {
@@ -65,14 +81,18 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
   }, [replaceToken]);
 
   useEffect(() => {
+    const current = ++generation.current;
     if ((!workspaceRoot && !providerRoots.length) || !query) {
       setMatches([]);
       setMeta("");
+      setResultsKey("");
+      setSearching(false);
       return;
     }
+    // The shown results are stale from now on (Replace All waits for this search).
+    setSearching(true);
     const timer = setTimeout(() => {
       void (async () => {
-        setSearching(true);
         try {
           const options = { caseSensitive, wholeWord, regex, include, exclude, maxResults: 2000 };
           const result = workspaceRoot
@@ -82,6 +102,9 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
           const provided = providerRoots.length
             ? await extensionService.call("providerSearchFiles", providerRoots, query, options)
             : { matches: [], truncated: false };
+          // A newer search started meanwhile: its results win.
+          if (current !== generation.current) return;
+          setResultsKey(searchKey);
           if (result.error) {
             setMatches([]);
             setMeta(result.error);
@@ -90,6 +113,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
           const all = [...result.matches, ...provided.matches];
           setMatches(all);
           const truncated = result.truncated || provided.truncated;
+          setTruncated(truncated);
           const files = new Set(all.map((m) => m.path)).size;
           setMeta(
             all.length
@@ -97,15 +121,16 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
               : "No results found.",
           );
         } catch {
+          if (current !== generation.current) return;
           setMatches([]);
           setMeta("Search failed");
         } finally {
-          setSearching(false);
+          if (current === generation.current) setSearching(false);
         }
       })();
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, caseSensitive, wholeWord, regex, include, exclude, workspaceRoot, providerRoots, version]);
+  }, [query, caseSensitive, wholeWord, regex, include, exclude, searchKey, workspaceRoot, providerRoots, version]);
 
   if (!workspaceRoot && !providerRoots.length) return <div className="tree-empty">Open a folder to search</div>;
 
@@ -126,13 +151,19 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
     }
   };
 
-  const replaceAll = async (paths?: string[]) => {
-    if (!query || !matches.length) return;
-    const targetMatches = paths ? matches.filter((m) => paths.includes(m.path)) : matches;
-    const fileCount = new Set(targetMatches.map((m) => m.path)).size;
+  const replaceAll = async (only?: string[]) => {
+    // Only results found with the current inputs, never those of the previous query.
+    if (!query || !matches.length || !resultsCurrent) return;
+    const targetMatches = only ? matches.filter((m) => only.includes(m.path)) : matches;
+    // Exactly the files listed: a capped search never widens into files nobody saw.
+    const paths = [...new Set(targetMatches.map((m) => m.path))];
     const choice = await showDialog({
       title: "Replace All",
-      message: `Replace ${targetMatches.length} occurrence${targetMatches.length === 1 ? "" : "s"} across ${fileCount} file${fileCount === 1 ? "" : "s"} with “${replacement}”?`,
+      message: `Replace ${targetMatches.length} occurrence${targetMatches.length === 1 ? "" : "s"} across ${paths.length} file${paths.length === 1 ? "" : "s"} with “${replacement}”?`,
+      detail:
+        truncated && !only
+          ? `The search stopped after ${matches.length} results: only the files listed are changed. Narrow the search to replace the rest.`
+          : "Files open in an editor are changed there and can be undone; other files are written now.",
       buttons: [
         { label: "Replace", role: "primary", value: "replace" },
         { label: "Cancel", role: "default", value: "cancel" },
@@ -140,19 +171,25 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
     });
     if (choice !== "replace") return;
     const options = { caseSensitive, wholeWord, regex, include, exclude };
-    const result = workspaceRoot
-      ? await api().request.replaceInFiles({ root: workspaceRoot, query, replacement, ...options, paths })
-      : { replacements: 0, files: 0, error: undefined as string | undefined };
-    const provided = providerRoots.length
-      ? await extensionService.call("providerReplaceFiles", providerRoots, query, replacement, options, paths)
-      : { replacements: 0, files: 0, error: undefined as string | undefined };
+    const open = await replaceInOpenDocuments(paths, query, replacement, options);
+    const onDisk = paths.filter((path) => !open.paths.includes(path));
+    const none = { replacements: 0, files: 0, failed: [] as string[], error: undefined as string | undefined };
+    const result =
+      workspaceRoot && onDisk.length ? await api().request.replaceInFiles({ root: workspaceRoot, query, replacement, ...options, paths: onDisk }) : none;
+    const provided =
+      providerRoots.length && onDisk.length ? await extensionService.call("providerReplaceFiles", providerRoots, query, replacement, options, onDisk) : none;
     if (result.error || provided.error) {
       toast(result.error ?? provided.error ?? "Replace failed", "error");
       return;
     }
-    const replacements = result.replacements + provided.replacements;
-    const files = result.files + provided.files;
-    toast(`Replaced ${replacements} occurrence${replacements === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`, "success");
+    const replacements = open.replacements + result.replacements + provided.replacements;
+    const files = open.files + result.files + provided.files;
+    const failed = result.failed ?? [];
+    toast(
+      `Replaced ${replacements} occurrence${replacements === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}` +
+        (failed.length ? `. Could not write ${failed.map((path) => path.split(/[\\/]/).pop()).join(", ")}` : ""),
+      failed.length ? "error" : "success",
+    );
     onReplaced();
     setVersion((v) => v + 1);
   };
@@ -205,7 +242,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                   type="button"
                   className="search-toggle"
                   title="Replace All (Ctrl+Alt+Enter)"
-                  disabled={!matches.length}
+                  disabled={!matches.length || !resultsCurrent}
                   onClick={() => void replaceAll()}
                 >
                   <ReplaceAll size={15} />

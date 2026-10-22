@@ -11,6 +11,7 @@ export type Settings = {
   "editor.fontFamily": string;
   "editor.tabSize": number;
   "editor.insertSpaces": boolean;
+  "editor.detectIndentation": boolean;
   "editor.wordWrap": "off" | "on";
   "editor.lineNumbers": "on" | "off";
   "editor.renderWhitespace": "none" | "all";
@@ -74,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   "editor.fontFamily": '"Cascadia Code", Consolas, ui-monospace, monospace',
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
+  "editor.detectIndentation": true,
   "editor.wordWrap": "off",
   "editor.lineNumbers": "on",
   "editor.renderWhitespace": "none",
@@ -129,6 +131,12 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
   { key: "editor.fontFamily", category: "Text Editor", label: "Font Family", description: "Controls the font family." },
   { key: "editor.tabSize", category: "Text Editor", label: "Tab Size", description: "The number of spaces a tab is equal to.", min: 1, max: 16 },
   { key: "editor.insertSpaces", category: "Text Editor", label: "Insert Spaces", description: "Insert spaces when pressing Tab." },
+  {
+    key: "editor.detectIndentation",
+    category: "Text Editor",
+    label: "Detect Indentation",
+    description: "Edit each file with the indentation it already uses (tabs or spaces, and how many) instead of Tab Size and Insert Spaces.",
+  },
   { key: "editor.wordWrap", category: "Text Editor", label: "Word Wrap", description: "Controls how lines should wrap.", options: ["off", "on"] },
   { key: "editor.lineNumbers", category: "Text Editor", label: "Line Numbers", description: "Controls the display of line numbers.", options: ["on", "off"] },
   {
@@ -261,7 +269,8 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     key: "update.channel",
     category: "Application",
     label: "Update: Channel",
-    description: "stable: update to releases only. beta: also update to beta pre-releases, which come before a release and may have bugs.",
+    description:
+      "stable: update to releases only. beta: also update to beta pre-releases, which come before a release and may have bugs. Unless set, a beta build of Lumen follows the beta channel.",
     options: ["stable", "beta"],
   },
 ];
@@ -360,6 +369,11 @@ const listeners = new Set<() => void>();
 function notify(): void {
   current = resolveSettings();
   for (const listener of listeners) listener();
+}
+
+/** Whether the user set `key` (as opposed to it having its default value). */
+export function isUserSetting(key: SettingKey): boolean {
+  return key in userSettings;
 }
 
 export function getSettings(): Settings {

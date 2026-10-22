@@ -15,15 +15,17 @@ import { terminalProfiles, terminals } from "./terminal.ts";
 import { killProcess, listProcesses } from "./process-explorer.ts";
 import { forwardToRunningInstance, instanceSocketPath, serveInstance } from "./single-instance.ts";
 import { UpdateService } from "./updates.ts";
-import { CompatCache, ExtensionManager, analyzeVsix, compareVersions } from "./extensions/manager.ts";
+import { CompatCache, ExtensionManager, analyzeVsix, compareVersions, userDataDir } from "./extensions/manager.ts";
 import { ExtensionHostClient, openExternal } from "./extensions/host-client.ts";
 import { downloadFromMarketplace, latestVersion, marketplaceDetails, searchMarketplace } from "./extensions/marketplace.ts";
 import { WebviewResourceServer } from "./extensions/webview-server.ts";
 import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.ts";
 import type { ExtensionDescription } from "../shared/extensions.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
+import { showFatalError } from "./crash-log.ts";
+import { BackupStore } from "./backups.ts";
 
-const APP_VERSION = "0.2.2-beta.3";
+const APP_VERSION = "0.2.2-beta.4";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 
@@ -37,9 +39,14 @@ function setWorkspace(path: string | null) {
   workspaceRoot = path;
   lspWorker.configure("setWorkspaceRoot", path);
   extensionHost.postFromView({ type: "workspace", root: path });
-  watchWorkspace(path, (paths, git) => {
-    mainWindow?.webContents.send.workspaceChanged({ paths, git });
-    extensionHost.filesChanged(paths);
+  watchWorkspace(path, ({ paths, git, typePaths, typesOverflow }) => {
+    if (paths.length || git) {
+      mainWindow?.webContents.send.workspaceChanged({ paths, git });
+      extensionHost.filesChanged(paths);
+    }
+    // The language service also hears of type files in node_modules / build output.
+    if (typesOverflow) lspWorker.notifyIfRunning("projectChanged");
+    else if (paths.length || typePaths.length) lspWorker.notifyIfRunning("filesChanged", [...paths, ...typePaths]);
   });
 }
 
@@ -156,6 +163,7 @@ async function installExtension(run: () => Promise<ExtensionInstallResult["exten
 
 /** Per-project layout (editors, panels, terminals) — see workspace-state.ts. */
 const workspaceState = new WorkspaceStateStore(APP_NAME);
+const backups = new BackupStore(userDataDir(APP_NAME));
 
 /* ── updates ──────────────────────────────────────────────────────────── */
 
@@ -200,10 +208,10 @@ const rpc = defineMainRPC<LumenRPC>({
         }
       },
 
-      readFile: async ({ path }) => await readTextFile(path),
+      readFile: async ({ path, encoding }) => await readTextFile(path, encoding),
 
-      writeFile: async ({ path, content }) => {
-        const result = await writeTextFile(path, content);
+      writeFile: async ({ path, content, encoding, expectedVersion }) => {
+        const result = await writeTextFile(path, content, { encoding, expectedVersion });
         if (result.success) lspWorker.notifyIfRunning("change", path, content);
         return result;
       },
@@ -559,8 +567,28 @@ const rpc = defineMainRPC<LumenRPC>({
 
       openExternal: ({ url }) => ({ ok: openExternal(url) }),
 
+      backupWrite: (backup) => {
+        try {
+          backups.write(backup);
+          return { success: true };
+        } catch (error) {
+          console.warn("[backups] cannot write a backup:", error);
+          return { success: false };
+        }
+      },
+      backupDelete: ({ path }) => {
+        try {
+          backups.delete(path);
+          return { success: true };
+        } catch {
+          return { success: false };
+        }
+      },
+      backupList: () => ({ backups: backups.list() }),
+
       updateConfigure: ({ mode, channel }) => {
-        updates.configure(mode, channel);
+        // A beta build keeps getting betas unless the user chose a channel.
+        updates.configure(mode, channel ?? (APP_VERSION.includes("-") ? "beta" : "stable"));
         return { state: updates.state };
       },
 
@@ -587,6 +615,21 @@ app.configure({
 });
 
 app.on("ready", () => {
+  try {
+    createMainWindow();
+  } catch (error) {
+    // webview_create fails without the WebView2 runtime: say so instead of exiting silently.
+    showFatalError(
+      "Lumen could not open its window.",
+      `Lumen needs the Microsoft Edge WebView2 Runtime, which Windows 10 and 11 normally include. Install it from https://developer.microsoft.com/microsoft-edge/webview2/ and start Lumen again.
+
+(${error instanceof Error ? error.message : String(error)})`,
+    );
+    process.exit(1);
+  }
+});
+
+function createMainWindow(): void {
   mainWindow = new BrowserWindow<LumenRPC>({
     title: APP_NAME,
     width: 1280,
@@ -623,7 +666,7 @@ app.on("ready", () => {
   const window = mainWindow;
 
   window.on("closed", () => {
-    void extensionHost.stop();
+    void stopExtensionHost();
     workspaceState.flush();
     terminals.killAll();
     mainWindow = null;
@@ -638,30 +681,37 @@ app.on("ready", () => {
       mainWindow?.webContents.send.terminalExit({ id, code });
     },
   );
-});
+}
 
 app.on("before-quit", () => {
-  void extensionHost.stop();
+  void stopExtensionHost();
   workspaceState.flush();
   terminals.killAll();
 });
+
+let extensionHostStopping: Promise<void> | null = null;
+/** Once per shutdown; the process waits for it (extensions deactivate, their processes end). */
+const stopExtensionHost = () => (extensionHostStopping ??= extensionHost.stop());
+app.onShutdown(stopExtensionHost);
 
 // Last chance for queued layout writes (e.g. the process is asked to exit).
 process.on("exit", () => workspaceState.flush());
 
 /**
- * A launch for lumen:// URIs (the OS protocol handler) hands them to a running Lumen and
- * exits; otherwise this instance starts and receives the URIs of such launches.
+ * A launch while Lumen runs hands its lumen:// URIs (if any) to the running Lumen, which
+ * comes to the front, and exits; otherwise this instance starts and receives later launches.
+ * Development runs (pnpm dev) only forward URIs, so they can run beside an installed Lumen.
  */
 async function start(): Promise<void> {
   const socket = instanceSocketPath(APP_IDENTIFIER);
-  if (launchUris.length && (await forwardToRunningInstance(socket, launchUris))) {
+  const forward = launchUris.length > 0 || !process.env.LUMEN_DEV;
+  if (forward && (await forwardToRunningInstance(socket, launchUris))) {
     process.exit(0);
   }
   // A socket file nobody listens on is left over from a crash.
   if (process.platform !== "win32" && existsSync(socket) && !(await forwardToRunningInstance(socket, []))) rmSync(socket, { force: true });
   void serveInstance(socket, (uris) => {
-    handleLaunchUris(uris);
+    if (uris.length) handleLaunchUris(uris);
     mainWindow?.focus();
   });
   void app.run();

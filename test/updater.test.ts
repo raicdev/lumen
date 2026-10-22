@@ -2,8 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import {
   autoUpdater,
   compareSemver,
@@ -139,4 +140,39 @@ test("download checks the SHA-256 digest and reuses a verified download", async 
   const unsafe = { ...update, installer: { ...update.installer, name: "..\\evil.exe" } };
   const saved = await autoUpdater.download(unsafe);
   assert.ok(saved.startsWith(autoUpdater.downloadDir));
+});
+
+test("a write error rejects the download and removes the partial file", { timeout: 30_000, skip: process.platform !== "win32" }, async (t) => {
+  const payload = Buffer.from("setup bytes ".repeat(1000));
+  autoUpdater.configure({ repository: "example/app", name: "Lumen", version: "0.1.0", identifier: `lumen-updater-write-test-${process.pid}` });
+  const file = join(autoUpdater.downloadDir, SETUP);
+  const partial = `${file}.part`;
+  const server = createServer((_request, response) => {
+    // An unwritable destination (disk full, permission, antivirus lock): the
+    // write stream fails after the response has started.
+    mkdirSync(autoUpdater.downloadDir, { recursive: true });
+    writeFileSync(partial, "");
+    chmodSync(partial, 0o444);
+    response.writeHead(200, { "Content-Length": payload.length });
+    response.end(payload);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    server.close();
+    if (existsSync(partial)) {
+      try {
+        chmodSync(partial, 0o666);
+      } catch {
+        /* already gone */
+      }
+    }
+    rmSync(autoUpdater.downloadDir, { recursive: true, force: true });
+  });
+
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/setup.exe`;
+  const update = { version: "0.2.0", title: "", notes: "", url: "", installer: { name: SETUP, url, size: payload.length, sha256: "0".repeat(64) } };
+  // A rejected promise the UI reports as an update error, not an uncaught 'error'.
+  await assert.rejects(autoUpdater.download(update), /EPERM|EACCES/);
+  assert.equal(existsSync(partial), false, "the partial file is removed");
+  assert.equal(existsSync(file), false);
 });

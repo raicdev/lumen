@@ -164,6 +164,28 @@ test("shell command lines are quoted for the shell", () => {
   assert.equal(ps.flavor, "powershell");
 });
 
+test("arguments with shell metacharacters are quoted; chaining operators stay raw", () => {
+  // ${file} on Windows: `&` would split the command under cmd, `;`/`$()` under sh.
+  const path = "D:\\repos\\a&b\\file.ts";
+  assert.equal(shellInvocation(new ShellExecution("tsc", [path]), "win32", { ComSpec: "cmd.exe" }).line, `tsc "${path}"`);
+  assert.equal(shellInvocation(new ShellExecution("tsc", [path]), "win32", { ComSpec: "powershell.exe" }).line, `tsc '${path}'`);
+  assert.equal(shellInvocation(new ShellExecution("tsc", [path]), "linux", { SHELL: "/bin/sh" }).line, `tsc '${path}'`);
+  for (const arg of ["a;b", "$(id)", "a`b", "a|b", "a>b", "a'b", 'a"b', ""]) {
+    assert.equal(shellInvocation(new ShellExecution("x", [arg]), "linux", { SHELL: "/bin/sh" }).line, `x '${arg.replace(/'/g, "'\\''")}'`);
+  }
+  // Globs and variables are meant for the shell.
+  assert.equal(
+    shellInvocation(new ShellExecution("eslint", ["src/*.js", "$HOME/x", "~/y"]), "linux", { SHELL: "/bin/sh" }).line,
+    "eslint src/*.js $HOME/x ~/y",
+  );
+  assert.equal(shellInvocation(new ShellExecution("x", ["%TEMP%\\a", "-Dkey=value"]), "win32", { ComSpec: "cmd.exe" }).line, "x %TEMP%\\a -Dkey=value");
+  // An argument that is already quoted, or an operator a task chains with, stays as written.
+  assert.equal(shellInvocation(new ShellExecution("x", ['"a b"']), "linux", { SHELL: "/bin/sh" }).line, 'x "a b"');
+  assert.equal(shellInvocation(new ShellExecution("echo", ["a", "&&", "echo", "b"]), "win32", { ComSpec: "cmd.exe" }).line, "echo a && echo b");
+  assert.equal(shellInvocation(new ShellExecution("echo", ["a", "&&", "echo", "b"]), "linux", { SHELL: "/bin/sh" }).line, "echo a && echo b");
+  assert.equal(shellInvocation(new ShellExecution("a", ["2>&1"]), "linux", { SHELL: "/bin/sh" }).line, "a 2>&1");
+});
+
 test("Task and friends follow the vscode.d.ts shapes", () => {
   const task = new Task({ type: "demo", id: 1 }, TaskScope.Workspace, "name", "src", new ShellExecution("echo hi"), "$tsc");
   assert.equal(task.name, "name");

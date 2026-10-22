@@ -1,7 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, renameSync, rmSync, readFileSync } from "fs";
+import { isUtf8 } from "buffer";
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, renameSync, rmSync, readFileSync, type Stats } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join, basename, dirname, extname, relative } from "path";
-import type { FileEntry, SearchOptions } from "../shared/types.ts";
+import { encodingLabel } from "../shared/encodings.ts";
+import { buildMatcher, replaceText } from "../shared/search-replace.ts";
+import type { FileEntry, OpenFileResult, SearchOptions } from "../shared/types.ts";
+import { decodeBytes, detectBom, encodeText, normalizeEncoding } from "./exthost/features/workspace-misc/encoding.ts";
 import { detectLanguage, firstLineOf } from "./language.ts";
 
 const IGNORE = new Set([
@@ -22,70 +26,118 @@ const IGNORE = new Set([
   "Thumbs.db",
 ]);
 
-const TEXT_EXTS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".mts",
-  ".cts",
-  ".json",
-  ".jsonc",
-  ".html",
-  ".htm",
-  ".css",
-  ".scss",
-  ".less",
-  ".md",
-  ".mdx",
-  ".txt",
-  ".log",
-  ".py",
-  ".rs",
-  ".go",
-  ".toml",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".svg",
-  ".sh",
-  ".bash",
-  ".zsh",
-  ".ps1",
-  ".sql",
-  ".graphql",
-  ".gql",
-  ".vue",
-  ".svelte",
-  ".env",
-  ".gitignore",
-  ".editorconfig",
-  ".prettierrc",
-  ".eslintrc",
-  ".lock",
-  ".csv",
-  ".tsv",
-  ".ini",
-  ".cfg",
-  ".conf",
-  ".dockerfile",
+/** Extensions of files that are never text: listed in Quick Open, but not opened as text or searched. */
+const BINARY_EXTS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".bmp",
+  ".ico",
+  ".webp",
+  ".tif",
+  ".tiff",
+  ".psd",
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".flac",
+  ".m4a",
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".webm",
+  ".zip",
+  ".gz",
+  ".tgz",
+  ".bz2",
+  ".xz",
+  ".7z",
+  ".rar",
+  ".tar",
+  ".jar",
+  ".vsix",
+  ".exe",
+  ".dll",
+  ".so",
+  ".dylib",
+  ".lib",
+  ".a",
+  ".o",
+  ".obj",
+  ".pdb",
+  ".bin",
+  ".iso",
+  ".dmg",
+  ".msi",
+  ".node",
+  ".wasm",
+  ".class",
+  ".pyc",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".eot",
+  ".sqlite",
+  ".db",
 ]);
 
+/** Text unless the extension says binary; the content check (NUL bytes) happens when the file is read. */
 export function isProbablyText(filePath: string): boolean {
-  const ext = extname(filePath).toLowerCase();
-  const name = basename(filePath).toLowerCase();
-  if (name.startsWith(".env") || name === "dockerfile" || name === "makefile") return true;
-  if (!ext) {
-    try {
-      // Heuristic: small unknown files may be text configs
-      return statSync(filePath).size < 256 * 1024;
-    } catch {
-      return false;
-    }
+  return !BINARY_EXTS.has(extname(filePath).toLowerCase());
+}
+
+/** How many leading bytes the binary check looks at. */
+const SNIFF_BYTES = 64 * 1024;
+
+/** NUL bytes mean a binary file, unless it is UTF-16. */
+function looksBinary(bytes: Uint8Array, encoding: string): boolean {
+  return !encoding.startsWith("utf16") && bytes.subarray(0, SNIFF_BYTES).includes(0);
+}
+
+/** Valid in a Japanese encoding and containing kana: Western text decoded that way has none. */
+function isJapanese(bytes: Uint8Array, label: string): boolean {
+  try {
+    return /[぀-ヿ]/.test(new TextDecoder(label, { fatal: true }).decode(bytes));
+  } catch {
+    return false;
   }
-  return TEXT_EXTS.has(ext) || name.endsWith("rc") || name.endsWith("ignore");
+}
+
+/** The encoding of a file: its BOM, UTF-8 when the bytes are valid UTF-8, Shift JIS / EUC-JP for Japanese text, Windows-1252 otherwise. */
+export function detectEncoding(bytes: Uint8Array): string {
+  const bom = detectBom(bytes);
+  if (bom) return bom;
+  if (isUtf8(bytes)) return "utf8";
+  if (isJapanese(bytes, "shift_jis")) return "shiftjis";
+  if (isJapanese(bytes, "euc-jp")) return "eucjp";
+  return "windows1252";
+}
+
+/** Changes whenever the file is written: compared before a save to catch changes made by other programs. */
+function fileVersion(stats: Stats): string {
+  return `${stats.mtimeMs}:${stats.size}`;
+}
+
+/** A text file's content and encoding; null for binary or unreadable files. */
+function readTextSync(filePath: string): { text: string; encoding: string } | null {
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(filePath);
+  } catch {
+    return null;
+  }
+  const encoding = detectEncoding(bytes);
+  return looksBinary(bytes, encoding) ? null : { text: decodeBytes(bytes, encoding), encoding };
 }
 
 export function readDirTree(dirPath: string, depth = 3): FileEntry[] {
@@ -137,29 +189,56 @@ export function readDirTree(dirPath: string, depth = 3): FileEntry[] {
   return entries;
 }
 
-export async function readTextFile(filePath: string): Promise<{ path: string; content: string; language: string } | { error: string }> {
+/** Read a text file, detecting its encoding unless one is given ("Reopen with Encoding"). */
+export async function readTextFile(filePath: string, encoding?: string): Promise<OpenFileResult | { error: string }> {
   try {
     if (!existsSync(filePath)) return { error: "File not found" };
     if (!isProbablyText(filePath)) return { error: "Binary or unsupported file type" };
 
-    if (statSync(filePath).size > 5 * 1024 * 1024) return { error: "File too large (>5MB)" };
+    const stats = statSync(filePath);
+    if (stats.size > 5 * 1024 * 1024) return { error: "File too large (>5MB)" };
 
-    const content = await readFile(filePath, "utf8");
+    const bytes = await readFile(filePath);
+    const chosen = normalizeEncoding(encoding) ?? detectEncoding(bytes);
+    if (!encoding && looksBinary(bytes, chosen)) return { error: "Binary or unsupported file type" };
+    const content = decodeBytes(bytes, chosen);
     return {
       path: filePath,
       content,
       language: detectLanguage(filePath, firstLineOf(content)),
+      encoding: chosen,
+      version: fileVersion(stats),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to read file" };
   }
 }
 
-export async function writeTextFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }> {
+/** Encodings that hold every character, so a save never needs the round-trip check. */
+const UNICODE_ENCODINGS = new Set(["utf8", "utf8bom", "utf16le", "utf16be"]);
+
+/**
+ * Write a text file in `encoding` (UTF-8 by default). With `expectedVersion`
+ * the write is refused (`conflict`) when another program changed the file
+ * since it was read or last saved.
+ */
+export async function writeTextFile(
+  filePath: string,
+  content: string,
+  options: { encoding?: string; expectedVersion?: string } = {},
+): Promise<{ success: boolean; error?: string; conflict?: boolean; version?: string }> {
   try {
+    if (options.expectedVersion && existsSync(filePath) && fileVersion(statSync(filePath)) !== options.expectedVersion) {
+      return { success: false, conflict: true, error: `${basename(filePath)} has been changed on disk.` };
+    }
+    const encoding = normalizeEncoding(options.encoding) ?? "utf8";
+    const bytes = encodeText(content, encoding);
+    if (!UNICODE_ENCODINGS.has(encoding) && decodeBytes(bytes, encoding) !== content) {
+      return { success: false, error: `Some characters cannot be saved in ${encodingLabel(encoding)}. Use "Save with Encoding" to pick another encoding.` };
+    }
     await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, content, "utf8");
-    return { success: true };
+    await writeFile(filePath, bytes);
+    return { success: true, version: fileVersion(statSync(filePath)) };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to write file" };
   }
@@ -330,13 +409,6 @@ function globList(patterns: string | undefined): RegExp[] {
     });
 }
 
-/** Build the line matcher shared by search and replace (always global). */
-function buildMatcher(query: string, options: SearchOptions): RegExp {
-  let source = options.regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (options.wholeWord) source = `\\b(?:${source})\\b`;
-  return new RegExp(source, options.caseSensitive ? "g" : "gi");
-}
-
 /** Walk the text files of a workspace, honouring the ignore list and include/exclude globs. */
 function walkTextFiles(root: string, options: SearchOptions & { maxFileBytes?: number }, visit: (full: string, relativePath: string) => boolean | void): void {
   const include = globList(options.include);
@@ -399,13 +471,8 @@ export function searchInFiles(root: string, query: string, options: TextSearchOp
 
   walkTextFiles(root, options, (full, rel) => {
     filesScanned++;
-    let text: string;
-    try {
-      text = readFileSync(full, "utf-8");
-    } catch {
-      return;
-    }
-    if (text.includes("\0")) return;
+    const text = readTextSync(full)?.text;
+    if (text === undefined) return;
 
     const lines = text.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
@@ -442,7 +509,7 @@ export async function replaceInFiles(
   query: string,
   replacement: string,
   options: SearchOptions & { paths?: string[] } = {},
-): Promise<{ files: number; replacements: number; error?: string }> {
+): Promise<{ files: number; replacements: number; failed?: string[]; error?: string }> {
   if (!query) return { files: 0, replacements: 0 };
   let matcher: RegExp;
   try {
@@ -459,40 +526,21 @@ export async function replaceInFiles(
 
   let files = 0;
   let replacements = 0;
+  const failed: string[] = [];
   for (const full of targets) {
-    let text: string;
-    try {
-      text = await readFile(full, "utf-8");
-    } catch {
-      continue;
-    }
-    if (text.includes("\0")) continue;
-    let count = 0;
-    // Line by line (keeping each line ending) so ^ / $ behave as in search.
-    const next = text
-      .split(/(\r?\n)/)
-      .map((part, index) => {
-        if (index % 2 === 1) return part;
-        return part.replace(matcher, (...args) => {
-          const matched = args[0] as string;
-          if (!matched) return matched;
-          count++;
-          if (!options.regex) return replacement;
-          // Expand $1, $&, … the way String.prototype.replace would.
-          return matched.replace(new RegExp(matcher.source, matcher.flags.replace("g", "")), replacement);
-        });
-      })
-      .join("");
+    const file = readTextSync(full);
+    if (!file) continue;
+    const { text, count } = replaceText(file.text, matcher, replacement, !!options.regex);
     if (count === 0) continue;
     try {
-      await writeFile(full, next, "utf-8");
+      await writeFile(full, encodeText(text, file.encoding));
       files++;
       replacements += count;
     } catch {
-      /* skip unwritable files */
+      failed.push(full);
     }
   }
-  return { files, replacements };
+  return { files, replacements, failed };
 }
 
 /** Filter workspace file paths by name query. */

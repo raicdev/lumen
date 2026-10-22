@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { Emitter } from "../shared/emitter.ts";
 import type { RpcApi, RpcHandlers, RPCSchema } from "../shared/protocol.ts";
 import type { Envelope } from "../shared/protocol.ts";
@@ -5,7 +6,7 @@ import { RpcEndpoint, createApi } from "../shared/rpc.ts";
 import { NativeWebview, SizeHint, type NativeHandle } from "./native/webview.ts";
 import { platform } from "./native/index.ts";
 import type { MenuGroup, PageRect, ResizeEdge, WindowState } from "./native/platform.ts";
-import { PRELUDE } from "../view/prelude.ts";
+import { prelude } from "../view/prelude.ts";
 import { app } from "./app.ts";
 
 export type CloseGuard = () => boolean | Promise<boolean>;
@@ -109,6 +110,8 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
   readonly events = new Emitter<WindowEvents>();
 
   #native: NativeWebview;
+  /** Proves a bridge call comes from this window's own page (see prelude()). */
+  #bridgeToken = randomBytes(16).toString("hex");
   #endpoint: RpcEndpoint;
   #api: RpcApi<S, "webview">;
   #outbox: Envelope[] = [];
@@ -179,7 +182,7 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
 
     // Bridge + prelude must exist before the page starts loading.
     this.#native.initScript(`window.__lumenWindowOptions = ${JSON.stringify({ frameless: this.#frameless })};`);
-    this.#native.initScript(PRELUDE);
+    this.#native.initScript(prelude(this.#bridgeToken, options.url ? new URL(options.url).origin : null));
     this.#native.bind("__lumen_invoke", (_seq, args) => this.#handleBridge(args));
 
     // Never leave the window invisible if the page fails to report its first frame.
@@ -411,6 +414,8 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
   }
 
   #handleBridge(args: unknown[]): unknown {
+    // Only the prelude of the app's own page knows the token (see prelude()).
+    if (args[2] !== this.#bridgeToken) return null;
     const channel = typeof args[0] === "string" ? (args[0] as string) : "";
     const data = typeof args[1] === "string" ? (args[1] as string) : "";
 

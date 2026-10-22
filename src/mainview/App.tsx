@@ -128,7 +128,7 @@ import { checkForUpdates, restartToUpdate, updateState } from "./lib/updates";
 import { Welcome } from "./components/Welcome";
 import { ExtensionsView, type ExtensionAction, type ExtensionTarget } from "./components/ExtensionsView";
 import { ExtensionDetails } from "./components/ExtensionDetails";
-import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus, TextRange } from "../shared/types";
+import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus, SearchOptions, TextRange } from "../shared/types";
 import type {
   ExtensionDescription,
   HostDebugConfiguration,
@@ -141,6 +141,9 @@ import type {
   MarketplaceExtension,
 } from "../shared/extensions";
 import { normalizeFileSystemKey, sameDocumentKey } from "../shared/file-systems";
+import { encodingShortName, FILE_ENCODINGS } from "../shared/encodings";
+import { indentationFor, setDocumentIndentation } from "./lib/indentation";
+import { buildMatcher, replacementEdits } from "../shared/search-replace";
 
 /** What the app knows about an open document besides the editor state. */
 type DocState = {
@@ -150,6 +153,10 @@ type DocState = {
   language: string;
   eol: "LF" | "CRLF";
   savedEol: "LF" | "CRLF";
+  /** The file's encoding (VS Code ids); UTF-8 when unset. */
+  encoding?: string;
+  /** The file's version on disk when it was read or last saved (see writeTextFile). */
+  version?: string;
   /** A document an extension provides for reading only (text document content provider). */
   readOnly?: boolean;
   /** The provider's message for a read-only file system (registerFileSystemProvider). */
@@ -174,9 +181,18 @@ const isInside = (path: string, folder: string) => {
 
 type EditorGroupState = { id: string; tabs: TabInfo[]; activePath: string | null };
 
-/** Read a document: from disk, or from the file system an extension provides. */
-async function readDocument(path: string): Promise<{ content: string; language: string; readOnly?: boolean; readOnlyMessage?: string } | { error: string }> {
-  if (!isVirtualDocument(path)) return await api().request.readFile({ path });
+type ReadDocumentResult = {
+  content: string;
+  language: string;
+  encoding?: string;
+  version?: string;
+  readOnly?: boolean;
+  readOnlyMessage?: string;
+};
+
+/** Read a document: from disk (in `encoding` when given), or from the file system an extension provides. */
+async function readDocument(path: string, encoding?: string): Promise<ReadDocumentResult | { error: string }> {
+  if (!isVirtualDocument(path)) return await api().request.readFile({ path, encoding });
   try {
     return await extensionService.call("readVirtualFile", path);
   } catch (error) {
@@ -184,8 +200,29 @@ async function readDocument(path: string): Promise<{ content: string; language: 
   }
 }
 
-async function writeDocument(path: string, content: string): Promise<{ success: boolean; error?: string }> {
-  if (!isVirtualDocument(path)) return await api().request.writeFile({ path, content });
+/** The document state of freshly read content (`\n` line endings inside, the file's own on save). */
+function loadedDocState(result: ReadDocumentResult): DocState {
+  const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
+  const content = result.content.replace(/\r\n/g, "\n");
+  return {
+    content,
+    savedContent: content,
+    language: result.language,
+    eol,
+    savedEol: eol,
+    encoding: result.encoding,
+    version: result.version,
+    readOnly: !!result.readOnly,
+    readOnlyMessage: result.readOnlyMessage,
+  };
+}
+
+async function writeDocument(
+  path: string,
+  content: string,
+  options: { encoding?: string; expectedVersion?: string } = {},
+): Promise<{ success: boolean; error?: string; conflict?: boolean; version?: string }> {
+  if (!isVirtualDocument(path)) return await api().request.writeFile({ path, content, ...options });
   try {
     await extensionService.call("writeVirtualFile", path, content);
     return { success: true };
@@ -206,6 +243,14 @@ const customEditorTabInfo = (path: string | null | undefined): CustomEditorTabIn
   if (!info?.uri) return null;
   return { id: info.id, uri: info.uri, viewType: info.viewType, kind: info.customKind ?? "text", dirty: !!info.dirty };
 };
+
+/** How long a save waits for format on save before saving the file unformatted. */
+const FORMAT_ON_SAVE_TIMEOUT_MS = 10_000;
+
+/** How often unsaved editors are backed up (hot exit). */
+const BACKUP_INTERVAL_MS = 1500;
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const FIRST_GROUP = "g1";
 /** The modal editor part (workbench.editor.useModal): an editor group outside the grid, shown over the window. */
@@ -691,19 +736,7 @@ export function App() {
               // The extension edits the file's text document: keep the view's copy in sync.
               if (!docs.current.has(path)) {
                 const result = await readDocument(path);
-                if (!("error" in result)) {
-                  const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
-                  const content = result.content.replace(/\r\n/g, "\n");
-                  docs.current.set(path, {
-                    content,
-                    savedContent: content,
-                    language: result.language,
-                    eol,
-                    savedEol: eol,
-                    readOnly: !!result.readOnly,
-                    readOnlyMessage: result.readOnlyMessage,
-                  });
-                }
+                if (!("error" in result)) docs.current.set(path, loadedDocState(result));
               }
               extensionService.documentOpened(path);
             }
@@ -720,17 +753,7 @@ export function App() {
           setTabs((prev) => prev.filter((tab) => tab.path !== path), groupId);
           return false;
         }
-        const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
-        const content = result.content.replace(/\r\n/g, "\n");
-        docs.current.set(path, {
-          content,
-          savedContent: content,
-          language: result.language,
-          eol,
-          savedEol: eol,
-          readOnly: !!result.readOnly,
-          readOnlyMessage: result.readOnlyMessage,
-        });
+        docs.current.set(path, loadedDocState(result));
       }
       const doc = docs.current.get(path)!;
       const preview = !!options.preview && getSettings()["workbench.editor.enablePreview"];
@@ -827,17 +850,7 @@ export function App() {
           toast(result.error, "error");
           return false;
         }
-        const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
-        const content = result.content.replace(/\r\n/g, "\n");
-        docs.current.set(modified, {
-          content,
-          savedContent: content,
-          language: result.language,
-          eol,
-          savedEol: eol,
-          readOnly: !!result.readOnly,
-          readOnlyMessage: result.readOnlyMessage,
-        });
+        docs.current.set(modified, loadedDocState(result));
       }
 
       const tabPath = diffTabPath(original, modified);
@@ -942,7 +955,11 @@ export function App() {
 
       if (editor.getCurrent()?.path === path) {
         const s = getSettings();
-        if (s["editor.formatOnSave"] && editor.canFormat()) await editor.format().catch(() => false);
+        if (s["editor.formatOnSave"] && editor.canFormat()) {
+          // A formatter that hangs (or an extension host that died) must not keep the file from being saved.
+          const formatted = await Promise.race([editor.format().catch(() => false), delay(FORMAT_ON_SAVE_TIMEOUT_MS).then(() => "timeout" as const)]);
+          if (formatted === "timeout") toast(`Formatting ${basename(path)} took too long; it was saved without formatting.`, "info");
+        }
         // onWillSaveTextDocument: extensions may hand back edits (reason 1 = Manually).
         if (extensionService.hasExtensions) {
           const edits = await extensionService.call("willSaveDocument", path, 1).catch(() => []);
@@ -954,7 +971,28 @@ export function App() {
 
       const content = docContent(path) ?? doc.content;
       const onDisk = doc.eol === "CRLF" ? content.replace(/\n/g, "\r\n") : content;
-      const result = await writeDocument(target, onDisk);
+      const write = (expectedVersion?: string) => writeDocument(target, onDisk, { encoding: doc.encoding, expectedVersion });
+      let result = await write(target === path ? doc.version : undefined);
+      if (result.conflict) {
+        // Another program wrote the file since it was read or saved here. Ask, unless the disk
+        // still holds what was last read or saved (a tool only touched it).
+        const current = await readDocument(target, doc.encoding);
+        const unchanged = !("error" in current) && current.content.replace(/\r\n/g, "\n") === doc.savedContent;
+        const choice = unchanged
+          ? "overwrite"
+          : await showDialog({
+              title: "File Changed on Disk",
+              message: `${basename(target)} has been changed on disk since you opened it. Overwrite it with your changes?`,
+              detail: "Revert File (Command Palette) loads the version on disk instead.",
+              buttons: [
+                { label: "Overwrite", role: "danger", value: "overwrite" },
+                { label: "Cancel", role: "default", value: "cancel" },
+              ],
+              kind: "warning",
+            });
+        if (choice !== "overwrite") return false;
+        result = await write();
+      }
       if (!result.success) {
         toast(result.error ?? "Save failed", "error");
         return false;
@@ -977,6 +1015,7 @@ export function App() {
       saved.savedContent = content;
       saved.content = content;
       saved.savedEol = saved.eol;
+      saved.version = result.version;
       // A diff tab edits the document without an EditorController holding it.
       editorDirty.current.set(target, content !== saved.savedContent);
       for (const other of editors.current.values()) other.markSaved(target, content);
@@ -1175,12 +1214,36 @@ export function App() {
         const crlf = eol ? eol === "CRLF" : file.content.includes("\r\n");
         let text = applyTextEdits(file.content.replace(/\r\n/g, "\n"), edits);
         if (crlf) text = text.replace(/\n/g, "\r\n");
-        const result = await writeDocument(path, text);
+        const result = await writeDocument(path, text, { encoding: file.encoding });
         if (result.success) changed++;
       }
       return changed;
     },
     [editorRef],
+  );
+
+  /** Replace in Files for the files open in editors: undoable edits that stay unsaved, as in VS Code. */
+  const replaceInOpenDocuments = useCallback(
+    async (paths: string[], query: string, replacement: string, options: SearchOptions) => {
+      const matcher = buildMatcher(query, options);
+      const handled: string[] = [];
+      const fileEdits: FileEdits[] = [];
+      let replacements = 0;
+      for (const path of paths) {
+        const openPath = [...docs.current.keys()].find((p) => sameDocumentKey(p, path));
+        if (!openPath) continue;
+        handled.push(path);
+        const edits = replacementEdits(docContent(openPath) ?? docs.current.get(openPath)!.content, matcher, replacement, !!options.regex);
+        if (!edits.length) continue;
+        fileEdits.push({ path: openPath, edits });
+        replacements += edits.length;
+      }
+      if (fileEdits.length) await applyWorkspaceEdits(fileEdits);
+      for (const { path } of fileEdits) refreshTabDirty(path);
+      syncDirtyState();
+      return { paths: handled, files: fileEdits.length, replacements };
+    },
+    [applyWorkspaceEdits, docContent, refreshTabDirty, syncDirtyState],
   );
 
   /* ── workspace ────────────────────────────────────────────────────────── */
@@ -1542,22 +1605,37 @@ export function App() {
     );
   }, [pick, editorRef]);
 
+  /** Indentation of the active file (with Detect Indentation on), else the editor.* settings. */
   const indentationPicker = useCallback(() => {
     const s = getSettings();
+    const editor = editorRef.current;
+    const path = editor?.getCurrent()?.path ?? null;
+    const current = indentationFor(path, s);
     pick(
       "Select Action",
       [
-        { id: "spaces", label: "Indent Using Spaces", description: s["editor.insertSpaces"] ? "(current)" : "" },
-        { id: "tabs", label: "Indent Using Tabs", description: !s["editor.insertSpaces"] ? "(current)" : "" },
-        ...[1, 2, 3, 4, 6, 8].map((n) => ({ id: `size:${n}`, label: `Tab Size: ${n}`, description: s["editor.tabSize"] === n ? "(current)" : "" })),
+        { id: "spaces", label: "Indent Using Spaces", description: current.insertSpaces ? "(current)" : "" },
+        { id: "tabs", label: "Indent Using Tabs", description: !current.insertSpaces ? "(current)" : "" },
+        ...[1, 2, 3, 4, 6, 8].map((n) => ({ id: `size:${n}`, label: `Tab Size: ${n}`, description: current.tabSize === n ? "(current)" : "" })),
       ],
       (id) => {
-        if (id === "spaces") updateSetting("editor.insertSpaces", true);
-        else if (id === "tabs") updateSetting("editor.insertSpaces", false);
-        else updateSetting("editor.tabSize", Number(id.slice(5)));
+        const next =
+          id === "spaces"
+            ? { ...current, insertSpaces: true }
+            : id === "tabs"
+              ? { ...current, insertSpaces: false }
+              : { ...current, tabSize: Number(id.slice(5)) };
+        if (path && s["editor.detectIndentation"]) {
+          setDocumentIndentation(path, next);
+          editor?.refreshIndentation();
+          setCursor((c) => (c ? { ...c } : c));
+        } else {
+          updateSetting("editor.insertSpaces", next.insertSpaces);
+          updateSetting("editor.tabSize", next.tabSize);
+        }
       },
     );
-  }, [pick]);
+  }, [pick, editorRef]);
 
   /** Preferences: Color Theme — the highlighted theme is previewed; Escape goes back to the configured one. */
   const colorThemePicker = useCallback(async () => {
@@ -2012,21 +2090,43 @@ export function App() {
   );
 
   /** Revert a file to what is on disk (workbench.action.files.revert). */
-  const revertDocument = useCallback(async (path: string) => {
-    const result = await readDocument(path);
+  const revertDocument = useCallback(async (path: string, encoding?: string) => {
+    const doc = docs.current.get(path);
+    const result = await readDocument(path, encoding ?? doc?.encoding);
     if ("error" in result) {
       toast(result.error, "error");
       return;
     }
-    const content = result.content.replace(/\r\n/g, "\n");
-    const doc = docs.current.get(path);
-    if (doc) {
-      Object.assign(doc, { content, savedContent: content, eol: result.content.includes("\r\n") ? "CRLF" : "LF" });
-      doc.savedEol = doc.eol;
-    }
+    const { content, eol, version } = loadedDocState(result);
+    if (doc) Object.assign(doc, { content, savedContent: content, eol, savedEol: eol, version, encoding: result.encoding ?? doc.encoding });
     for (const editor of editors.current.values()) if (editor.hasDocument(path)) editor.reloadDocument(path, content);
     extensionService.documentChanged(path);
+    setCursor((c) => (c ? { ...c } : c));
   }, []);
+
+  /** Reopen or save the active file in another encoding (the status bar's encoding item). */
+  const encodingPicker = useCallback(() => {
+    const path = editorRef.current?.getCurrent()?.path;
+    const doc = path ? docs.current.get(path) : null;
+    if (!path || !doc || isVirtualDocument(path)) return;
+    const current = doc.encoding ?? "utf8";
+    const actions = [...(isUntitled(path) ? [] : [{ id: "reopen", label: "Reopen with Encoding" }]), { id: "save", label: "Save with Encoding" }];
+    pick("Select Action", actions, (action) => {
+      const encodings = FILE_ENCODINGS.map((encoding) => ({ id: encoding.id, label: encoding.label, description: encoding.id === current ? "(current)" : "" }));
+      pick(
+        action === "reopen" ? "Reopen with Encoding" : "Save with Encoding",
+        encodings,
+        (id) => {
+          if (action === "save") {
+            doc.encoding = id;
+            void saveDoc(path).then(() => setCursor((c) => (c ? { ...c } : c)));
+          } else if (isDocDirty(path)) toast("Save or revert your changes before reopening the file in another encoding.", "info");
+          else void revertDocument(path, id);
+        },
+        current,
+      );
+    });
+  }, [pick, saveDoc, isDocDirty, revertDocument, editorRef]);
 
   /** Reopen the active file with another editor (Text Editor, or a matching custom editor). */
   const reopenWithEditor = useCallback(
@@ -2882,7 +2982,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.3", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.4", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -3652,7 +3752,8 @@ export function App() {
 
   /**
    * Editors follow a file operation (explorer, workspace.applyEdit): renamed
-   * files and folders keep their tabs (and unsaved changes), deleted ones close.
+   * files and folders keep their tabs (and unsaved changes), deleted ones close
+   * unless they have unsaved changes.
    */
   async function followFileOperation(kind: "create" | "delete" | "rename", files: HostFileOperation[]) {
     for (const file of files) {
@@ -3670,9 +3771,13 @@ export function App() {
           extensionService.documentOpened(target);
         }
       } else if (kind === "delete" && file.path) {
+        // Clean editors close; editors with unsaved changes stay open (saving writes the file again),
+        // as in VS Code: deleting a file never throws away edits that exist nowhere else.
         const affected = [...docs.current.keys()].filter((p) => isInside(p, file.path!));
-        for (const path of affected) editorDirty.current.set(path, false);
-        if (affected.length) await act.current.closeTabs(affected);
+        const kept = affected.filter((path) => isDocDirty(path));
+        if (kept.length) toast(`Unsaved changes in ${kept.map((path) => basename(path)).join(", ")} are kept in the editor.`, "info");
+        const closing = affected.filter((path) => !kept.includes(path));
+        if (closing.length) await act.current.closeTabs(closing);
       }
     }
     setTreeRefresh((n) => n + 1);
@@ -3732,6 +3837,82 @@ export function App() {
     return () => window.removeEventListener("blur", onBlur);
   }, [isDocDirty]);
 
+  /* ── hot exit: backups of unsaved editors ─────────────────────────────── */
+
+  // What each backup on disk holds, so only documents that changed are written again.
+  const backedUp = useRef(new Map<string, string>());
+  // Set once the user chose "Don't Save" on close: nothing is backed up any more.
+  const backupsDiscarded = useRef(false);
+
+  /** Back up the documents with unsaved changes; drop the backups of those that have none any more. */
+  const syncBackups = useCallback(() => {
+    if (backupsDiscarded.current) return;
+    const dirty = new Set<string>();
+    for (const [path, doc] of docs.current) {
+      // Provider documents live in their extension's file system: only files and untitled editors.
+      if (isVirtualDocument(path) || !isDocDirty(path)) continue;
+      dirty.add(path);
+      const content = docContent(path) ?? doc.content;
+      if (backedUp.current.get(path) === content) continue;
+      backedUp.current.set(path, content);
+      void api()
+        .request.backupWrite({ path, content, language: doc.language, eol: doc.eol, encoding: doc.encoding, time: Date.now() })
+        .catch(() => backedUp.current.delete(path));
+    }
+    for (const path of [...backedUp.current.keys()]) {
+      if (dirty.has(path)) continue;
+      backedUp.current.delete(path);
+      void api().request.backupDelete({ path });
+    }
+  }, [docContent, isDocDirty]);
+
+  useEffect(() => {
+    const timer = setInterval(syncBackups, BACKUP_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [syncBackups]);
+
+  /** The user discarded their unsaved changes on close: the next launch must not bring them back. */
+  const discardBackups = useCallback(() => {
+    backupsDiscarded.current = true;
+    for (const path of backedUp.current.keys()) void api().request.backupDelete({ path });
+    backedUp.current.clear();
+  }, []);
+
+  /** Bring back the unsaved editors of the last session (it crashed, or Windows ended it). */
+  const restoreBackups = useCallback(async () => {
+    const { backups } = await api()
+      .request.backupList({})
+      .catch(() => ({ backups: [] }));
+    let count = 0;
+    for (const backup of backups) {
+      if (!isUntitled(backup.path) && (await openFile(backup.path))) {
+        const path = openDocumentKey(docs.current, backup.path);
+        const doc = docs.current.get(path);
+        if (!doc) continue;
+        const current = docContent(path) ?? doc.content;
+        if (current === backup.content) {
+          // Saved after all (the backup outlived the save): nothing to bring back.
+          void api().request.backupDelete({ path: backup.path });
+          continue;
+        }
+        const lines = current.split("\n");
+        await applyWorkspaceEdits([
+          { path, edits: [{ startLine: 0, startCharacter: 0, endLine: lines.length - 1, endCharacter: lines.at(-1)!.length, newText: backup.content }] },
+        ]);
+        doc.eol = backup.eol;
+        if (backup.encoding) doc.encoding = backup.encoding;
+        refreshTabDirty(path);
+      } else {
+        // An untitled editor (or a file that is gone): a new untitled editor with the text.
+        void api().request.backupDelete({ path: backup.path });
+        await newUntitled(backup.language, backup.content);
+      }
+      count++;
+    }
+    syncDirtyState();
+    if (count) toast(`Restored unsaved changes in ${count} editor${count === 1 ? "" : "s"} from the last session.`, "info");
+  }, [applyWorkspaceEdits, docContent, newUntitled, openFile, refreshTabDirty, syncDirtyState]);
+
   /* ── close guard ──────────────────────────────────────────────────────── */
 
   useEffect(() => {
@@ -3759,9 +3940,11 @@ export function App() {
               : !!(await extensionService.call("saveCustomEditor", entry.uri, entry.viewType).catch(() => false));
           if (!saved) return { allow: false, dirtyCount: total };
         }
+        syncBackups();
         return { allow: true, dirtyCount: 0 };
       }
       if (choice === "discard") {
+        discardBackups();
         // Editable custom documents are backed up so the extension can restore them (hot exit).
         for (const entry of dirtyCustom) {
           if (entry.kind === "editable") void extensionService.call("backupCustomEditor", entry.uri, entry.viewType).catch(() => null);
@@ -3770,7 +3953,7 @@ export function App() {
       }
       return { allow: false, dirtyCount: total };
     });
-  }, [isDocDirty]);
+  }, [isDocDirty, discardBackups, syncBackups]);
 
   /* ── workspace events ─────────────────────────────────────────────────── */
 
@@ -3789,6 +3972,13 @@ export function App() {
   useEffect(() => {
     if (startupDone) void extensionService.start(workspaceRootRef.current);
   }, [startupDone]);
+  // Then the unsaved editors the last session left behind.
+  const backupsRestored = useRef(false);
+  useEffect(() => {
+    if (!startupDone || backupsRestored.current) return;
+    backupsRestored.current = true;
+    void restoreBackups();
+  }, [startupDone, restoreBackups]);
   useEffect(() => {
     if (startupDone && ext.ready) extensionService.activate("onStartupFinished");
   }, [startupDone, ext.ready, ext.extensions]);
@@ -3803,17 +3993,23 @@ export function App() {
       for (const [path, doc] of docs.current) {
         if (isUntitled(path) || !changed.has(lowerKey(path))) continue;
         void api()
-          .request.readFile({ path })
+          .request.readFile({ path, encoding: doc.encoding })
           .then((result) => {
             if ("error" in result) return;
             const content = result.content.replace(/\r\n/g, "\n");
-            if (content === doc.savedContent) return;
+            if (content === doc.savedContent) {
+              // Same text (our own save, or a tool touched the file): nothing to ask about on the next save.
+              doc.version = result.version;
+              return;
+            }
             if (isDocDirty(path)) {
-              toast(`${basename(path)} changed on disk. Your unsaved changes are kept.`, "info");
+              // The version stays the one read: saving asks before overwriting the other program's changes.
+              toast(`${basename(path)} changed on disk. Your unsaved changes are kept; saving will ask before overwriting.`, "info");
               return;
             }
             doc.savedContent = content;
             doc.content = content;
+            doc.version = result.version;
             for (const editor of editors.current.values()) if (editor.hasDocument(path)) editor.reloadDocument(path, content);
             extensionService.documentChanged(path);
           });
@@ -4511,6 +4707,7 @@ export function App() {
   const errorCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "error").length, 0);
   const warningCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "warning").length, 0);
   const activeDoc = activePath ? docs.current.get(parseDiffTab(activePath)?.modified ?? activePath) : undefined;
+  const activeIndentation = indentationFor(activePath ? (parseDiffTab(activePath)?.modified ?? activePath) : null, settings);
   const editorActive = !!activePath && !isSpecialTab(activePath);
   const paletteCommands = useMemo(() => [...allCommands.values()], [allCommands]);
   const visiblePaletteCommands = quick ? paletteCommands.filter((command) => command.enabled?.() !== false) : paletteCommands;
@@ -5077,6 +5274,7 @@ export function App() {
                   onOpenResult={(t) =>
                     void openFile(t.path, { preview: true, line: t.line, character: t.column, end: { line: t.line, character: t.column + t.length } })
                   }
+                  replaceInOpenDocuments={replaceInOpenDocuments}
                   onReplaced={() => setTreeRefresh((n) => n + 1)}
                 />
               </div>
@@ -5311,9 +5509,11 @@ export function App() {
           warnings={warningCount}
           cursor={editorActive ? cursor : null}
           indentation={
-            editorActive ? (settings["editor.insertSpaces"] ? `Spaces: ${settings["editor.tabSize"]}` : `Tab Size: ${settings["editor.tabSize"]}`) : null
+            editorActive ? (activeIndentation.insertSpaces ? `Spaces: ${activeIndentation.tabSize}` : `Tab Size: ${activeIndentation.tabSize}`) : null
           }
           eol={editorActive ? (activeDoc?.eol ?? null) : null}
+          encoding={editorActive && activeDoc && activePath && !isVirtualDocument(activePath) ? encodingShortName(activeDoc.encoding ?? "utf8") : null}
+          onEncoding={encodingPicker}
           language={activeLanguage && editorActive ? languageLabel(activeLanguage) : null}
           lsp={activeLanguage && editorActive && isSmart(activeLanguage) ? lspStatusLabel(activeLanguage) : null}
           message={statusMessage}

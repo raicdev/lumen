@@ -41,6 +41,9 @@ function handle(request) {
         supportsConfigurationDoneRequest: true,
         supportsRestartRequest: true,
         exceptionBreakpointFilters: [{ filter: "uncaught", label: "Uncaught Exceptions", default: true }],
+        // Not DAP: what the client's transport did (test/debug.test.ts reads it).
+        ipc: !!process.send,
+        argv: process.argv.slice(2),
       });
       return;
     case "launch":

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -409,6 +409,45 @@ test("the extension manager installs, disables and uninstalls a .vsix", () => {
     assert.equal(manager.enabled().length, 0);
     assert.ok(manager.uninstall(installed.id));
     assert.equal(manager.list().length, 0);
+  } finally {
+    if (previous === undefined) delete process.env.LUMEN_EXTENSIONS_DIR;
+    else process.env.LUMEN_EXTENSIONS_DIR = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the extension manager refuses names and versions that would escape its folders", () => {
+  const dir = temp();
+  const previous = process.env.LUMEN_EXTENSIONS_DIR;
+  process.env.LUMEN_EXTENSIONS_DIR = dir;
+  try {
+    const manager = new ExtensionManager();
+    const vsix = (manifest: Record<string, unknown>) => zip({ "extension/package.json": JSON.stringify(manifest) });
+    const base = { publisher: "test", version: "1.0.0", engines: { lumen: "^0.1.0" } };
+    for (const manifest of [
+      { ...base, name: "..\\evil" },
+      { ...base, name: "evil/../../x" },
+      { ...base, publisher: "..\\..\\x", name: "evil" },
+      { ...base, name: "evil", version: "1.0.0/../../x" },
+      { ...base, name: "evil", version: "nightly" },
+    ]) {
+      assert.throws(() => manager.installVsix(vsix(manifest), { type: "vsix", file: "evil.vsix" }), /invalid extension name\/version in package manifest/);
+    }
+    assert.equal(existsSync(join(dir, "..", "evil")), false);
+    // The fallback publisher and a semver pre-release are fine.
+    const installed = manager.installVsix(vsix({ name: "nopub", version: "1.2.3-beta.1", engines: { lumen: "^0.1.0" } }), { type: "vsix", file: "nopub.vsix" });
+    assert.equal(installed.id, "undefined_publisher.nopub");
+    assert.equal(installed.location, join(dir, "undefined_publisher.nopub-1.2.3-beta.1"));
+
+    // Copying a development folder does not validate its manifest: the folder check refuses it.
+    const source = temp();
+    try {
+      writeFileSync(join(source, "package.json"), JSON.stringify({ publisher: "test", name: "..\\escape", version: "1.0.0" }));
+      assert.throws(() => manager.installFolder(source, { copy: true }), /outside the extensions directory/);
+      assert.equal(existsSync(join(dir, "..", "escape-1.0.0")), false);
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
   } finally {
     if (previous === undefined) delete process.env.LUMEN_EXTENSIONS_DIR;
     else process.env.LUMEN_EXTENSIONS_DIR = previous;

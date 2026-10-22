@@ -17,6 +17,20 @@ window.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
+// With an IME (Japanese, Chinese, Korean input), Enter confirms a conversion and Escape cancels it:
+// those keys belong to the IME, not to the field's own handlers (which would accept a Quick Open
+// row, submit an input box or close a dialog). CodeMirror and xterm handle composition themselves.
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (!event.isComposing && event.keyCode !== 229) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(".cm-editor, .xterm")) return;
+    event.stopImmediatePropagation();
+  },
+  true,
+);
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("#root not found");
 

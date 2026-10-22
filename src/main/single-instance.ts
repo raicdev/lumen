@@ -3,10 +3,12 @@ import { tmpdir, userInfo } from "os";
 import { join } from "path";
 
 /**
- * lumen:// URIs for an already running Lumen. The OS starts a new process for
- * every URI it opens (the installer registers the scheme); like VS Code, that
- * process hands the URIs to the running instance over a local socket (a named
- * pipe on Windows) and exits. Plain launches still open a window of their own.
+ * One Lumen per user. The OS starts a new process for every launch (and every
+ * lumen:// URI it opens, the installer registers the scheme); like VS Code,
+ * that process hands its URIs to the running instance over a local socket (a
+ * named pipe on Windows), which comes to the front, and exits. A second app
+ * would serve its page from another port, i.e. with other web storage, so its
+ * settings would look reset.
  */
 
 /** The socket of one user's instances (per app identifier). */
@@ -38,8 +40,8 @@ export function forwardToRunningInstance(path: string, uris: string[], timeoutMs
   });
 }
 
-/** Listen for URIs from later launches; `onUris` gets each launch's lumen:// URIs. */
-export function serveInstance(path: string, onUris: (uris: string[]) => void): Promise<Server | null> {
+/** Listen for later launches; `onLaunch` gets each launch's lumen:// URIs (none for a plain launch). */
+export function serveInstance(path: string, onLaunch: (uris: string[]) => void): Promise<Server | null> {
   return new Promise((resolve) => {
     const server = createServer((socket) => {
       let data = "";
@@ -53,7 +55,7 @@ export function serveInstance(path: string, onUris: (uris: string[]) => void): P
         try {
           const message = JSON.parse(data) as { uris?: unknown };
           const uris = Array.isArray(message.uris) ? message.uris.filter((uri): uri is string => typeof uri === "string" && uri.startsWith("lumen://")) : [];
-          if (uris.length) onUris(uris);
+          onLaunch(uris);
         } catch {
           /* not a launch message */
         }

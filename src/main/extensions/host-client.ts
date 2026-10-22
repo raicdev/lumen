@@ -6,6 +6,7 @@ import type { ConfigSnapshot, HostMethods, HostToView, MainMethods, ViewToHost }
 import type { HostInit, HostToMain, MainToHost } from "../exthost/protocol.ts";
 import { workerEntry } from "../workers.ts";
 import { languageIds } from "../language.ts";
+import { killTree } from "../tasks/process.ts";
 import { ExtensionManager, userDataDir } from "./manager.ts";
 import type { WebviewResourceServer } from "./webview-server.ts";
 
@@ -14,6 +15,9 @@ import type { WebviewResourceServer } from "./webview-server.ts";
  * between it and the view, answers its dialog / OS requests, and restarts it
  * (after installs, or when it crashed).
  */
+
+/** Heap limit of the extension host worker (all extensions together). */
+const HOST_HEAP_MB = 4096;
 
 type Dialogs = {
   showOpenDialog: (options: { title?: string; defaultPath?: string; folders?: boolean; many?: boolean }) => Promise<string[]>;
@@ -94,7 +98,9 @@ export class ExtensionHostClient {
     this.#options.webviews.clear();
     const generation = ++this.#generation;
     const extensions = this.#options.manager.enabled();
-    const worker = new Worker(workerEntry(), { workerData: { lumenWorker: "exthost" } });
+    // The heap cap makes an extension that runs out of memory end this worker (and the
+    // view restarts it) instead of aborting the whole app with every unsaved editor.
+    const worker = new Worker(workerEntry(), { workerData: { lumenWorker: "exthost" }, resourceLimits: { maxOldGenerationSizeMb: HOST_HEAP_MB } });
     worker.unref();
     this.#worker = worker;
     worker.on("message", (message: HostToMain) => this.#onMessage(message));
@@ -103,6 +109,7 @@ export class ExtensionHostClient {
       console.error("[extensions] extension host terminated:", error);
       this.#worker = null;
       this.#rejectAll(error);
+      this.#killChildProcesses();
       this.#options.toView({ type: "crashed", error: error.message });
     };
     worker.on("error", fail);
@@ -147,6 +154,13 @@ export class ExtensionHostClient {
     });
     await worker.terminate().catch(() => 0);
     this.#rejectAll(new Error("extension host stopped"));
+    this.#killChildProcesses();
+  }
+
+  /** Language servers and other helpers the extensions started do not outlive them. */
+  #killChildProcesses(): void {
+    for (const pid of this.#childProcesses.keys()) killTree(pid);
+    this.#childProcesses.clear();
   }
 
   /** A notification from the view (documents, replies, events). */

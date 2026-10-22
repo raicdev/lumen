@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import { createHash } from "crypto";
+import { once } from "events";
 import { createWriteStream, existsSync } from "fs";
 import { mkdir, readdir, readFile, rename, rm } from "fs/promises";
 import { tmpdir } from "os";
@@ -226,25 +227,43 @@ class AutoUpdater {
     const partial = `${file}.part`;
     const hash = createHash("sha256");
     const out = createWriteStream(partial);
+    // A disk-full / permission / antivirus-lock error has to reject the
+    // download instead of becoming an uncaught exception (and leaving a
+    // pending drain wait forever).
+    let writeError: Error | null = null;
+    let rejectWrite: ((error: Error) => void) | null = null;
+    const writeFailed = new Promise<never>((_, reject) => (rejectWrite = reject));
+    writeFailed.catch(() => undefined);
+    out.on("error", (error) => {
+      writeError = error;
+      rejectWrite?.(error);
+    });
     const reader = response.body.getReader();
     let received = 0;
     try {
       for (let next = await reader.read(); !next.done; next = await reader.read()) {
+        if (writeError) throw writeError;
         const chunk = next.value;
         hash.update(chunk);
         received += chunk.length;
-        if (!out.write(chunk)) await new Promise<void>((resolve) => out.once("drain", resolve));
+        if (!out.write(chunk)) await Promise.race([new Promise<void>((resolve) => out.once("drain", resolve)), writeFailed]);
         onProgress?.(received, total);
       }
-      await new Promise<void>((resolve, reject) => out.end((error?: Error | null) => (error ? reject(error) : resolve())));
+      await Promise.race([new Promise<void>((resolve, reject) => out.end((error?: Error | null) => (error ? reject(error) : resolve()))), writeFailed]);
     } catch (error) {
+      // Close the handle first: Windows keeps the file busy until then.
       out.destroy();
-      await rm(partial, { force: true });
+      if (!out.closed) await once(out, "close").catch(() => undefined);
+      try {
+        await rm(partial, { force: true });
+      } catch {
+        /* EBUSY: the next download removes it */
+      }
       throw error;
     }
     const digest = hash.digest("hex");
     if (digest !== installer.sha256) {
-      await rm(partial, { force: true });
+      await rm(partial, { force: true }).catch(() => undefined);
       throw new Error(`the downloaded ${installer.name} does not match its published SHA-256 digest`);
     }
     await rename(partial, file);
@@ -258,10 +277,13 @@ class AutoUpdater {
    */
   install(file: string, options: { relaunch?: boolean } = {}): void {
     if (!this.canInstall) throw new Error("this copy of the app cannot install updates");
+    if (!existsSync(file)) throw new Error(`the downloaded setup ${file} is missing`);
     const installDir = dirname(process.execPath);
     // NSIS reads /D= raw up to the end of the command line: it must come last and stay unquoted.
     const args = ["/S", ...(options.relaunch ? ["/RELAUNCH"] : []), `/D=${installDir}`].join(" ");
     const child = spawn(file, [args], { argv0: `"${file}"`, detached: true, stdio: "ignore", windowsVerbatimArguments: true });
+    // A refused start is logged: an unhandled 'error' event would crash the app.
+    child.on("error", (error) => console.error(`[updater] could not start the setup: ${error.message}`));
     child.unref();
   }
 

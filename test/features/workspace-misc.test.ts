@@ -242,8 +242,10 @@ test("a launch with lumen:// URIs hands them to the running instance", async () 
   assert.ok(server);
   try {
     assert.equal(await forwardToRunningInstance(path, ["lumen://pub.ext/a?x=1", "https://not-ours"]), true);
+    // A plain launch is handed over too (the running window comes to the front).
+    assert.equal(await forwardToRunningInstance(path, []), true);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.deepEqual(received, [["lumen://pub.ext/a?x=1"]]);
+    assert.deepEqual(received, [["lumen://pub.ext/a?x=1"], []]);
   } finally {
     server!.close();
   }

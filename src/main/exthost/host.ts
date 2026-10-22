@@ -457,17 +457,23 @@ export class ExtensionHost {
     await Promise.all(matching.map((runtime) => this.activate(runtime, event)));
   }
 
-  activate(runtime: ExtensionRuntime, reason: string): Promise<void> {
+  /** `chain`: the extensions whose activation waits for this one (their dependencies first). */
+  activate(runtime: ExtensionRuntime, reason: string, chain: ReadonlySet<string> = new Set()): Promise<void> {
     if (runtime.activated) return Promise.resolve();
-    runtime.activating ??= this.#doActivate(runtime, reason);
+    // A dependency cycle (A needs B, B needs A): waiting for the activation further up would never end.
+    if (chain.has(runtime.id)) {
+      this.log("warning", `extension dependency cycle: ${[...chain, runtime.id].join(" → ")}`, runtime.id);
+      return Promise.resolve();
+    }
+    runtime.activating ??= this.#doActivate(runtime, reason, new Set([...chain, runtime.id]));
     return runtime.activating;
   }
 
-  async #doActivate(runtime: ExtensionRuntime, reason: string): Promise<void> {
+  async #doActivate(runtime: ExtensionRuntime, reason: string, chain: ReadonlySet<string>): Promise<void> {
     const { manifest, location } = runtime.description;
     for (const dependency of manifest.extensionDependencies ?? []) {
       const other = this.runtimes.get(dependency.toLowerCase());
-      if (other) await this.activate(other, `dependency of ${runtime.id}`);
+      if (other) await this.activate(other, `dependency of ${runtime.id}`, chain);
       else if (!dependency.startsWith("vscode.")) this.log("warning", `missing dependency ${dependency}`, runtime.id);
     }
     const started = performance.now();

@@ -1,6 +1,6 @@
 import type { UpdateState } from "../../shared/types";
 import { api } from "./rpc";
-import { getSettings, onSettingsChange } from "./settings";
+import { getSettings, isUserSetting, onSettingsChange } from "./settings";
 import { notify, showProgress, toast } from "./toast";
 
 /**
@@ -91,7 +91,9 @@ async function show(next: UpdateState): Promise<void> {
 export function startUpdates(): void {
   window.addEventListener("lumen:update-state", (event) => void show((event as CustomEvent<UpdateState>).detail));
   let mode = getSettings()["update.mode"];
-  let channel = getSettings()["update.channel"];
+  // Unset, the main process picks the channel of the running build (beta builds follow beta).
+  const configuredChannel = () => (isUserSetting("update.channel") ? getSettings()["update.channel"] : null);
+  let channel = configuredChannel();
   const configure = () =>
     api()
       .request.updateConfigure({ mode, channel })
@@ -104,9 +106,9 @@ export function startUpdates(): void {
   void configure();
   onSettingsChange(() => {
     const settings = getSettings();
-    if (settings["update.mode"] === mode && settings["update.channel"] === channel) return;
+    if (settings["update.mode"] === mode && configuredChannel() === channel) return;
     mode = settings["update.mode"];
-    channel = settings["update.channel"];
+    channel = configuredChannel();
     void configure();
   });
 }

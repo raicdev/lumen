@@ -256,10 +256,15 @@ export class DapConnection {
 /** A child process speaking DAP on its stdio. */
 export function executableTransport(descriptor: T.DebugAdapterExecutable, onStderr: (text: string) => void): DapTransport {
   const env = { ...process.env, ...descriptor.options?.env };
+  // The packaged app runs on Lumen.exe, a Node SEA whose launcher starts a
+  // script (instead of a second app window) when it has an IPC channel and the
+  // script in argv[2] — the way child_process.fork starts it. DAP still uses
+  // stdin/stdout; in dev (plain node.exe) the extra channel is harmless.
+  const forked = descriptor.command === process.execPath;
   const child = spawn(descriptor.command, descriptor.args, {
     cwd: descriptor.options?.cwd,
     env,
-    stdio: ["pipe", "pipe", "pipe"],
+    stdio: forked ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
   const parser = new FrameParser();
@@ -273,7 +278,11 @@ export function executableTransport(descriptor: T.DebugAdapterExecutable, onStde
     for (const listener of closeListeners) listener(error);
   };
   child.on("error", (error) => closed(error));
-  child.on("exit", (code, signal) => closed(new Error(`the debug adapter exited (code ${code ?? "?"}${signal ? `, signal ${signal}` : ""})`)));
+  child.on("exit", (code, signal) => {
+    // The IPC channel (when there is one) must not keep the host's event loop alive.
+    if (child.connected) child.disconnect();
+    closed(new Error(`the debug adapter exited (code ${code ?? "?"}${signal ? `, signal ${signal}` : ""})`));
+  });
   return {
     send: (message) => {
       try {
@@ -1061,8 +1070,8 @@ export class DebugSessionManager {
       if (!program) continue;
       const runtimeName = String(platform?.runtime ?? debugger_.runtime ?? (program.endsWith(".js") ? "node" : ""));
       const command = runtimeName === "node" ? process.execPath : runtimeName || program;
-      const args = runtimeName ? [resolveProgram(program, runtime.description.location)] : ([] as string[]);
-      if (runtimeName) args.push(...((platform?.args ?? debugger_.args ?? []) as string[]).map(String));
+      const contributedArgs = ((platform?.args ?? debugger_.args ?? []) as string[]).map(String);
+      const args = runtimeName ? [resolveProgram(program, runtime.description.location), ...contributedArgs] : contributedArgs;
       return new T.DebugAdapterExecutable(command, args);
     }
     return undefined;

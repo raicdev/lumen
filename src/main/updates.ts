@@ -1,4 +1,5 @@
 import { app, autoUpdater, type UpdateRelease as ShellUpdateRelease } from "@lumen/shell/main";
+import { existsSync } from "fs";
 import type { UpdateChannel, UpdateMode, UpdateRelease, UpdateState } from "../shared/types.ts";
 
 /** The first background check waits for startup to settle. */
@@ -133,6 +134,13 @@ export class UpdateService {
   async install(): Promise<{ ok: boolean; error?: string }> {
     if (this.#state.kind !== "ready" || !this.#file) return { ok: false, error: "No update has been downloaded yet." };
     const file = this.#file;
+    // Checked while the window is still there to say so: after quitting nobody would see the error.
+    if (!autoUpdater.canInstall) return { ok: false, error: "This copy of Lumen cannot install updates." };
+    if (!existsSync(file)) {
+      this.#file = null;
+      this.#set({ kind: "idle" });
+      return { ok: false, error: "The downloaded update was removed (for example by disk cleanup). Check for updates to download it again." };
+    }
     if (!(await this.#options.quit())) return { ok: false };
     try {
       autoUpdater.install(file, { relaunch: true });

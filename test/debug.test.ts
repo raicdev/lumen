@@ -335,6 +335,46 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
   }
 });
 
+test("contributed debuggers run through process.execPath with an IPC channel and keep their args", { timeout: 30_000 }, async () => {
+  const dir = temp();
+  try {
+    const app = join(dir, "app.js");
+    writeFileSync(app, "// app\n");
+    const { host, waitFor } = await harness(dir, `const lumen = require("lumen");\nexports.activate = () => {};`, {
+      contributes: {
+        debuggers: [
+          { type: "runtime-adapter", label: "Runtime Adapter", runtime: "node", program: FIXTURE },
+          { type: "exec-adapter", label: "Exec Adapter", program: process.execPath, args: [FIXTURE, "sentinel"] },
+        ],
+      },
+    });
+    const capabilities = async (sessionId: string) => {
+      const message = (await waitFor((m) => m.type === "debugCapabilities" && m.capabilities.sessionId === sessionId)) as Extract<
+        HostToView,
+        { type: "debugCapabilities" }
+      >;
+      return message.capabilities.capabilities as { ipc?: boolean; argv?: string[] };
+    };
+
+    // runtime "node": the command is process.execPath (Lumen.exe when packaged),
+    // which the launcher only treats as a script host when it has an IPC channel.
+    const runtime = await host.methods.debugStartConfiguration(dir, { type: "runtime-adapter", name: "Runtime", request: "launch", program: app });
+    assert.equal(runtime.error, undefined);
+    assert.equal((await capabilities(runtime.sessionId!)).ipc, true, "the adapter is started like a fork, not as a second app window");
+    await host.methods.debugStop(runtime.sessionId!);
+
+    // No runtime: the contributed args must be kept (the program is the command).
+    const exec = await host.methods.debugStartConfiguration(dir, { type: "exec-adapter", name: "Exec", request: "launch" });
+    assert.equal(exec.error, undefined);
+    const body = await capabilities(exec.sessionId!);
+    assert.equal(body.ipc, true);
+    assert.ok(body.argv?.includes("sentinel"), "args reach the adapter when there is no runtime");
+    await host.methods.debugStop(exec.sessionId!);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /** An extension whose "alias" configurations resolve to the "recorded" type, served by an in-process adapter that records requests. */
 function aliasMain(): string {
   return [

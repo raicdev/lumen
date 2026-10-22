@@ -19,10 +19,26 @@ export type FileEntry = {
   children?: FileEntry[];
 };
 
+/** An unsaved editor kept on disk until it is saved or discarded (hot exit). */
+export type DocumentBackup = {
+  /** The file path, or `untitled:Untitled-1`. */
+  path: string;
+  content: string;
+  language: string;
+  eol: "LF" | "CRLF";
+  encoding?: string;
+  /** When the backup was written (ms since the epoch). */
+  time: number;
+};
+
 export type OpenFileResult = {
   path: string;
   content: string;
   language: string;
+  /** The file's encoding (VS Code ids: `utf8`, `utf8bom`, `shiftjis`, …). */
+  encoding?: string;
+  /** Changes when the file is written; a save passes it back to detect changes made by other programs. */
+  version?: string;
 };
 
 export type Diagnostic = {
@@ -229,12 +245,12 @@ export type LumenRPC = {
         response: { entries: FileEntry[]; error?: string };
       };
       readFile: {
-        params: { path: string };
+        params: { path: string; encoding?: string };
         response: OpenFileResult | { error: string };
       };
       writeFile: {
-        params: { path: string; content: string };
-        response: { success: boolean; error?: string };
+        params: { path: string; content: string; encoding?: string; expectedVersion?: string };
+        response: { success: boolean; error?: string; conflict?: boolean; version?: string };
       };
       createFile: {
         params: { path: string; content?: string };
@@ -277,7 +293,8 @@ export type LumenRPC = {
           /** Limit the replacement to these files. */
           paths?: string[];
         };
-        response: { files: number; replacements: number; error?: string };
+        /** `failed`: files that could not be written (read-only, locked). */
+        response: { files: number; replacements: number; failed?: string[]; error?: string };
       };
       searchFilesByName: {
         params: { root: string; query: string; maxResults?: number };
@@ -543,9 +560,23 @@ export type LumenRPC = {
         params: { url: string };
         response: { ok: boolean };
       };
+      backupWrite: {
+        params: DocumentBackup;
+        response: { success: boolean };
+      };
+      backupDelete: {
+        params: { path: string };
+        response: { success: boolean };
+      };
+      /** The backups left by the last session (unsaved editors to restore). */
+      backupList: {
+        params: Record<string, never>;
+        response: { backups: DocumentBackup[] };
+      };
       /** `update.mode` or `update.channel` changed (also sent once at startup): schedules the background checks. */
       updateConfigure: {
-        params: { mode: UpdateMode; channel: UpdateChannel };
+        /** `channel` null: the user did not choose one (the channel of the running build). */
+        params: { mode: UpdateMode; channel: UpdateChannel | null };
         response: { state: UpdateState };
       };
       /** Help > Check for Updates: check now and download what is found. */

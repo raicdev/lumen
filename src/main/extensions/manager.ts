@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir, tmpdir } from "os";
-import { extname, isAbsolute, join, resolve, sep } from "path";
+import { dirname, extname, isAbsolute, join, resolve, sep } from "path";
 import { randomBytes } from "crypto";
 import type { CompatReport, ExtensionDescription, ExtensionManifest, ExtensionSource, MarketplaceCompat } from "../../shared/extensions.ts";
 import { TRANSPILER_VERSION, isVscodeManifest, refreshReport, transpileExtension, transpileVsix } from "./transpiler.ts";
@@ -47,6 +47,10 @@ export function userDataDir(appName: string): string {
 export function extensionId(manifest: ExtensionManifest): string {
   return `${manifest.publisher || "undefined_publisher"}.${manifest.name}`;
 }
+
+/** The id and version become a folder name below the extensions dir: plain words only. */
+const NAME_PATTERN = /^[a-z0-9][a-z0-9-_]*$/i;
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
 function readManifest(dir: string): ExtensionManifest | null {
   try {
@@ -257,7 +261,13 @@ export class ExtensionManager {
     this.#save(registry);
   }
 
+  /** Whether a folder is directly inside the extensions dir (nothing a package name could escape to). */
+  #inside(path: string): boolean {
+    return dirname(resolve(path)) === resolve(this.dir);
+  }
+
   #remove(path: string): boolean {
+    if (!this.#inside(path)) return false;
     try {
       rmSync(path, { recursive: true, force: true, maxRetries: 2 });
       return true;
@@ -352,6 +362,9 @@ export class ExtensionManager {
     if (!raw) throw new Error("not a VS Code extension package (extension/package.json is missing)");
     const manifest = JSON.parse(raw.toString("utf8")) as ExtensionManifest;
     if (!manifest.name || !manifest.version) throw new Error("the package manifest needs a name and a version");
+    if (!NAME_PATTERN.test(manifest.publisher || "undefined_publisher") || !NAME_PATTERN.test(manifest.name) || !VERSION_PATTERN.test(manifest.version)) {
+      throw new Error("invalid extension name/version in package manifest");
+    }
     const id = extensionId(manifest);
     // A package for another platform lacks this platform's binaries (like VS Code, refuse it).
     const target = vsixTargetPlatform(vsix);
@@ -407,6 +420,7 @@ export class ExtensionManager {
       console.warn(`[extensions] installing ${id}@${version} over a newer version`);
     }
     let folder = `${id.toLowerCase()}-${version}`;
+    if (!this.#inside(join(this.dir, folder))) throw new Error(`refusing to install ${id} outside the extensions directory`);
     if (existsSync(join(this.dir, folder))) {
       if (!this.#remove(join(this.dir, folder))) folder = `${folder}-${randomBytes(2).toString("hex")}`;
     }

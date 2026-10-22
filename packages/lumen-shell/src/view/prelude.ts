@@ -15,12 +15,31 @@
  * layouts); that element gets `data-hover` / `data-pressed` attributes since
  * the OS, not the page, receives the mouse there.
  *
- * Kept as a plain string so it can be handed to `webview_init` verbatim.
+ * Built as a plain string so it can be handed to `webview_init` verbatim.
+ *
+ * The native binding exists in every document the window loads, so the shell
+ * only answers calls that carry `token`: the prelude knows it, and only sets
+ * up the bridge in the app's own page (`origin`). A page the window was
+ * navigated to (a dropped file, a link) gets nothing it can call.
  */
-export const PRELUDE = `
+export function prelude(token: string, origin: string | null): string {
+  return `
 (function () {
-  // Only the window's own page: never iframes (e.g. extension webviews).
+  // Only the window's own page: never iframes (e.g. extension webviews) or other sites.
   if (window.__lumen || window.top !== window) return;
+  var ORIGIN = ${JSON.stringify(origin)};
+  if (ORIGIN && location.origin !== ORIGIN) return;
+  var TOKEN = ${JSON.stringify(token)};
+
+  // A file or link dropped where the page does not handle drops would navigate the window away.
+  window.addEventListener("dragover", function (event) {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+  });
+  window.addEventListener("drop", function (event) {
+    if (!event.defaultPrevented) event.preventDefault();
+  });
 
   var listeners = [];
   var pending = [];
@@ -29,7 +48,7 @@ export const PRELUDE = `
     if (typeof window.__lumen_invoke !== "function") {
       return Promise.reject(new Error("Lumen Shell bridge is not available"));
     }
-    return window.__lumen_invoke(channel, data);
+    return window.__lumen_invoke(channel, data, TOKEN);
   }
 
   function signalReady() {
@@ -322,3 +341,4 @@ export const PRELUDE = `
   }
 })();
 `;
+}

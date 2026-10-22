@@ -230,6 +230,10 @@ export function normalizeKeybinding(key: string): string {
 
 const titleOf = (value: string | { value: string } | undefined) => (typeof value === "string" ? value : (value?.value ?? ""));
 
+/** The extension host is restarted automatically after this many crashes within CRASH_WINDOW_MS. */
+const AUTO_RESTARTS = 3;
+const CRASH_WINDOW_MS = 5 * 60_000;
+
 class ExtensionService {
   #snapshot: ExtensionsSnapshot = {
     ready: false,
@@ -277,6 +281,8 @@ class ExtensionService {
   #languageConfigurations = new Map<string, HostLanguageConfiguration>();
   #languageConfigListeners = new Set<(languageId: string) => void>();
   #started = false;
+  /** When the extension host crashed recently (see AUTO_RESTARTS). */
+  #crashes: number[] = [];
 
   constructor() {
     window.addEventListener("lumen:ext-host", (e) => this.#onMessage((e as CustomEvent<HostToView>).detail));
@@ -1003,12 +1009,25 @@ class ExtensionService {
         this.#refreshFileDecorations();
         return;
       }
-      case "crashed":
+      case "crashed": {
         this.#update({ ready: false, crashed: message.error });
-        void notify("error", `The extension host terminated unexpectedly (${message.error}).`, ["Restart Extension Host"]).then((choice) => {
+        // Restart on its own, unless it keeps crashing (then one bad extension would loop forever).
+        const now = Date.now();
+        this.#crashes = [...this.#crashes.filter((at) => now - at < CRASH_WINDOW_MS), now];
+        if (this.#crashes.length <= AUTO_RESTARTS) {
+          void notify("error", `The extension host terminated unexpectedly (${message.error}). It is being restarted.`);
+          void this.restart();
+          return;
+        }
+        void notify(
+          "error",
+          `The extension host terminated unexpectedly ${this.#crashes.length} times in the last few minutes (${message.error}). Disable recently installed extensions, then restart it.`,
+          ["Restart Extension Host"],
+        ).then((choice) => {
           if (choice === 0) void this.restart();
         });
         return;
+      }
       case "request": {
         const handler = this.#handlers[message.method] as ((...args: unknown[]) => unknown) | undefined;
         let reply: ViewToHost;

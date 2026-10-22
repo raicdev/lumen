@@ -36,6 +36,7 @@ function loadUser32() {
     GetSystemMetrics: user32.func("int __stdcall GetSystemMetrics(int index)"),
     ShowWindow: user32.func("int __stdcall ShowWindow(void *hwnd, int cmd)"),
     IsZoomed: user32.func("int __stdcall IsZoomed(void *hwnd)"),
+    IsIconic: user32.func("int __stdcall IsIconic(void *hwnd)"),
     SetForegroundWindow: user32.func("int __stdcall SetForegroundWindow(void *hwnd)"),
     SetFocus: user32.func("void *__stdcall SetFocus(void *hwnd)"),
     SetWindowLongPtrW: user32.func("intptr_t __stdcall SetWindowLongPtrW(void *hwnd, int index, intptr_t value)"),
@@ -607,6 +608,8 @@ function center(handle: NativeHandle, width: number, height: number): void {
 }
 
 function focus(handle: NativeHandle): void {
+  // A minimized window comes back first (a second launch brings Lumen to the front).
+  if (symbols().IsIconic(handle) !== 0) symbols().ShowWindow(handle, SW_RESTORE);
   symbols().SetForegroundWindow(handle);
   symbols().SetFocus(handle);
 }

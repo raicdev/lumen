@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { dirname, join, normalize } from "path";
+import { dirname, isAbsolute, join, normalize, relative } from "path";
 import { existsSync, readdirSync, statSync, readFileSync } from "fs";
 import { createRequire } from "module";
 import type {
@@ -121,7 +121,30 @@ function resolveTsLibDir(): string {
 
 const TS_LIB_DIR = resolveTsLibDir();
 
+/**
+ * A TypeScript default lib (`lib.es2022.d.ts`) asked for at a path that does not exist
+ * (the packaged app's): the file in TS_LIB_DIR. Never a project's own file: a `dist/lib.d.ts`
+ * in the workspace is read from disk, or does not exist.
+ */
+function defaultLibFallback(fileName: string, root: string | null): string | null {
+  const base = fileName.replace(/\\/g, "/").split("/").pop()!;
+  if (!base.startsWith("lib.") || !base.endsWith(".d.ts") || existsSync(fileName)) return null;
+  if (root) {
+    const inside = relative(root, fileName);
+    if (inside && !inside.startsWith("..") && !isAbsolute(inside)) return null;
+  }
+  const libPath = join(TS_LIB_DIR, base);
+  return existsSync(libPath) ? libPath : null;
+}
+
+/** A change to one of these makes a new program (see filesChanged): compiler options, or installed packages. */
+const PROJECT_FILE = /(^|[\\/])(tsconfig[^\\/]*|jsconfig)\.json$|[\\/]node_modules[\\/]/i;
+
 // ─── JSON / lightweight language diagnostics ───────────────────────────
+
+function asHints(diagnostics: Diagnostic[]): Diagnostic[] {
+  return diagnostics.map((diagnostic) => ({ ...diagnostic, severity: "hint" }));
+}
 
 function pythonDiagnostics(path: string, content: string): Diagnostic[] {
   const diags: Diagnostic[] = [];
@@ -403,6 +426,8 @@ export class LanguageServiceHub {
     lib: ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
   };
   private hostFiles = new Map<string, string>();
+  /** Bumped for a file that is not open whenever it changes on disk (see filesChanged). */
+  private diskVersions = new Map<string, number>();
   private tsPlugins: TsServerPluginSpec[] = [];
   private projectFiles: string[] = [];
 
@@ -471,6 +496,31 @@ export class LanguageServiceHub {
     this.hostFiles.delete(path);
   }
 
+  /**
+   * Files changed on disk (the workspace watcher): files that are not open are
+   * read again, so renames and references are computed on what the files hold
+   * now, not on the text read before a `git checkout` or a formatter run.
+   */
+  filesChanged(paths: string[]) {
+    // Compiler options or installed packages changed: imports may resolve differently now,
+    // which re-reading files does not redo (TypeScript reuses the program's resolutions).
+    if (paths.some((path) => PROJECT_FILE.test(path))) {
+      this.projectChanged();
+      return;
+    }
+    for (const changed of paths) {
+      const path = normalizePath(changed);
+      if (this.docs.has(path)) continue;
+      this.hostFiles.delete(path);
+      this.diskVersions.set(path, (this.diskVersions.get(path) ?? 0) + 1);
+    }
+  }
+
+  /** Start over with a new program (tsconfig changed, packages were installed): open documents are kept. */
+  projectChanged() {
+    if (this.service) this.rebuildService();
+  }
+
   private ensureService() {
     if (!this.service) this.rebuildService();
   }
@@ -523,7 +573,8 @@ export class LanguageServiceHub {
         fileName = normalizePath(fileName);
         const doc = this.docs.get(fileName);
         if (doc) return String(doc.version);
-        return "1";
+        // Another value than any open version: closing a document makes TypeScript read the file again.
+        return `disk:${this.diskVersions.get(fileName) ?? 0}`;
       },
       getScriptSnapshot: (fileName) => {
         fileName = normalizePath(fileName);
@@ -531,14 +582,11 @@ export class LanguageServiceHub {
           return ts.ScriptSnapshot.fromString(this.hostFiles.get(fileName)!);
         }
         // Default libs under TS_LIB_DIR
-        const base = fileName.replace(/\\/g, "/").split("/").pop()!;
-        if (base.startsWith("lib.") && base.endsWith(".d.ts")) {
-          const libPath = join(TS_LIB_DIR, base);
-          if (existsSync(libPath)) {
-            const text = readFileSync(libPath, "utf-8");
-            this.hostFiles.set(fileName, text);
-            return ts.ScriptSnapshot.fromString(text);
-          }
+        const libPath = defaultLibFallback(fileName, root);
+        if (libPath) {
+          const text = readFileSync(libPath, "utf-8");
+          this.hostFiles.set(fileName, text);
+          return ts.ScriptSnapshot.fromString(text);
         }
         if (existsSync(fileName)) {
           const text = ts.sys.readFile(fileName);
@@ -568,20 +616,13 @@ export class LanguageServiceHub {
       },
       fileExists: (fileName) => {
         if (this.hostFiles.has(normalizePath(fileName))) return true;
-        const base = fileName.replace(/\\/g, "/").split("/").pop()!;
-        if (base.startsWith("lib.") && base.endsWith(".d.ts")) {
-          if (existsSync(join(TS_LIB_DIR, base))) return true;
-        }
-        return ts.sys.fileExists(fileName);
+        return ts.sys.fileExists(fileName) || !!defaultLibFallback(fileName, root);
       },
       readFile: (fileName, encoding) => {
         fileName = normalizePath(fileName);
         if (this.hostFiles.has(fileName)) return this.hostFiles.get(fileName);
-        const base = fileName.replace(/\\/g, "/").split("/").pop()!;
-        if (base.startsWith("lib.") && base.endsWith(".d.ts")) {
-          const libPath = join(TS_LIB_DIR, base);
-          if (existsSync(libPath)) return readFileSync(libPath, "utf-8");
-        }
+        const libPath = defaultLibFallback(fileName, root);
+        if (libPath) return readFileSync(libPath, "utf-8");
         return ts.sys.readFile(fileName, encoding);
       },
       readDirectory: ts.sys.readDirectory,
@@ -734,16 +775,18 @@ export class LanguageServiceHub {
       switch (doc.language) {
         case "json":
           return jsonDiagnostics(path, doc.content);
+        // Pattern checks, not parsers: they can be wrong (a quote in a heredoc, `"""` in a
+        // docstring), so they are hints, never errors in the Problems count.
         case "python":
-          return pythonDiagnostics(path, doc.content);
+          return asHints(pythonDiagnostics(path, doc.content));
         case "css":
-          return cssDiagnostics(path, doc.content);
+          return asHints(cssDiagnostics(path, doc.content));
         case "html":
-          return htmlDiagnostics(path, doc.content);
+          return asHints(htmlDiagnostics(path, doc.content));
         case "shell":
-          return shellDiagnostics(path, doc.content);
+          return asHints(shellDiagnostics(path, doc.content));
         case "yaml":
-          return yamlDiagnostics(path, doc.content);
+          return asHints(yamlDiagnostics(path, doc.content));
         default:
           return [];
       }
