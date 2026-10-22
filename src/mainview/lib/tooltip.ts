@@ -48,8 +48,8 @@ function adopt(element: Element): void {
   const title = element.getAttribute("title");
   if (title === null) return;
   removeAttribute.call(element, "title");
-  if (title) element.setAttribute("data-tooltip", title);
-  else removeAttribute.call(element, "data-tooltip");
+  // An empty one stays too: as in browsers, it hides the tooltips of the elements around it.
+  element.setAttribute("data-tooltip", title);
   // The title named icon-only controls; for the others it described them.
   const ownLabel = element.hasAttribute("aria-label") && !element.hasAttribute("data-tooltip-aria");
   if (ownLabel) return;
@@ -80,7 +80,7 @@ function anchorOf(target: EventTarget | null): Element | null {
   const found = target.closest(ANCHOR_SELECTOR);
   if (!found || found.tagName === "IFRAME") return null;
   adopt(found);
-  return found.hasAttribute("data-tooltip") || found.hasAttribute("data-tooltip-markdown") ? found : null;
+  return found.getAttribute("data-tooltip") || found.getAttribute("data-tooltip-markdown") ? found : null;
 }
 
 function clearTimers(): void {
