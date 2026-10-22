@@ -184,14 +184,48 @@ async function saveAs(host: ExtensionHost, target: T.Uri): Promise<T.Uri | undef
 
 /* ── the feature ─────────────────────────────────────────────────────────── */
 
-/** `files.encoding` for a resource (language overrides are not distinguished). */
-function configuredEncoding(host: ExtensionHost): string | undefined {
+/** A workspace folder as the explorer sees it (`path` is the window's document key). */
+const describeFolder = (folder: { uri: T.Uri; name: string }) => ({
+  uri: folder.uri.toString(),
+  name: folder.name,
+  scheme: folder.uri.scheme,
+  path: keyOfUri(folder.uri),
+});
+
+/**
+ * `files.encoding` for a resource: the `"[<language>]"` section of an open document's
+ * language first (user, Lumen, then extension defaults), the global setting otherwise.
+ */
+function configuredEncoding(host: ExtensionHost, uri?: T.Uri): string | undefined {
+  const languageId = uri ? host.documentForUri(uri)?.languageId : undefined;
+  if (languageId) {
+    for (const source of [host.config.user, host.config.lumen, host.configDefaultOverrides]) {
+      const section = source[`[${languageId}]`];
+      const value = section && typeof section === "object" ? (section as Record<string, unknown>)["files.encoding"] : undefined;
+      if (typeof value === "string") return value;
+    }
+  }
   const value = host.configValue("files.encoding");
   return typeof value === "string" ? value : undefined;
 }
 
+/** decode / encode options: `{ uri?, encoding? }`, or the resource's Uri. */
+function encodingOptions(options: { uri?: T.Uri; encoding?: string } | T.Uri | undefined): { uri?: T.Uri; encoding?: string } {
+  if (!options) return {};
+  if (T.Uri.isUri(options)) return { uri: options as T.Uri };
+  return { uri: T.Uri.isUri(options.uri) ? T.Uri.revive(options.uri) : undefined, encoding: options.encoding };
+}
+
 export const workspaceMiscFeature: HostFeature = {
   area: "workspace-misc",
+
+  // The explorer shows extra workspace folders (including provided file systems) next to the local root.
+  init: (host) => {
+    const { folders } = stateOf(host);
+    const postFolders = () => host.postFeature("workspace-misc", { type: "folders", folders: folders.folders.map(describeFolder) });
+    postFolders();
+    folders.onDidChange(() => postFolders());
+  },
 
   api: (ctx) => {
     if (building) return {};
@@ -279,12 +313,12 @@ export const workspaceMiscFeature: HostFeature = {
         },
         saveAs: (uri: T.Uri) => saveAs(host, uri),
         decode: async (content: Uint8Array, options?: { uri?: T.Uri; encoding?: string } | T.Uri) => {
-          const given = options && !T.Uri.isUri(options) ? (options as { encoding?: string }).encoding : undefined;
-          return decodeBytes(content, given ?? configuredEncoding(host));
+          const { uri, encoding } = encodingOptions(options);
+          return decodeBytes(content, encoding ?? configuredEncoding(host, uri));
         },
         encode: async (content: string, options?: { uri?: T.Uri; encoding?: string } | T.Uri) => {
-          const given = options && !T.Uri.isUri(options) ? (options as { encoding?: string }).encoding : undefined;
-          return encodeText(content, given ?? configuredEncoding(host));
+          const { uri, encoding } = encodingOptions(options);
+          return encodeText(content, encoding ?? configuredEncoding(host, uri));
         },
         get fs() {
           if (fileSystem) return fileSystem;

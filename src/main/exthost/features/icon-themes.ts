@@ -74,11 +74,28 @@ async function assets(key: unknown, paths: unknown): Promise<Record<string, stri
   return result;
 }
 
+/** The font of a contributes.icons entry as a data: URI (`null` when it cannot be read). */
+async function iconFont(host: ExtensionHost, extensionId: unknown, path: unknown): Promise<string | null> {
+  if (typeof extensionId !== "string" || typeof path !== "string") return null;
+  const runtime = host.runtimes.get(extensionId.toLowerCase());
+  const mime = ICON_MIME_TYPES[extname(path).toLowerCase()];
+  if (!runtime || !mime?.startsWith("font/")) return null;
+  try {
+    const file = await real(path);
+    if (!insideFolder(await real(runtime.description.location), file)) return null;
+    if ((await stat(file)).size > MAX_ASSET_BYTES) return null;
+    return `data:${mime};base64,${(await readFile(file)).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 export const iconThemesFeature: HostFeature = {
   area: "icon-themes",
   onViewRequest: async (host, method, args) => {
     if (method === "load") return await load(host, args[0], args[1], args[2]);
     if (method === "assets") return await assets(args[0], args[1]);
+    if (method === "iconFont") return await iconFont(host, args[0], args[1]);
     throw new Error(`unknown icon theme request: ${method}`);
   },
 };

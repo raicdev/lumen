@@ -3,17 +3,17 @@ import { homedir } from "os";
 import { basename, join } from "path";
 
 /**
- * Shell integration scripts (bash, zsh, PowerShell). They make the shell emit
+ * Shell integration scripts (bash, zsh, fish, PowerShell). They make the shell emit
  * VS Code's OSC 633 sequences (prompt start / end, command line, execution
  * start, exit code, cwd) that the terminal view parses into the extension API's
  * `Terminal.shellIntegration` and execution events.
  *
  * The scripts are written once to `~/.lumen/shell-integration` and loaded by
- * the shell through an rcfile / ZDOTDIR / `-Command` argument, so the user's
- * own startup files still run.
+ * the shell through an rcfile / ZDOTDIR / `-Command` / `--init-command`
+ * argument, so the user's own startup files still run.
  */
 
-export type ShellKind = "bash" | "zsh" | "pwsh";
+export type ShellKind = "bash" | "zsh" | "fish" | "pwsh";
 
 /** String.raw cannot hold a literal `${`: scripts write `@{` where a shell parameter expansion is meant. */
 const sh = (text: string) => text.replaceAll("@{", "${");
@@ -103,6 +103,46 @@ add-zsh-hook preexec __lumen_preexec
 add-zsh-hook precmd __lumen_precmd
 `);
 
+export const FISH_SCRIPT = String.raw`# Lumen shell integration for fish
+if set -q __lumen_integration
+    return
+end
+set -g __lumen_integration 1
+set -g __lumen_nonce "$LUMEN_SHELL_NONCE"
+
+function __lumen_esc
+    set -l s (string replace -a '\\' '\\\\' -- "$argv[1]" | string collect -N)
+    string replace -a ';' '\x3b' -- "$s"
+end
+
+function __lumen_preexec --on-event fish_preexec
+    printf "\e]633;E;%s;%s\a\e]633;C\a" (__lumen_esc "$argv[1]" | string collect -N) "$__lumen_nonce"
+end
+
+function __lumen_postexec --on-event fish_postexec
+    printf "\e]633;D;%s\a" $status
+end
+
+if functions -q fish_prompt
+    functions -c fish_prompt __lumen_original_prompt
+end
+
+function fish_prompt
+    printf "\e]633;P;Cwd=%s;%s\a" (__lumen_esc "$PWD" | string collect -N) "$__lumen_nonce"
+    printf "\e]633;A\a"
+    if functions -q __lumen_original_prompt
+        __lumen_original_prompt
+    else
+        set_color normal
+        printf "%s" (prompt_pwd)
+        set_color blue
+        printf "> "
+        set_color normal
+    end
+    printf "\e]633;B\a"
+end
+`;
+
 const ZSH_FORWARD = (name: string) => `# Lumen: load the user's ${name}, then keep our ZDOTDIR
 __lumen_zdotdir="$ZDOTDIR"
 if [[ -n "$USER_ZDOTDIR" && -f "$USER_ZDOTDIR/${name}" ]]; then ZDOTDIR="$USER_ZDOTDIR"; . "$USER_ZDOTDIR/${name}"; fi
@@ -179,6 +219,7 @@ export function shellKindOf(file: string): ShellKind | null {
   const name = basename(file).toLowerCase().replace(/\.exe$/, "");
   if (name === "bash") return "bash";
   if (name === "zsh") return "zsh";
+  if (name === "fish") return "fish";
   if (name === "pwsh" || name === "powershell") return "pwsh";
   return null;
 }
@@ -210,6 +251,7 @@ export function ensureIntegrationScripts(): string {
   }
   writeIfChanged(join(dir, "lumen-integration.bash"), BASH_SCRIPT);
   writeIfChanged(join(dir, "bash-rcfile.sh"), BASH_RC);
+  writeIfChanged(join(dir, "lumen-integration.fish"), FISH_SCRIPT);
   // Windows PowerShell 5.1 reads a BOM-less file as ANSI: write a BOM.
   writeIfChanged(join(dir, "lumen-integration.ps1"), `﻿${PWSH_SCRIPT}`);
   writeIfChanged(join(dir, "zsh", "lumen-integration.zsh"), ZSH_SCRIPT);
@@ -226,6 +268,9 @@ const psQuote = (value: string) => `'${value.replace(/['‘’‚‛]/g, (quote)
 
 /** Arguments after which PowerShell takes the rest of the command line as the command or script parameters. */
 const PWSH_COMMAND_FLAGS = new Set(["-command", "-c", "-file", "-f", "-encodedcommand", "-ec", "-e", "-commandwithargs", "-cwa"]);
+
+/** Quote a path for a fish single-quoted string (`\\` and `\'` are its only escapes). */
+const fishQuote = (value: string) => `'${value.replace(/[\\']/g, (char) => `\\${char}`)}'`;
 
 /**
  * Arguments / environment that make `file` load the integration script, or
@@ -253,6 +298,12 @@ export function injectShellIntegration(
     }
     case "zsh":
       return { args, env: { ...env, USER_ZDOTDIR: env.ZDOTDIR || homedir(), ZDOTDIR: join(dir, "zsh") } };
+    case "fish": {
+      // `-c` runs a command instead of an interactive shell: our prompt hooks would be pointless.
+      if (args.some((arg) => arg === "-c" || arg === "--command" || arg.startsWith("--command="))) return null;
+      // --init-command runs after the user's config, so their own fish_prompt is the one we wrap.
+      return { args: [...args, "--init-command", `source ${fishQuote(join(dir, "lumen-integration.fish"))}`], env };
+    }
     case "pwsh": {
       // The caller already runs a command or script: appending ours would become its text or parameters.
       if (args.some((arg) => PWSH_COMMAND_FLAGS.has(arg.toLowerCase()))) return null;

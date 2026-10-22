@@ -2,9 +2,14 @@ import { RotateCcw, X } from "lucide-react";
 import { ModalEditorTitleActions } from "../features/menus-walkthroughs/MenuActions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  DEFAULT_SETTINGS,
   SETTINGS_SCHEMA,
+  configurationDefaultLanguages,
+  configurationLanguageOverrides,
+  getDefaultSettings,
+  getSettingsForLanguage,
+  resetLanguageSetting,
   resetSetting,
+  updateLanguageSetting,
   updateSetting,
   useSettings,
   type SettingKey,
@@ -142,11 +147,23 @@ export function SettingsEditor({ open, onClose }: Props) {
   const extensions = useExtensions();
   const [query, setQuery] = useState("");
   const [modifiedOnly, setModifiedOnly] = useState(false);
+  /** "" = user (all languages); otherwise a `[language]` scope. */
+  const [language, setLanguage] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   /** A category picked in the TOC stays highlighted while the list cannot scroll it to the top (end of the list). */
   const pickedCategory = useRef<string | null>(null);
+
+  /** Values and defaults of the selected scope (extension configurationDefaults are the defaults). */
+  const scopedSettings = language ? getSettingsForLanguage(language) : settings;
+  const scopedDefaults = useMemo(() => getDefaultSettings(language || undefined), [language]);
+
+  const languages = useMemo(() => {
+    const ids = new Set([...configurationDefaultLanguages(), ...configurationLanguageOverrides()]);
+    for (const contributed of extensionService.contributedLanguages()) ids.add(contributed.id.toLowerCase());
+    return [...ids].sort();
+  }, [extensions]);
 
   useEffect(() => {
     if (!open) return;
@@ -167,7 +184,7 @@ export function SettingsEditor({ open, onClose }: Props) {
     const q = query.trim().toLowerCase();
     const map = new Map<string, typeof SETTINGS_SCHEMA>();
     for (const entry of SETTINGS_SCHEMA) {
-      if (modifiedOnly && settings[entry.key] === DEFAULT_SETTINGS[entry.key]) continue;
+      if (modifiedOnly && scopedSettings[entry.key] === scopedDefaults[entry.key]) continue;
       const haystack = `${entry.key} ${entry.label} ${entry.description} ${entry.category}`.toLowerCase();
       if (q && !q.split(/\s+/).every((word) => haystack.includes(word))) continue;
       const list = map.get(entry.category) ?? [];
@@ -175,7 +192,7 @@ export function SettingsEditor({ open, onClose }: Props) {
       map.set(entry.category, list);
     }
     return map;
-  }, [query, modifiedOnly, settings]);
+  }, [query, modifiedOnly, scopedSettings, scopedDefaults]);
 
   const extensionGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -235,7 +252,10 @@ export function SettingsEditor({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const set = <K extends SettingKey>(key: K, value: Settings[K]) => updateSetting(key, value);
+  const set = <K extends SettingKey>(key: K, value: Settings[K]) => {
+    if (language) updateLanguageSetting(language, key, value);
+    else updateSetting(key, value);
+  };
 
   return (
     <div className="modal-overlay settings-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -251,6 +271,18 @@ export function SettingsEditor({ open, onClose }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          {languages.length > 0 && (
+            <label className="settings-filter" title="Edit the settings of one language (extension defaults included)">
+              <select value={language} onChange={(e) => setLanguage(e.target.value)} aria-label="Settings language">
+                <option value="">All languages</option>
+                {languages.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="settings-filter">
             <input type="checkbox" checked={modifiedOnly} onChange={(e) => setModifiedOnly(e.target.checked)} />
             Modified
@@ -274,15 +306,20 @@ export function SettingsEditor({ open, onClose }: Props) {
               <section key={category} className="settings-section" data-category={category}>
                 <h3>{category}</h3>
                 {entries.map((entry) => {
-                  const value = settings[entry.key];
-                  const modified = value !== DEFAULT_SETTINGS[entry.key];
+                  const value = scopedSettings[entry.key];
+                  const modified = value !== scopedDefaults[entry.key];
                   return (
                     <div key={entry.key} className={`setting${modified ? " modified" : ""}`}>
                       <div className="setting-title">
                         <span className="setting-category">{entry.category}: </span>
                         <strong>{entry.label}</strong>
                         {modified && (
-                          <button type="button" className="setting-reset" title="Reset to default" onClick={() => resetSetting(entry.key)}>
+                          <button
+                            type="button"
+                            className="setting-reset"
+                            title="Reset to default"
+                            onClick={() => (language ? resetLanguageSetting(language, entry.key) : resetSetting(entry.key))}
+                          >
                             <RotateCcw size={13} />
                           </button>
                         )}

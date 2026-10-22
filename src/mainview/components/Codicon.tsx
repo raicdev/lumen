@@ -80,7 +80,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
-import { productIcon, useIconThemeState } from "../features/icon-themes-state";
+import { contributedIcon, productIcon, useIconThemeState } from "../features/icon-themes-state";
 
 /**
  * VS Code's `$(icon-name)` syntax (status bar items, quick picks) rendered
@@ -210,8 +210,12 @@ export function WithCodicons({ text, size = 13 }: { text: string; size?: number 
       {parts.map((part, index) => {
         const match = /^\$\(([\w-]+)(~spin)?\)$/.exec(part);
         if (!match) return part ? <Fragment key={index}>{part}</Fragment> : null;
-        // A product icon theme (contributes.productIconThemes) replaces the glyph by its own font.
-        const glyph = productIcon(match[1]!, themeState);
+        // A product icon theme (contributes.productIconThemes) replaces the glyph by its own font;
+        // otherwise an icon an extension defines (contributes.icons) uses the extension's font.
+        const contributed = contributedIcon(match[1]!, themeState);
+        // An alias of another icon ("default": "<icon id>") ends at a codicon.
+        const name = contributed && "codicon" in contributed ? contributed.codicon : match[1]!;
+        const glyph = productIcon(match[1]!, themeState) ?? productIcon(name, themeState) ?? (contributed && "char" in contributed ? contributed : undefined);
         if (glyph) {
           const glyphSpin = !!match[2] || match[1] === "loading";
           return (
@@ -220,7 +224,7 @@ export function WithCodicons({ text, size = 13 }: { text: string; size?: number 
             </span>
           );
         }
-        const Icon = ICONS[match[1]!];
+        const Icon = ICONS[name];
         if (!Icon) return null;
         const spin = !!match[2] || match[1] === "loading";
         return <Icon key={index} size={size} className={`codicon${spin ? " spin" : ""}`} aria-hidden="true" />;

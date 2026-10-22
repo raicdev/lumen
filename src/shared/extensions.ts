@@ -1,4 +1,4 @@
-import type { Diagnostic, DocumentSymbol, FileEdits, TextEdit, TextRange } from "./types.ts";
+import type { Diagnostic, DocumentSymbol, FileEdits, FileEntry, SearchMatch, TextEdit, TextRange } from "./types.ts";
 import type { ColorThemeKind } from "./color-theme.ts";
 
 /**
@@ -381,24 +381,74 @@ export type HostStatusBarItem = {
   visible: boolean;
 };
 
+/** The before / after text of a decoration (ThemableDecorationAttachmentRenderOptions). */
+export type HostDecorationAttachment = {
+  contentText?: string;
+  /** The content icon as data URLs (both set to the same URL for one image). */
+  contentIcon?: { light?: string; dark?: string };
+  border?: string;
+  borderColor?: string;
+  textDecoration?: string;
+  color?: string;
+  backgroundColor?: string;
+  margin?: string;
+  width?: string;
+  height?: string;
+  fontStyle?: string;
+  fontWeight?: string;
+};
+
 export type HostDecorationStyle = {
   backgroundColor?: string;
   color?: string;
   border?: string;
+  borderColor?: string;
+  borderStyle?: string;
+  borderWidth?: string;
+  borderSpacing?: string;
   borderRadius?: string;
   outline?: string;
+  outlineColor?: string;
+  outlineStyle?: string;
+  outlineWidth?: string;
   fontWeight?: string;
   fontStyle?: string;
   textDecoration?: string;
   opacity?: string;
   cursor?: string;
-  before?: { contentText?: string; color?: string; backgroundColor?: string; margin?: string; fontStyle?: string; fontWeight?: string };
-  after?: { contentText?: string; color?: string; backgroundColor?: string; margin?: string; fontStyle?: string; fontWeight?: string };
+  letterSpacing?: string;
+  overviewRulerColor?: string;
+  before?: HostDecorationAttachment;
+  after?: HostDecorationAttachment;
 };
 
-export type HostDecorationType = HostDecorationStyle & { isWholeLine?: boolean };
+export type HostDecorationType = HostDecorationStyle & {
+  isWholeLine?: boolean;
+  /** DecorationRangeBehavior: OpenOpen 0 (default), ClosedClosed 1, OpenClosed 2, ClosedOpen 3. */
+  rangeBehavior?: number;
+  /** The style of light themes: the base options merged with the `light` options. */
+  light?: HostDecorationStyle;
+  /** The style of dark themes: the base options merged with the `dark` options. */
+  dark?: HostDecorationStyle;
+  /** The gutter icon as data URLs, loaded by the host (light / dark variants). */
+  gutterIcon?: { light?: string; dark?: string };
+  gutterIconSize?: string;
+  overviewRulerLane?: number;
+};
 
-export type HostDecoration = TextRange & { hover?: string; before?: string; after?: string };
+/** One range's own before / after attachments (ThemableDecorationInstanceRenderOptions). */
+export type HostDecorationInstanceRenderOptions = {
+  before?: HostDecorationAttachment;
+  after?: HostDecorationAttachment;
+};
+
+/** DecorationOptions.renderOptions, with the light / dark variants as the extension gave them. */
+export type HostDecorationRenderOptions = HostDecorationInstanceRenderOptions & {
+  light?: HostDecorationInstanceRenderOptions;
+  dark?: HostDecorationInstanceRenderOptions;
+};
+
+export type HostDecoration = TextRange & { hover?: string; renderOptions?: HostDecorationRenderOptions };
 
 /** A file decoration from a FileDecorationProvider (window.registerFileDecorationProvider). */
 export type HostFileDecoration = {
@@ -499,7 +549,7 @@ export type HostDebugSetBreakpoint = { line: number; enabled?: boolean; conditio
 /* ── editor layout (window.tabGroups) ───────────────────────────────────── */
 
 /** "feature": an editor a feature plug-in renders (`uri` is the file, `viewType` the opener id). */
-export type HostTabKind = "text" | "webview" | "custom" | "terminal" | "feature" | "other";
+export type HostTabKind = "text" | "webview" | "custom" | "terminal" | "feature" | "diff" | "other";
 
 export type HostTab = {
   label: string;
@@ -510,9 +560,12 @@ export type HostTab = {
   isDirty: boolean;
   isPinned: boolean;
   isPreview: boolean;
-  /** A custom editor tab: the file and the provider's view type. */
+  /** A custom editor tab: the file and the provider's view type; a webview tab: the panel's view type. */
   uri?: string;
   viewType?: string;
+  /** A diff tab: the two documents (view keys) it compares. */
+  original?: string;
+  modified?: string;
 };
 
 export type HostTabGroup = { viewColumn: number; isActive: boolean; tabs: HostTab[] };
@@ -580,6 +633,8 @@ export type ViewMethods = {
   showQuickPick: (pick: HostQuickPick) => number[] | null;
   showInputBox: (options: HostInputBox) => string | null;
   showTextDocument: (path: string, options: { selection?: TextRange; preview?: boolean; preserveFocus?: boolean; beside?: boolean }) => boolean;
+  /** Open a side-by-side diff of two documents (`vscode.diff`); the modified side is editable. */
+  openDiff: (original: string, modified: string, options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange }) => boolean;
   /** Open an untitled editor under the path the host chose (`untitled:Name`). */
   openUntitled: (path: string, language: string, content: string) => boolean;
   setDocumentLanguage: (path: string, language: string) => boolean;
@@ -621,7 +676,7 @@ export const MAIN_METHODS: readonly (keyof MainMethods)[] = ["showOpenDialog", "
 
 /* ── webviews ──────────────────────────────────────────────────────────── */
 
-export type HostWebviewOptions = { enableScripts: boolean; enableForms: boolean; enableCommandUris: boolean; retainContextWhenHidden: boolean };
+export type HostWebviewOptions = { enableScripts: boolean; enableForms: boolean; enableCommandUris: boolean; retainContextWhenHidden: boolean; enableFindWidget?: boolean };
 
 export type HostWebview = {
   id: string;
@@ -751,10 +806,38 @@ export type HostMethods = {
   /** Bring back a webview panel saved with the window (registerWebviewPanelSerializer). */
   deserializeWebviewPanel: (viewType: string, webviewId: string, title: string, state: unknown, options: HostWebviewOptions | null) => boolean;
   /** Documents of file systems provided by extensions (registerFileSystemProvider). */
-  readVirtualFile: (path: string) => { content: string; language: string; readOnly?: boolean };
+  readVirtualFile: (path: string) => { content: string; language: string; readOnly?: boolean; readOnlyMessage?: string };
   writeVirtualFile: (path: string, content: string) => boolean;
   /** Schemes with a file system provider. */
   virtualSchemes: () => string[];
+  /** Children of a folder of a provided file system (workspace folders in the explorer). */
+  providerReadDirectory: (path: string) => { entries: FileEntry[]; readOnly?: boolean; readOnlyMessage?: string; error?: string };
+  /** Explorer operations of provided folders; the provider's read-only message is the error. */
+  providerCreateFile: (path: string, content: string) => { success: boolean; error?: string };
+  providerCreateDirectory: (path: string) => { success: boolean; error?: string };
+  providerRename: (oldPath: string, newPath: string) => { success: boolean; error?: string };
+  /** Copy a file or folder inside one provided file system (provider.copy, else read + write). */
+  providerCopy: (source: string, destination: string) => { success: boolean; error?: string };
+  providerDelete: (path: string) => { success: boolean; error?: string };
+  /** Watch a provided workspace folder the explorer shows (recursive) / stop watching it. */
+  providerWatch: (path: string, recursive: boolean) => boolean;
+  providerUnwatch: (path: string) => boolean;
+  /** Files under provided workspace folders, for Quick Open (bounded depth and count). */
+  providerListFiles: (roots: string[], limit?: number) => string[];
+  /** Find in Files for provided workspace folders. */
+  providerSearchFiles: (
+    roots: string[],
+    query: string,
+    options: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean; include?: string; exclude?: string; maxResults?: number },
+  ) => { matches: SearchMatch[]; truncated: boolean };
+  /** Replace in Files for provided workspace folders (only `paths`, when given). */
+  providerReplaceFiles: (
+    roots: string[],
+    query: string,
+    replacement: string,
+    options: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean; include?: string; exclude?: string; maxResults?: number },
+    paths?: string[],
+  ) => { replacements: number; files: number; error?: string };
   /** Children of a tree item (`null`: the root); `null` when no provider is registered for the view. */
   treeChildren: (viewId: string, handle: string | null) => HostTreeItem[] | null;
   /** TreeDataProvider.resolveTreeItem: the item's tooltip, once the user hovers it. */
@@ -923,8 +1006,8 @@ export type HostToView =
   | { type: "webviewReveal"; id: string; preserveFocus: boolean }
   | { type: "webviewDispose"; id: string }
   /** Files of an extension's file system changed (onDidChangeFile). */
-  | { type: "virtualFilesChanged"; paths: string[] }
-  | { type: "fileSystems"; schemes: string[] }
+  | { type: "virtualFilesChanged"; paths: string[]; changes?: { path: string; type: number }[] }
+  | { type: "fileSystems"; schemes: string[]; readOnly?: Record<string, string | true>; caseSensitive?: string[] }
   /** A file decoration provider's onDidChangeFileDecorations fired (all when `paths` is missing). */
   | { type: "fileDecorationsChanged"; paths?: string[] }
   /** A tree view's provider registered or its title, message, … changed. */

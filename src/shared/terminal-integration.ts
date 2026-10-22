@@ -6,8 +6,8 @@
  *   OSC 633 ; B          prompt end / input      (133 ; B)
  *   OSC 633 ; C          command is executing    (133 ; C)
  *   OSC 633 ; D [; code] command finished        (133 ; D [; code])
- *   OSC 633 ; E ; line   the command line (escaped: `\` and `\xHH`)
- *   OSC 633 ; P ; K=V    property (Cwd)
+ *   OSC 633 ; E ; line [; nonce]   the command line (escaped: `\` and `\xHH`)
+ *   OSC 633 ; P ; K=V [; nonce]    property (Cwd)
  *
  * Used by the window (xterm data) and by tests; no DOM or Node APIs.
  */
@@ -15,7 +15,8 @@
 export type ShellIntegrationEvent =
   | { type: "prompt-start" }
   | { type: "command-start" }
-  | { type: "command-line"; commandLine: string }
+  /** `nonceVerified`: the line came with the nonce this terminal was started with (nothing else can produce it). */
+  | { type: "command-line"; commandLine: string; nonceVerified: boolean }
   | { type: "executing" }
   | { type: "finished"; exitCode: number | undefined }
   | { type: "property"; key: string; value: string }
@@ -160,7 +161,7 @@ export class ShellIntegrationParser {
           // `;<escaped line>[;<nonce>]`: the line has no raw `;` (it is escaped).
           const [line = "", sent] = rest.slice(1).split(";");
           if (this.#nonce !== undefined && sent !== this.#nonce) break;
-          events.push({ type: "command-line", commandLine: unescapeIntegrationValue(line) });
+          events.push({ type: "command-line", commandLine: unescapeIntegrationValue(line), nonceVerified: this.#nonce !== undefined });
         }
         break;
       case "P":

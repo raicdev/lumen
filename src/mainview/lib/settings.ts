@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { ExtensionDescription } from "../../shared/extensions";
 
 /**
  * User settings (VS Code style keys), persisted in localStorage and observable
@@ -45,6 +46,10 @@ export type Settings = {
   "workbench.editor.closeEmptyGroups": boolean;
   /** Editors in a centered modal: "all" files too; Settings, Keyboard Shortcuts and extension details always are. */
   "workbench.editor.useModal": "off" | "some" | "all";
+  /** Open an extension's walkthrough when the extension is installed. */
+  "workbench.welcomePage.walkthroughs.openOnInstall": boolean;
+  /** Walkthrough keys the user hid from the Welcome page (`publisher.name#id`). */
+  "workbench.welcomePage.hiddenCategories": string[];
   /** Color theme: Lumen Dark / Lumen Light or a theme an extension contributes (its id or label). */
   "workbench.colorTheme": string;
   /** File icon theme contributed by an extension (id or label); empty = Lumen's built-in icons. */
@@ -54,6 +59,8 @@ export type Settings = {
   "terminal.integrated.fontSize": number;
   /** Profile id (pwsh, powershell, cmd, gitbash, wsl, bash, …); empty = first available. */
   "terminal.integrated.defaultProfile": string;
+  /** default: check at startup and every few hours, download in the background; manual: Help > Check for Updates only; none: never. */
+  "update.mode": "default" | "manual" | "none";
 };
 
 export type SettingKey = keyof Settings;
@@ -90,11 +97,14 @@ export const DEFAULT_SETTINGS: Settings = {
   "workbench.editor.enablePreview": true,
   "workbench.editor.closeEmptyGroups": false,
   "workbench.editor.useModal": "some",
+  "workbench.welcomePage.walkthroughs.openOnInstall": true,
+  "workbench.welcomePage.hiddenCategories": [],
   "workbench.colorTheme": "Lumen Dark",
   "workbench.iconTheme": "",
   "workbench.productIconTheme": "",
   "terminal.integrated.fontSize": 13,
   "terminal.integrated.defaultProfile": "",
+  "update.mode": "default",
 };
 
 type SchemaEntry = {
@@ -152,6 +162,12 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     options: ["off", "some", "all"],
   },
   {
+    key: "workbench.welcomePage.walkthroughs.openOnInstall",
+    category: "Workbench",
+    label: "Welcome: Walkthroughs: Open On Install",
+    description: "When enabled, an extension's walkthrough will open upon install of the extension.",
+  },
+  {
     key: "workbench.colorTheme",
     category: "Workbench",
     label: "Color Theme",
@@ -168,50 +184,217 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     label: "Default Profile",
     description: "Shell used for new terminals: pwsh, powershell, cmd, gitbash, wsl (Windows) or bash, zsh, … Empty uses the first available. Also: Terminal: Select Default Profile.",
   },
+  {
+    key: "update.mode",
+    category: "Application",
+    label: "Update: Mode",
+    description:
+      "default: check for updates at startup and every few hours, download them in the background and ask to restart. manual: only Help > Check for Updates. none: never check.",
+    options: ["default", "manual", "none"],
+  },
 ];
 
 const STORAGE_KEY = "lumen.settings";
+const LANGUAGE_STORAGE_KEY = "lumen.settings.languages";
 
-function load(): Settings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
-  } catch {
-    /* corrupt or unavailable storage: defaults */
-  }
-  return { ...DEFAULT_SETTINGS };
+type UserSettings = Partial<Settings>;
+type LanguageUserSettings = Record<string, Partial<Settings>>;
+
+/** contributes.configurationDefaults of the enabled extensions, for keys without a language. */
+let contributedDefaults: Record<string, unknown> = {};
+/** contributes.configurationDefaults for language scopes (`"[python]": {...}`), lower-cased language id → values. */
+let contributedLanguageDefaults: Record<string, Record<string, unknown>> = {};
+
+function matchesType(key: SettingKey, value: unknown): boolean {
+  const base = DEFAULT_SETTINGS[key];
+  return Array.isArray(base) ? Array.isArray(value) : typeof value === typeof base;
 }
 
-let current = load();
+/** Applies a contribution default only when the key and its value type are settings Lumen knows. */
+function assignSetting(out: Settings, key: string, value: unknown): void {
+  if (!(key in DEFAULT_SETTINGS)) return;
+  const setting = key as SettingKey;
+  if (!matchesType(setting, value)) return;
+  (out as Record<string, unknown>)[setting] = value;
+}
+
+function load(): UserSettings {
+  const out: UserSettings = {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return out;
+    const stored = JSON.parse(raw) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(stored)) assignSetting(out as Settings, key, value);
+  } catch {
+    /* corrupt or unavailable storage: no user settings */
+  }
+  return out;
+}
+
+function loadLanguageSettings(): LanguageUserSettings {
+  const out: LanguageUserSettings = {};
+  try {
+    const raw = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (!raw) return out;
+    const stored = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+    for (const [language, values] of Object.entries(stored)) {
+      const scope: Partial<Settings> = {};
+      for (const [key, value] of Object.entries(values ?? {})) assignSetting(scope as Settings, key, value);
+      if (Object.keys(scope).length) out[language.toLowerCase()] = scope;
+    }
+  } catch {
+    /* corrupt or unavailable storage: no language overrides */
+  }
+  return out;
+}
+
+let userSettings = load();
+let languageSettings = loadLanguageSettings();
+
+function defaultSettings(languageId?: string): Settings {
+  const out: Settings = { ...DEFAULT_SETTINGS };
+  for (const [key, value] of Object.entries(contributedDefaults)) assignSetting(out, key, value);
+  if (languageId) {
+    for (const [key, value] of Object.entries(contributedLanguageDefaults[languageId.toLowerCase()] ?? {})) assignSetting(out, key, value);
+  }
+  return out;
+}
+
+/** The defaults of the built-in settings: Lumen's own, overridden by extension configurationDefaults. */
+export function getDefaultSettings(languageId?: string): Settings {
+  return defaultSettings(languageId);
+}
+
+/** User settings over the defaults (VS Code: default < extension defaults < user, language-specific last). */
+function resolveSettings(languageId?: string): Settings {
+  const out = defaultSettings(languageId);
+  Object.assign(out, userSettings);
+  if (languageId) Object.assign(out, languageSettings[languageId.toLowerCase()] ?? {});
+  return out;
+}
+
+function persist(key: string, value: unknown): void {
+  try {
+    if (value && Object.keys(value as object).length) localStorage.setItem(key, JSON.stringify(value));
+    else localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+let current = resolveSettings();
 const listeners = new Set<() => void>();
+
+function notify(): void {
+  current = resolveSettings();
+  for (const listener of listeners) listener();
+}
 
 export function getSettings(): Settings {
   return current;
 }
 
-export function updateSetting<K extends SettingKey>(key: K, value: Settings[K]): void {
-  if (current[key] === value) return;
-  current = { ...current, [key]: value };
-  try {
-    // Only store what differs from the defaults, like VS Code's settings.json.
-    const changed: Partial<Settings> = {};
-    for (const k of Object.keys(current) as SettingKey[]) {
-      if (JSON.stringify(current[k]) !== JSON.stringify(DEFAULT_SETTINGS[k])) (changed as Record<string, unknown>)[k] = current[k];
+/** Settings of one language: extension defaults for `[language]`, then user overrides for it. */
+export function getSettingsForLanguage(languageId: string): Settings {
+  return resolveSettings(languageId);
+}
+
+/** Language ids that have extension-contributed defaults, for the Settings editor. */
+export function configurationDefaultLanguages(): string[] {
+  return Object.keys(contributedLanguageDefaults).sort();
+}
+
+/** Language ids the user has overrides for, for the Settings editor. */
+export function configurationLanguageOverrides(): string[] {
+  return Object.keys(languageSettings).sort();
+}
+
+/**
+ * Reads contributes.configurationDefaults of the enabled extensions (from the host's `ready`
+ * message) and makes them the defaults of the built-in settings, below the user's values.
+ * Later extensions win, like the extension host's own resolution. Language defaults are merged
+ * per language.
+ */
+export function applyConfigurationDefaults(extensions: readonly Pick<ExtensionDescription, "manifest">[]): void {
+  const defaults: Record<string, unknown> = {};
+  const languageDefaults: Record<string, Record<string, unknown>> = {};
+  for (const extension of extensions) {
+    const contributed = (extension.manifest.contributes as { configurationDefaults?: Record<string, unknown> } | undefined)?.configurationDefaults;
+    if (!contributed || typeof contributed !== "object") continue;
+    for (const [key, value] of Object.entries(contributed)) {
+      const languages = [...key.matchAll(/\[([^\]]+)\]/g)].map((match) => match[1].trim().toLowerCase()).filter(Boolean);
+      if (languages.length) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const values: Record<string, unknown> = {};
+        for (const [setting, settingValue] of Object.entries(value)) {
+          // A later extension with an incompatible value must not hide an earlier valid default.
+          if (setting in DEFAULT_SETTINGS && !matchesType(setting as SettingKey, settingValue)) continue;
+          values[setting] = settingValue;
+        }
+        for (const language of languages) languageDefaults[language] = { ...languageDefaults[language], ...values };
+      } else {
+        if (key in DEFAULT_SETTINGS && !matchesType(key as SettingKey, value)) continue;
+        defaults[key] = value;
+      }
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(changed));
-  } catch {
-    /* ignore */
   }
-  for (const listener of listeners) listener();
+  if (JSON.stringify([defaults, languageDefaults]) === JSON.stringify([contributedDefaults, contributedLanguageDefaults])) return;
+  contributedDefaults = defaults;
+  contributedLanguageDefaults = languageDefaults;
+  notify();
+}
+
+type HostMessage = { type?: string; extensions?: readonly Pick<ExtensionDescription, "manifest">[] };
+
+/** The host's `ready` message carries the extension list, including configurationDefaults. */
+export function handleHostMessage(message: HostMessage | null | undefined): void {
+  if (message?.type === "ready" && Array.isArray(message.extensions)) applyConfigurationDefaults(message.extensions);
+}
+
+export function updateSetting<K extends SettingKey>(key: K, value: Settings[K]): void {
+  if (JSON.stringify(current[key]) === JSON.stringify(value)) return;
+  const defaults = defaultSettings();
+  if (JSON.stringify(value) === JSON.stringify(defaults[key])) delete userSettings[key];
+  else (userSettings as Record<string, unknown>)[key] = value;
+  persist(STORAGE_KEY, userSettings);
+  notify();
+}
+
+/** Sets a value in the `[language]` scope (undefined removes the override). */
+export function updateLanguageSetting<K extends SettingKey>(languageId: string, key: K, value: Settings[K] | undefined): void {
+  const language = languageId.toLowerCase();
+  const scope = { ...(languageSettings[language] ?? {}) };
+  if (value === undefined || JSON.stringify(value) === JSON.stringify(defaultSettings(language)[key])) delete scope[key];
+  else (scope as Record<string, unknown>)[key] = value;
+  if (Object.keys(scope).length) languageSettings[language] = scope;
+  else delete languageSettings[language];
+  persist(LANGUAGE_STORAGE_KEY, languageSettings);
+  notify();
 }
 
 export function resetSetting(key: SettingKey): void {
-  updateSetting(key, DEFAULT_SETTINGS[key]);
+  delete userSettings[key];
+  persist(STORAGE_KEY, userSettings);
+  notify();
+}
+
+export function resetLanguageSetting(languageId: string, key: SettingKey): void {
+  const language = languageId.toLowerCase();
+  const scope = { ...(languageSettings[language] ?? {}) };
+  delete scope[key];
+  if (Object.keys(scope).length) languageSettings[language] = scope;
+  else delete languageSettings[language];
+  persist(LANGUAGE_STORAGE_KEY, languageSettings);
+  notify();
 }
 
 export function onSettingsChange(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("lumen:ext-host", (event) => handleHostMessage((event as CustomEvent<HostMessage>).detail));
 }
 
 export function useSettings(): Settings {

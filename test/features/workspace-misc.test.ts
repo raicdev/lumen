@@ -10,6 +10,7 @@ import { WorkspaceFolders } from "../../src/main/exthost/features/workspace-misc
 import { isPortable, readValidation, workspaceMiscFeature } from "../../src/main/exthost/features/workspace-misc.ts";
 import { decodeValidation, encodeValidation } from "../../src/shared/workspace-misc.ts";
 import type { HostToView } from "../../src/shared/extensions.ts";
+import { forwardToRunningInstance, instanceSocketPath, serveInstance } from "../../src/main/single-instance.ts";
 
 /** node --test test/features/workspace-misc.test.ts */
 
@@ -81,6 +82,51 @@ test("window root changes reach the folder list", () => {
   assert.deepEqual(seen, [1, 0]);
 });
 
+test("encode supports every encoding decode does, CJK and DOS code pages included", () => {
+  assert.deepEqual([...encodeText("あ", "shiftjis")], [0x82, 0xa0]);
+  assert.deepEqual([...encodeText("ｱあ", "eucjp")], [0x8e, 0xb1, 0xa4, 0xa2]);
+  assert.deepEqual([...encodeText("aあ", "iso2022jp")], [0x61, 0x1b, 0x24, 0x42, 0x24, 0x22, 0x1b, 0x28, 0x42]);
+  assert.deepEqual([...encodeText("한", "euckr")], [0xc7, 0xd1]);
+  assert.deepEqual([...encodeText("中", "gbk")], [0xd6, 0xd0]);
+  assert.deepEqual([...encodeText("中", "big5hkscs")], [0xa4, 0xa4]);
+  assert.deepEqual([...encodeText("é░", "cp437")], [0x82, 0xb0]);
+  assert.deepEqual([...encodeText("ı", "cp850")], [0xd5]);
+  assert.deepEqual([...encodeText("ů", "cp852")], [0x85]);
+  assert.deepEqual([...encodeText("Ж", "cp866")], [0x86]);
+  // What an encoding cannot hold becomes "?", like iconv-lite.
+  assert.deepEqual([...encodeText("a中", "cp437")], [0x61, 0x3f]);
+  assert.deepEqual([...encodeText("😀", "shiftjis")], [0x3f]);
+  const samples: Record<string, string> = {
+    shiftjis: "日本語テキスト ｶﾅ ①",
+    eucjp: "日本語テキスト ｶﾅ",
+    iso2022jp: "日本語 text ｶﾅ",
+    euckr: "한국어 텍스트",
+    gbk: "中文文本 €",
+    gb18030: "中文文本 😀 ㄅ",
+    big5hkscs: "中文 繁體",
+    cp950: "中文 繁體",
+    windows1250: "Příliš žluťoučký",
+    windows1251: "Привет",
+    windows1253: "Γειά",
+    windows1255: "שלום",
+    windows1256: "مرحبا",
+    windows874: "สวัสดี",
+    iso88592: "Příliš",
+    iso88597: "Γειά",
+    iso885915: "€uro",
+    koi8r: "Привет",
+    koi8u: "Привіт",
+    macroman: "café ∑",
+    cp437: "café ░▒▓ αß",
+    cp850: "café ÐÞ",
+    cp852: "Příliš ů",
+    cp865: "æøå",
+    cp866: "Привет",
+  };
+  for (const [encoding, text] of Object.entries(samples)) assert.equal(decodeBytes(encodeText(text, encoding), encoding), text, encoding);
+  assert.throws(() => encodeText("a", "nope"));
+});
+
 test("validation severity is encoded for the window", () => {
   assert.deepEqual(readValidation({ message: "careful", severity: 2 }), { message: "careful", severity: 2 });
   assert.deepEqual(readValidation("bad"), { message: "bad", severity: 3 });
@@ -115,6 +161,13 @@ test("the API: types, saveAs, decode/encode, updateWorkspaceFolders, URI handler
   assert.equal(await api.workspace.decode(new Uint8Array([0xe9]), { encoding: "iso88591" }), "é");
   host.config = { lumen: { "files.encoding": "utf16le" }, user: {} };
   assert.deepEqual([...(await api.workspace.encode("a"))], [0xff, 0xfe, 0x61, 0x00]);
+  // The "[language]" section of the resource's language wins over the global setting.
+  const sjis = join(dir, "a.sjis");
+  host.handleView({ type: "documentOpen", doc: { path: sjis, languageId: "sjis-lang", version: 1, text: "", eol: "LF", dirty: false } } as never);
+  host.config = { lumen: { "files.encoding": "utf16le" }, user: { "[sjis-lang]": { "files.encoding": "shiftjis" } } };
+  assert.deepEqual([...(await api.workspace.encode("あ", { uri: T.Uri.file(sjis) }))], [0x82, 0xa0]);
+  assert.equal(await api.workspace.decode(new Uint8Array([0x82, 0xa0]), T.Uri.file(sjis)), "あ");
+  assert.deepEqual([...(await api.workspace.encode("a", { uri: T.Uri.file(join(dir, "other.txt")) }))], [0xff, 0xfe, 0x61, 0x00]);
 
   // saveAs
   host.requestMain = (async (method: string) => (method === "showSaveDialog" ? join(dir, "out.txt") : null)) as any;
@@ -156,4 +209,19 @@ test("the API: types, saveAs, decode/encode, updateWorkspaceFolders, URI handler
   chmodSync(file, 0o444);
   assert.equal((await api.workspace.fs.stat(T.Uri.file(file))).permissions, 1);
   assert.ok(workspaceMiscFeature.commands?.includes("lumen.handleUri"));
+});
+
+test("a launch with lumen:// URIs hands them to the running instance", async () => {
+  const path = instanceSocketPath(`dev.lumen.test-${process.pid}`, "tester");
+  assert.equal(await forwardToRunningInstance(path, ["lumen://pub.ext/a"]), false);
+  const received: string[][] = [];
+  const server = await serveInstance(path, (uris) => received.push(uris));
+  assert.ok(server);
+  try {
+    assert.equal(await forwardToRunningInstance(path, ["lumen://pub.ext/a?x=1", "https://not-ours"]), true);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(received, [["lumen://pub.ext/a?x=1"]]);
+  } finally {
+    server!.close();
+  }
 });

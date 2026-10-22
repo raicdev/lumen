@@ -29,7 +29,7 @@ test("source controls, groups, input box and counts reach the snapshot", async (
   const root = api.Uri.file(join(tmpdir(), "repo"));
   const control = api.scm.createSourceControl("fake", "Fake SCM", root);
   const group = control.createResourceGroup("work", "Changes");
-  group.resourceStates = [{ resourceUri: api.Uri.file(join(tmpdir(), "repo", "src", "a.ts")), command: { command: "fake.open", title: "Open" }, decorations: { tooltip: "Modified", strikeThrough: true } }];
+  group.resourceStates = [{ resourceUri: api.Uri.file(join(tmpdir(), "repo", "src", "a.ts")), command: { command: "fake.open", title: "Open" }, contextValue: "modified", decorations: { tooltip: "Modified", strikeThrough: true } }];
   control.inputBox.placeholder = "Message";
   control.acceptInputCommand = { command: "fake.commit", title: "Commit" };
   control.statusBarCommands = [{ command: "fake.sync", title: "sync" }];
@@ -43,9 +43,11 @@ test("source controls, groups, input box and counts reach the snapshot", async (
   assert.equal(data.inputBox.value, "feat: ");
   assert.equal(data.inputBox.placeholder, "Message");
   assert.equal(data.accept?.title, "Commit");
+  assert.equal(data.groups[0]!.id, "work");
   assert.equal(data.groups[0]!.resources[0]!.label, "a.ts");
   assert.equal(data.groups[0]!.resources[0]!.description, "src");
   assert.equal(data.groups[0]!.resources[0]!.letter, "M");
+  assert.equal(data.groups[0]!.resources[0]!.contextValue, "modified");
   assert.equal(data.groups[0]!.resources[0]!.strikeThrough, true);
   assert.equal(api.scm.inputBox, control.inputBox);
 
@@ -61,6 +63,35 @@ test("source controls, groups, input box and counts reach the snapshot", async (
   assert.equal(scmSnapshot(host).controls[0]!.groups.length, 0);
   control.dispose();
   assert.equal(scmSnapshot(host).controls.length, 0);
+});
+
+test("resource decorations send their icon (light/dark or theme icon) and text styles", async () => {
+  const { host, userData } = startedHost();
+  const api = host.apiFor(null) as Any;
+  const lightIcon = join(userData, "modified-light.svg");
+  const darkIcon = join(userData, "modified-dark.png");
+  writeFileSync(lightIcon, '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  writeFileSync(darkIcon, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  const control = api.scm.createSourceControl("fake", "Fake");
+  const group = control.createResourceGroup("g", "G");
+  group.resourceStates = [
+    {
+      resourceUri: api.Uri.file(join(tmpdir(), "a.ts")),
+      decorations: { iconPath: { light: api.Uri.file(lightIcon), dark: api.Uri.file(darkIcon) }, tooltip: "Modified", faded: true, strikeThrough: true },
+    },
+    { resourceUri: api.Uri.file(join(tmpdir(), "b.ts")), decorations: { iconPath: new api.ThemeIcon("diff-modified") } },
+    { resourceUri: api.Uri.file(join(tmpdir(), "c.ts")), decorations: { iconPath: join(userData, "missing.svg") } },
+  ];
+
+  const resources = scmSnapshot(host).controls[0]!.groups[0]!.resources as Any[];
+  assert.match(resources[0]!.icon!.light!, /^data:image\/svg\+xml;base64,/);
+  assert.match(resources[0]!.icon!.dark!, /^data:image\/png;base64,/);
+  assert.equal(resources[0]!.tooltip, "Modified");
+  assert.equal(resources[0]!.faded, true);
+  assert.equal(resources[0]!.strikeThrough, true);
+  assert.equal(resources[1]!.icon!.codicon, "diff-modified");
+  // A missing icon file silently falls back to the file type icon in the view.
+  assert.equal(resources[2]!.icon, undefined);
 });
 
 test("view messages run the extension's commands and typing does not echo", async () => {

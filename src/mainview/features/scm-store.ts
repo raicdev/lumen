@@ -1,8 +1,22 @@
 import { createStore } from "./store";
-import type { ScmControlData, ScmSnapshot } from "../../shared/scm-protocol";
+import type { ScmControlData, ScmResourceData, ScmSnapshot } from "../../shared/scm-protocol";
+
+/** The icon of a resource state (`decorations.iconPath`), already resolved by the host to URLs per theme kind or a codicon. */
+export type ScmResourceIcon = { light?: string; dark?: string; codicon?: string };
+
+/** A resource row plus the optional icon the protocol does not declare yet. */
+export type ScmResource = ScmResourceData & { icon?: ScmResourceIcon };
+
+/** The icon of a resource state, if the extension decorated it. */
+export function resourceIcon(resource: ScmResourceData): ScmResourceIcon | undefined {
+  return (resource as ScmResource).icon;
+}
 
 /** Source controls of extensions as the host last reported them (shared by the panel, status bar items and the quick diff gutter). */
 export const scmStore = createStore<ScmSnapshot>({ controls: [], busy: 0 });
+
+/** Whether the window uses a dark theme: resource icons have light/dark variants (`decorations.iconPath`). */
+export const scmDarkTheme = createStore(false);
 
 /** What the user typed per source control; adopted from the host only when the extension set the value itself. */
 export const scmInputs = createStore<Record<number, string>>({});

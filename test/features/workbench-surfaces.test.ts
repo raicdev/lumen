@@ -11,11 +11,12 @@ import "../../src/main/exthost/features/registry.ts";
 import { parseIssueArgs } from "../../src/main/exthost/features/issue-reporter.ts";
 import { parsePortInput, portsSnapshot } from "../../src/main/exthost/features/ports.ts";
 import { GIT_SOURCE, provideTimeline, timelineFeature, timelineSources } from "../../src/main/exthost/features/timeline.ts";
+import { terminalFeature } from "../../src/main/exthost/features/terminal.ts";
 import { githubIssueUrl, githubRepository, issueBody, issueTarget } from "../../src/shared/issue-reporter.ts";
 import type { HostToView } from "../../src/shared/extensions.ts";
 
 /**
- * Timeline, Ports and the issue reporter (host side and the pure helpers).
+ * Timeline, Ports, editor view columns and the issue reporter (host side and the pure helpers).
  *
  *   node --test test/features/workbench-surfaces.test.ts
  */
@@ -92,6 +93,43 @@ test("Lumen's Git History source lists a file's commits and opens a revision", a
   assert.equal(await host.contentProviders.provide(item.command.arguments[0]), "one\n");
 });
 
+/* ── editor view columns ──────────────────────────────────────────────────── */
+
+function textTab(label: string, path: string): Record<string, unknown> {
+  return { label, path, kind: "text", isActive: true, isDirty: false, isPinned: false, isPreview: false };
+}
+
+test("TextEditor.viewColumn reports the editor's group and moving between groups fires the event", () => {
+  const { host, api } = startedHost();
+  terminalFeature.init!(host);
+  const file = join(tmpdir(), "column.txt");
+  const other = join(tmpdir(), "other.txt");
+  host.handleView({ type: "documentOpen", doc: { path: file, languageId: "plaintext", version: 1, text: "a\n", eol: "LF", dirty: false } } as never);
+  host.handleView({ type: "documentOpen", doc: { path: other, languageId: "plaintext", version: 1, text: "b\n", eol: "LF", dirty: false } } as never);
+  host.handleView({ type: "tabs", groups: [{ viewColumn: 1, isActive: true, tabs: [textTab("column.txt", file)] }] } as never);
+  host.handleView({ type: "activeEditor", path: file, selections: [{ anchorLine: 0, anchorCharacter: 0, activeLine: 0, activeCharacter: 0 }], visible: [file] } as never);
+  assert.equal(api.window.activeTextEditor.viewColumn, 1);
+  assert.deepEqual(api.window.visibleTextEditors.map((editor: any) => editor.viewColumn), [1]);
+
+  const moved: any[] = [];
+  api.window.onDidChangeTextEditorViewColumn((event: any) => moved.push(event));
+  // Split right: the editor is now the visible tab of column 2, another file stays in column 1.
+  host.handleView({
+    type: "tabs",
+    groups: [
+      { viewColumn: 1, isActive: false, tabs: [textTab("other.txt", other)] },
+      { viewColumn: 2, isActive: true, tabs: [textTab("column.txt", file)] },
+    ],
+  } as never);
+  host.handleView({ type: "activeEditor", path: file, selections: [], visible: [other, file] } as never);
+
+  assert.equal(api.window.activeTextEditor.viewColumn, 2);
+  assert.deepEqual(api.window.visibleTextEditors.map((editor: any) => editor.viewColumn), [1, 2]);
+  assert.deepEqual(moved.map((event) => event.viewColumn), [2]);
+  assert.equal(moved[0]!.textEditor.viewColumn, 2);
+  assert.equal(moved[0]!.textEditor.document.uri.fsPath.toLowerCase(), file.toLowerCase());
+});
+
 /* ── ports ────────────────────────────────────────────────────────────────── */
 
 test("ports: openTunnel forwards a local port through a forwarder, lists it and closes it", async () => {
@@ -159,4 +197,83 @@ test("the issue reporter reads VS Code's arguments and builds the GitHub issue",
   assert.equal(open.open.extensionId, "pub.ext");
   assert.equal(open.open.title, "T");
   assert.match(open.open.system.app, /Lumen/);
+});
+
+/* ── custom editors ───────────────────────────────────────────────────────── */
+
+function customEditorProvider(log: string[]) {
+  const changed = new (startedHost().api.EventEmitter)();
+  let opened = 0;
+  return {
+    provider: {
+      onDidChangeCustomDocument: changed.event,
+      openCustomDocument(uri: any, context: { backupId?: string }) {
+        opened++;
+        log.push(`open ${context.backupId ?? "-"}`);
+        return { uri, dispose: () => log.push("dispose") };
+      },
+      resolveCustomEditor(_document: unknown, panel: any) {
+        log.push(`resolve ${panel.viewType}`);
+      },
+      backupCustomDocument(_document: unknown, context: { destination: any }) {
+        log.push(`backup ${context.destination.scheme}`);
+        return { id: "backup-1", delete() {} };
+      },
+      saveCustomDocument() {},
+      saveCustomDocumentAs() {},
+      revertCustomDocument() {},
+    },
+    changed,
+    opened: () => opened,
+  };
+}
+
+test("custom editors: several editors share a document with supportsMultipleEditorsPerDocument", async () => {
+  const { host, posted } = startedHost();
+  const log: string[] = [];
+  const { provider, changed } = customEditorProvider(log);
+  host.customEditors.register(null, "test.multi", provider, { supportsMultipleEditorsPerDocument: true });
+  const path = join(host.init.userData, "a.bin");
+  writeFileSync(path, "x");
+  const first = await host.customEditors.open(path, "test.multi");
+  const second = await host.customEditors.open(path, "test.multi");
+  assert.ok(first && second && first.id !== second.id);
+  assert.deepEqual(log, ["open -", "resolve test.multi", "resolve test.multi"]);
+  // A change marks both editors dirty.
+  changed.fire({ document: {}, undo() {}, redo() {} });
+  assert.deepEqual(
+    posted.filter((m: any) => m.type === "webviewUpdate" && m.dirty === true).map((m: any) => m.id).sort(),
+    [first!.id, second!.id].sort(),
+  );
+  // Without the option, opening again reveals the one editor.
+  host.customEditors.register(null, "test.single", customEditorProvider([]).provider);
+  const single = await host.customEditors.open(path, "test.single");
+  assert.equal((await host.customEditors.open(path, "test.single"))?.id, single?.id);
+});
+
+test("custom editors: a backed-up document is reopened from its backup and starts dirty", async () => {
+  const { host } = startedHost();
+  const log: string[] = [];
+  host.customEditors.register(null, "test.backup", customEditorProvider(log).provider);
+  const path = join(host.init.userData, "b.bin");
+  writeFileSync(path, "x");
+  await host.customEditors.open(path, "test.backup");
+  assert.equal(await host.customEditors.backup(path, "test.backup"), "backup-1");
+  assert.ok(log.includes("backup file"));
+
+  // The next session (same user data) opens the file with the backup id.
+  const next = startedHost();
+  next.host.init = { ...next.host.init, userData: host.init.userData };
+  const nextLog: string[] = [];
+  next.host.customEditors.register(null, "test.backup", customEditorProvider(nextLog).provider);
+  const opened = await next.host.customEditors.open(path, "test.backup");
+  assert.equal(nextLog[0], "open backup-1");
+  assert.ok(next.posted.some((m: any) => m.type === "webviewUpdate" && m.id === opened?.id && m.dirty === true));
+  // Used once: a later open starts from the file.
+  const third = startedHost();
+  third.host.init = { ...third.host.init, userData: host.init.userData };
+  const thirdLog: string[] = [];
+  third.host.customEditors.register(null, "test.backup", customEditorProvider(thirdLog).provider);
+  await third.host.customEditors.open(path, "test.backup");
+  assert.equal(thirdLog[0], "open -");
 });

@@ -1,5 +1,5 @@
 import type { ScmHostMessage } from "../../shared/scm-protocol";
-import { applySnapshot, resetSnapshot, scmStore, statusCommands } from "./scm-store";
+import { applySnapshot, resetSnapshot, scmDarkTheme, scmStore, statusCommands } from "./scm-store";
 import { quickDiffExtension } from "./scm-gutter";
 import type { FeatureCommand, FeatureStatusBarItem, ViewFeature } from "./types";
 
@@ -31,13 +31,16 @@ const slotItems: FeatureStatusBarItem[] = Array.from({ length: STATUS_SLOTS }, (
   command: `lumen.scm.statusBar.${slot}`,
 }));
 
-const isVirtualPath = (path: string) => /^[a-zA-Z][\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path);
+const isVirtualPath = (path: string) => /^\w[\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path);
 
 export const scmView: ViewFeature = {
   area: "scm",
   init: (api) => {
     // Status items and badges follow the snapshot.
     scmStore.subscribe(() => api.refresh());
+    // Resource icons pick their light or dark variant with the theme.
+    scmDarkTheme.set(api.theme.isDark());
+    api.theme.onChange(() => scmDarkTheme.set(api.theme.isDark()));
   },
   onHostReady: (api) => {
     resetSnapshot();

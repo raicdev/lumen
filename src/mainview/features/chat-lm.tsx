@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { ChevronRight, Plus, RefreshCw, Send, Square, ThumbsDown, ThumbsUp, MessageSquare, Wrench } from "lucide-react";
-import type { ChatHostMessage, ChatWireFollowup, ChatWireParticipant, ChatWirePart, ChatWireState, ChatWireTreeNode } from "../../shared/chat-lm";
+import { ChevronRight, Cpu, Eye, EyeOff, Plus, RefreshCw, Send, Settings2, Square, ThumbsDown, ThumbsUp, MessageSquare, Wrench } from "lucide-react";
+import type { ChatHostMessage, ChatWireFollowup, ChatWireModel, ChatWireParticipant, ChatWirePart, ChatWireState, ChatWireTreeNode } from "../../shared/chat-lm";
 import { renderMarkdown } from "../lib/markdown";
+import { themeColor } from "../lib/theme";
+import { WithCodicons } from "../components/Codicon";
 import { createStore, refreshFeatures, useStore } from "./store";
 import type { ViewFeature, ViewFeatureApi } from "./types";
 import { MenuActions } from "./menus-walkthroughs/MenuActions";
 
 /** Window side of the "chat-lm" area: the Chat side bar view. Its styles go to feature-chat-lm.css (linked from index.html). */
+
+/** A participant's `iconPath` as the host sends it (see exthost/features/chat-lm/types.ts). */
+type ParticipantIcon = { url: string; dark?: string } | { codicon: string; color?: string };
+type Participant = ChatWireParticipant & { icon?: ParticipantIcon };
 
 type Message = {
   id: number;
@@ -29,11 +35,47 @@ type ChatState = {
   busy: boolean;
   modelId: string;
   useTools: boolean;
+  /** Models the user hides from the picker ("Manage Language Models"), as `vendor/id`. */
+  hidden: string[];
   /** A message to send as soon as the panel state arrived (`workbench.action.chat.open` with a query). */
   loading: boolean;
 };
 
-const store = createStore<ChatState>({ messages: [], host: null, input: "", busy: false, modelId: "", useTools: true, loading: false });
+/** A registered model as the host lists it for the "Manage Language Models" view (LanguageModelEntry in exthost/features/chat-lm/core.ts). */
+type LanguageModelEntry = { id: string; name: string; vendor: string; family: string; version: string; extensionId: string; extensionName?: string };
+
+const HIDDEN_KEY = "lumen.chat.hiddenModels";
+const CONSENT_KEY = "lumen.chat.modelConsent";
+
+/** Hidden model ids (persisted; the picker filters them out). */
+function storedHidden(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHidden(hidden: string[]): void {
+  try {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(hidden));
+  } catch {
+    /* no storage: the choice lasts for this session */
+  }
+}
+
+/** Previous answers to "may this extension use that extension's models?", per (consumer, provider) pair. */
+function storedConsent(): Record<string, boolean> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? "{}") as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+const store = createStore<ChatState>({ messages: [], host: null, input: "", busy: false, modelId: "", useTools: true, hidden: storedHidden(), loading: false });
 let api: ViewFeatureApi | null = null;
 let nextId = 1;
 
@@ -42,6 +84,47 @@ const update = (change: Partial<ChatState> | ((state: ChatState) => Partial<Chat
 
 const patchMessage = (id: number, patch: (message: Message) => Message) =>
   update((state) => ({ messages: state.messages.map((message) => (message.id === id ? patch(message) : message)) }));
+
+/** The models of the picker: everything the host reports minus the ones the user hid. */
+function visibleModels(): ChatWireModel[] {
+  const state = store.get();
+  return (state.host?.models ?? []).filter((model) => !state.hidden.includes(model.id));
+}
+
+function setModelHidden(id: string, hidden: boolean): void {
+  const state = store.get();
+  const next = hidden ? [...new Set([...state.hidden, id])] : state.hidden.filter((candidate) => candidate !== id);
+  saveHidden(next);
+  update({ hidden: next, modelId: state.modelId === id ? "" : state.modelId });
+}
+
+function showAllModels(): void {
+  saveHidden([]);
+  update({ hidden: [] });
+}
+
+/**
+ * `<extension> wants to use the language models provided by <provider>`: asked once per extension pair,
+ * remembered in this window (the host also remembers the answer for its session).
+ */
+async function askModelConsent(featureApi: ViewFeatureApi, extensionId: string, providerExtensionId: string, vendor: string, justification?: string): Promise<boolean> {
+  const key = `${extensionId}\u0000${providerExtensionId}`;
+  const known = storedConsent()[key];
+  if (typeof known === "boolean") return known;
+  const lines = [`${extensionId} wants to use the language models provided by ${providerExtensionId}.`];
+  if (justification) lines.push("", `Justification: ${justification}`);
+  if (vendor) lines.push("", `Provider: ${vendor}`);
+  const answer = await featureApi.showMessage("warning", lines.join("\n"), ["Allow", "Deny"]);
+  // Dismissing the prompt denies this request but is not remembered as a "no".
+  if (answer === null) return false;
+  const allowed = answer === 0;
+  try {
+    localStorage.setItem(CONSENT_KEY, JSON.stringify({ ...storedConsent(), [key]: allowed }));
+  } catch {
+    /* no storage: the answer lasts for the host's session */
+  }
+  return allowed;
+}
 
 /** Add a part: consecutive markdown merges, a tool call updates in place, progress replaces the previous progress. */
 function addPart(parts: ChatWirePart[], part: ChatWirePart): ChatWirePart[] {
@@ -69,7 +152,7 @@ function send(text: string): void {
       { id, role: "assistant", parts: [], done: false, followups: [] },
     ],
   });
-  api.requestHost("send", [{ id, text: trimmed, modelId: state.modelId || undefined, useTools: state.useTools }]).catch((error: unknown) => finish(id, error instanceof Error ? error.message : String(error), []));
+  api.requestHost("send", [{ id, text: trimmed, modelId: state.modelId || visibleModels()[0]?.id, useTools: state.useTools }]).catch((error: unknown) => finish(id, error instanceof Error ? error.message : String(error), []));
 }
 
 function finish(id: number, error: string | undefined, followups: ChatWireFollowup[], participant?: string): void {
@@ -146,6 +229,20 @@ function Markdown({ text }: { text: string }) {
   return <div className="chat-md" onClick={onMarkdownClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+/** `participant.iconPath`: an image (light/dark) or a codicon; nothing when the extension set none. */
+function ParticipantIconView({ icon }: { icon?: ParticipantIcon }) {
+  if (!icon) return null;
+  if ("codicon" in icon) {
+    return (
+      <span className="chat-participant-icon" style={icon.color ? { color: themeColor(icon.color) } : undefined} aria-hidden="true">
+        <WithCodicons text={`$(${icon.codicon})`} size={13} />
+      </span>
+    );
+  }
+  const src = api?.theme.isDark() ? (icon.dark ?? icon.url) : icon.url;
+  return <img className="chat-participant-icon" src={src} alt="" draggable={false} />;
+}
+
 function Tree({ nodes, base, dir }: { nodes: ChatWireTreeNode[]; base: string; dir: string }) {
   return (
     <ul className="chat-tree">
@@ -220,9 +317,14 @@ function Part({ part }: { part: ChatWirePart }) {
 function MessageView({ message }: { message: Message }) {
   if (message.role === "user") return <div className="chat-msg chat-user">{message.text}</div>;
   const empty = !message.parts.length && !message.error;
+  const participant = message.participant ? (store.get().host?.participants as Participant[] | undefined)?.find((p) => p.id === message.participant) : undefined;
   return (
     <div className="chat-msg chat-assistant">
-      {message.participant ? <div className="chat-who">@{store.get().host?.participants.find((p) => p.id === message.participant)?.name ?? message.participant}</div> : null}
+      {message.participant ? (
+        <div className="chat-who">
+          <ParticipantIconView icon={participant?.icon} />@{participant?.name ?? message.participant}
+        </div>
+      ) : null}
       {message.parts.map((part, index) => (
         <Part key={index} part={part} />
       ))}
@@ -256,19 +358,19 @@ function feedback(message: Message, helpful: boolean): void {
   patchMessage(message.id, (m) => ({ ...m, feedback: helpful ? "up" : "down" }));
 }
 
-type Suggestion = { insert: string; label: string; description: string };
+type Suggestion = { insert: string; label: string; description: string; icon?: ParticipantIcon };
 
 /** `@participant` and `/command` completions for the text typed so far. */
-function suggestions(input: string, participants: ChatWireParticipant[]): Suggestion[] {
+function suggestions(input: string, participants: Participant[]): Suggestion[] {
   const mention = /^@(\S*)$/.exec(input);
   if (mention) {
     const typed = mention[1]!.toLowerCase();
-    return participants.filter((p) => p.name.toLowerCase().startsWith(typed)).map((p) => ({ insert: `@${p.name} `, label: `@${p.name}`, description: p.description || p.fullName }));
+    return participants.filter((p) => p.name.toLowerCase().startsWith(typed)).map((p) => ({ insert: `@${p.name} `, label: `@${p.name}`, description: p.description || p.fullName, icon: p.icon }));
   }
   const command = /^@(\S+)\s+\/(\S*)$/.exec(input);
   if (command) {
     const participant = participants.find((p) => p.name.toLowerCase() === command[1]!.toLowerCase());
-    return (participant?.commands ?? []).filter((c) => c.name.startsWith(command[2]!)).map((c) => ({ insert: `@${participant!.name} /${c.name} `, label: `/${c.name}`, description: c.description }));
+    return (participant?.commands ?? []).filter((c) => c.name.startsWith(command[2]!)).map((c) => ({ insert: `@${participant!.name} /${c.name} `, label: `/${c.name}`, description: c.description, icon: participant!.icon }));
   }
   return [];
 }
@@ -277,11 +379,11 @@ function ChatPanel() {
   const state = useStore(store);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const participants = state.host?.participants ?? [];
-  const models = state.host?.models ?? [];
+  const participants = (state.host?.participants ?? []) as Participant[];
+  const models = (state.host?.models ?? []).filter((model) => !state.hidden.includes(model.id));
   const hints = suggestions(state.input, participants);
   const tools = state.host?.tools.length ?? 0;
-  const nothing = !!state.host && !participants.length && !models.length;
+  const nothing = !!state.host && !participants.length && !(state.host.models.length);
 
   useEffect(() => {
     const element = log.current;
@@ -324,12 +426,12 @@ function ChatPanel() {
               </>
             ) : (
               <>
-                <p>{models.length ? "Ask a question, or mention a participant with @." : "No language model is available. Chat participants can still be used with @."}</p>
+                <p>{models.length ? "Ask a question, or mention a participant with @." : state.host?.models.length ? "All language models are hidden. Show one in Manage Language Models." : "No language model is available. Chat participants can still be used with @."}</p>
                 {participants.length ? (
                   <div className="chat-participants">
                     {participants.map((p) => (
                       <button key={p.id} type="button" className="chat-chip" title={p.description || p.fullName} onClick={() => { update({ input: `@${p.name} ` }); input.current?.focus(); }}>
-                        @{p.name}
+                        <ParticipantIconView icon={p.icon} />@{p.name}
                       </button>
                     ))}
                   </div>
@@ -346,7 +448,10 @@ function ChatPanel() {
           <div className="chat-hints">
             {hints.map((hint) => (
               <button key={hint.insert} type="button" onClick={() => { update({ input: hint.insert }); input.current?.focus(); }}>
-                <span>{hint.label}</span>
+                <span className="chat-hint-label">
+                  <ParticipantIconView icon={hint.icon} />
+                  <span>{hint.label}</span>
+                </span>
                 <small>{hint.description}</small>
               </button>
             ))}
@@ -385,6 +490,11 @@ function ChatPanel() {
               ))}
             </select>
           ) : null}
+          {state.host?.models.length ? (
+            <button type="button" className="icon-btn" title={models.length ? "Manage Language Models" : "All models are hidden: show one"} onClick={() => api?.revealSidebarView("chat-lm.models")}>
+              <Settings2 size={12} />
+            </button>
+          ) : null}
           {tools ? (
             <label title={(state.host?.tools ?? []).map((tool) => tool.name).join("\n")}>
               <input type="checkbox" checked={state.useTools} onChange={(event) => update({ useTools: event.target.checked })} /> Tools ({tools})
@@ -401,6 +511,72 @@ function ChatPanel() {
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** "Manage Language Models": every registered model with its provider; hiding one takes it out of the picker. */
+function ManageModelsPanel() {
+  const state = useStore(store);
+  const [entries, setEntries] = useState<LanguageModelEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = () => {
+    if (!api) return;
+    setLoading(true);
+    api.requestHost<{ models: LanguageModelEntry[] }>("models").then(
+      (result) => {
+        setEntries(result.models ?? []);
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+  };
+
+  // The list follows the host: providers (and their models) come and go.
+  useEffect(load, [state.host]);
+
+  return (
+    <div className="lm-models">
+      <div className="sidebar-header">
+        <span>Language Models</span>
+        <div className="sidebar-actions">
+          <button type="button" className={`icon-btn${loading ? " chat-spin" : ""}`} title="Refresh models" onClick={load}>
+            <RefreshCw size={14} />
+          </button>
+        </div>
+      </div>
+      <div className="lm-models-list">
+        {entries.length ? (
+          entries.map((model) => {
+            const hidden = state.hidden.includes(model.id);
+            return (
+              <div key={model.id} className={`lm-model${hidden ? " lm-model-hidden" : ""}`}>
+                <div className="lm-model-main">
+                  <span className="lm-model-name">{model.name}</span>
+                  <span className="lm-model-meta" title={model.id}>
+                    {model.vendor} · {model.family || "no family"} · {model.id}
+                  </span>
+                  <span className="lm-model-provider" title={model.extensionId}>
+                    Provided by {model.extensionName ?? model.extensionId}
+                  </span>
+                </div>
+                <button type="button" className="icon-btn" title={hidden ? "Show in the model picker" : "Hide from the model picker"} onClick={() => setModelHidden(model.id, !hidden)}>
+                  {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            );
+          })
+        ) : (
+          <p className="lm-models-empty">{loading ? "Loading models…" : "No language model is registered. Install an extension that contributes languageModelChatProviders."}</p>
+        )}
+      </div>
+      {state.hidden.length ? (
+        <button type="button" className="chat-button lm-models-reset" onClick={showAllModels}>
+          Show all {state.hidden.length} hidden model{state.hidden.length === 1 ? "" : "s"}
+        </button>
+      ) : null}
+      <p className="lm-models-hint">Hidden models stay installed: they are only left out of the Chat model picker. The choice is remembered in this window.</p>
     </div>
   );
 }
@@ -423,14 +599,21 @@ export const chatLmView: ViewFeature = {
   },
 
   onHostRequest: async (method, args, featureApi) => {
-    if (method !== "confirm") throw new Error(`unknown chat request '${method}'`);
-    const [title, message, actions] = args as [string, string, string[]];
-    return featureApi.showMessage("warning", `${title}\n${message}`, actions);
+    if (method === "confirm") {
+      const [title, message, actions] = args as [string, string, string[]];
+      return featureApi.showMessage("warning", `${title}\n${message}`, actions);
+    }
+    if (method === "modelConsent") {
+      const [extensionId, providerExtensionId, vendor, justification] = args as [string, string, string, string | undefined];
+      return askModelConsent(featureApi, extensionId, providerExtensionId, vendor, justification);
+    }
+    throw new Error(`unknown chat request '${method}'`);
   },
 
   commands: [
     { id: "lumen.chat.focus", title: "Focus on Chat View", category: "Chat", run: (featureApi) => featureApi.revealSidebarView("chat-lm") },
     { id: "lumen.chat.new", title: "New Chat", category: "Chat", run: (featureApi) => { featureApi.revealSidebarView("chat-lm"); newChat(); } },
+    { id: "lumen.chat.manageLanguageModels", title: "Manage Language Models", category: "Chat", run: (featureApi) => featureApi.revealSidebarView("chat-lm.models") },
   ],
 
   sidebarViews: [
@@ -439,6 +622,12 @@ export const chatLmView: ViewFeature = {
       title: "Chat",
       icon: MessageSquare,
       render: () => <ChatPanel />,
+    },
+    {
+      id: "chat-lm.models",
+      title: "Language Models",
+      icon: Cpu,
+      render: () => <ManageModelsPanel />,
     },
   ],
 };

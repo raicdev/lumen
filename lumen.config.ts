@@ -28,7 +28,7 @@ export default {
   app: {
     name: "Lumen",
     identifier: "dev.lumen.editor",
-    version: "0.1.1",
+    version: "0.2.0",
   },
   main: "src/main/index.ts",
   view: {
@@ -47,5 +47,7 @@ export default {
     // Rendered from resources/icon.svg.
     icon: "resources/icon.ico",
     publisher: "Lumen Contributors",
+    // lumen://<extension id>/... opens in Lumen (window.registerUriHandler).
+    protocols: ["lumen"],
   },
 } satisfies LumenConfig;

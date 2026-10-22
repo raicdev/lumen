@@ -30,6 +30,7 @@ import type {
 } from "../../shared/extensions";
 import type { Diagnostic, FileEdits } from "../../shared/types";
 import { matchesSelector } from "../../shared/glob";
+import { setFileSystemSchemes } from "../../shared/file-systems";
 import { dispatchHostMessage, notifyHostReady } from "../features/registry";
 import { customEditorContributions, type CustomEditorContribution } from "../../shared/extensions";
 
@@ -78,6 +79,8 @@ export type ExtensionsSnapshot = {
   settingsVersion: number;
   /** URI schemes of file systems extensions provide (memfs:, …). */
   virtualSchemes: string[];
+  /** Read-only schemes of those file systems: the provider's message (registerFileSystemProvider). */
+  virtualReadOnly: Record<string, string | true>;
   /** Extension file decorations, by lower-cased path (window.registerFileDecorationProvider). */
   fileDecorations: Map<string, HostFileDecoration>;
 };
@@ -206,6 +209,7 @@ class ExtensionService {
     quickPick: null,
     settingsVersion: 0,
     virtualSchemes: [],
+    virtualReadOnly: {},
     fileDecorations: new Map(),
   };
   #listeners = new Set<() => void>();
@@ -783,6 +787,7 @@ class ExtensionService {
         const staleLanguages = [...this.#languageConfigurations.keys()];
         this.#languageConfigurations.clear();
         for (const languageId of staleLanguages) for (const listener of this.#languageConfigListeners) listener(languageId);
+        setFileSystemSchemes([]);
         this.#update({
           ready: true,
           crashed: null,
@@ -796,6 +801,7 @@ class ExtensionService {
           diagnostics: new Map(),
           quickPick: null,
           virtualSchemes: [],
+          virtualReadOnly: {},
           fileDecorations: new Map(),
         });
         this.#resync();
@@ -935,10 +941,11 @@ class ExtensionService {
         return;
       }
       case "fileSystems":
-        this.#update({ virtualSchemes: message.schemes });
+        setFileSystemSchemes(message.schemes, message.caseSensitive ?? message.schemes);
+        this.#update({ virtualSchemes: message.schemes, virtualReadOnly: message.readOnly ?? {} });
         return;
       case "virtualFilesChanged":
-        window.dispatchEvent(new CustomEvent("lumen:ext-virtual-changed", { detail: { paths: message.paths } }));
+        window.dispatchEvent(new CustomEvent("lumen:ext-virtual-changed", { detail: { paths: message.paths, changes: message.changes ?? [] } }));
         return;
       case "fileDecorationsChanged": {
         // The changed paths win over the ones we already asked about.

@@ -145,9 +145,9 @@ test("a web-only extension using custom editors is reported as limited", () => {
     writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "web", publisher: "p", version: "1.0.0", engines: { vscode: "^1.80.0" }, browser: "./b.js" }));
     writeFileSync(join(dir, "b.js"), `const vscode = require("vscode"); vscode.window.registerCustomEditorProvider("a", {});`);
     const { report } = transpileExtension(dir);
-    // The API is a supported (partial) feature now, but a web-only extension still cannot load.
+    // The API is supported now, but a web-only extension still cannot load.
     assert.equal(report.level, "limited");
-    assert.ok(report.apis.some((api) => api.name === "window.registerCustomEditorProvider" && api.status === "partial"));
+    assert.ok(report.apis.some((api) => api.name === "window.registerCustomEditorProvider" && api.status === "supported"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -180,11 +180,12 @@ test("a stored report is re-rated against the current API table", () => {
   };
   const report = refreshReport(stale, manifest);
   const panel = report.apis.find((api) => api.name === "window.createWebviewPanel")!;
-  assert.equal(panel.status, "partial");
+  assert.equal(panel.status, "supported");
   assert.equal(panel.count, 2);
   assert.deepEqual(report.apis.find((api) => api.name === "window.registerWebviewViewProvider"), { name: "window.registerWebviewViewProvider", count: 1, status: "supported" });
   assert.equal(report.contributions.find((c) => c.name === "views")?.status, "supported");
-  assert.equal(report.level, "partial");
+  // Everything it uses is supported now: limited becomes full.
+  assert.equal(report.level, "full");
 });
 
 test("readZip reads the entries of a package", () => {
@@ -1469,4 +1470,24 @@ test("refreshing a stored report recomputes the manifest warnings", () => {
   const report = refreshReport(stale, manifest);
   // Lumen raises debug activation events now; onUri still is not; code-scan warnings stay.
   assert.deepEqual(report.warnings, ["Activation event “onUri” is never raised by Lumen.", "The entry point ./out/main.js is missing from the package."]);
+});
+
+test("getConfiguration() without a section shows every setting as a nested tree, like VS Code", () => {
+  const host = new ExtensionHost();
+  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.configDefaults = { "vsicons.associations.files": [], "vsicons.associations.folders": [], "vsicons.dontShowNewVersionMessage": false };
+  host.config = { lumen: { "editor.tabSize": 4 }, user: { "vsicons.associations.files": [{ icon: "js", extensions: ["mjs"] }], "[python]": { "editor.tabSize": 2 } } };
+  const api = host.apiFor(null) as any;
+  // vscode-icons reads workspace.getConfiguration()["vsicons"].associations.files.
+  const root = api.workspace.getConfiguration();
+  assert.deepEqual(root.vsicons.associations.files, [{ icon: "js", extensions: ["mjs"] }]);
+  assert.deepEqual(root.vsicons.associations.folders, []);
+  assert.equal(root.vsicons.dontShowNewVersionMessage, false);
+  assert.equal(root.editor.tabSize, 4);
+  assert.deepEqual(root["[python]"], { "editor.tabSize": 2 });
+  assert.equal(typeof root.get, "function");
+  assert.equal(root.get("vsicons.dontShowNewVersionMessage"), false);
+  // The tree is a copy: changing it does not change the settings.
+  root.vsicons.associations.files.push({ icon: "x" });
+  assert.equal(api.workspace.getConfiguration("vsicons").associations.files.length, 1);
 });

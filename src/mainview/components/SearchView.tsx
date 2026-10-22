@@ -2,12 +2,15 @@ import { CaseSensitive, ChevronRight, ChevronsUpDown, ListCollapse, Ellipsis, Re
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SearchMatch } from "../../shared/types";
 import { api } from "../lib/rpc";
+import { extensionService } from "../lib/extensions";
 import { showDialog } from "../lib/dialog";
 import { toast } from "../lib/toast";
 import { FileIcon } from "./FileIcon";
 
 type Props = {
   workspaceRoot: string | null;
+  /** Workspace folders of provided file systems (searched through their provider). */
+  providerRoots: string[];
   focusToken: number;
   /** Bumped to open the replace field (Ctrl+Shift+H). */
   replaceToken: number;
@@ -26,7 +29,7 @@ function Toggle({ active, title, label, onClick }: { active: boolean; title: str
   );
 }
 
-export function SearchView({ workspaceRoot, focusToken, replaceToken, initialQuery, onOpenResult, onReplaced }: Props) {
+export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceToken, initialQuery, onOpenResult, onReplaced }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -62,7 +65,7 @@ export function SearchView({ workspaceRoot, focusToken, replaceToken, initialQue
   }, [replaceToken]);
 
   useEffect(() => {
-    if (!workspaceRoot || !query) {
+    if ((!workspaceRoot && !providerRoots.length) || !query) {
       setMatches([]);
       setMeta("");
       return;
@@ -71,26 +74,24 @@ export function SearchView({ workspaceRoot, focusToken, replaceToken, initialQue
       void (async () => {
         setSearching(true);
         try {
-          const result = await api().request.searchInFiles({
-            root: workspaceRoot,
-            query,
-            caseSensitive,
-            wholeWord,
-            regex,
-            include,
-            exclude,
-            maxResults: 2000,
-          });
+          const options = { caseSensitive, wholeWord, regex, include, exclude, maxResults: 2000 };
+          const result = workspaceRoot
+            ? await api().request.searchInFiles({ root: workspaceRoot, query, ...options })
+            : { matches: [], truncated: false, error: undefined as string | undefined };
+          // Provided schemes have no TextSearchProvider here: walk their folders through the provider.
+          const provided = providerRoots.length ? await extensionService.call("providerSearchFiles", providerRoots, query, options) : { matches: [], truncated: false };
           if (result.error) {
             setMatches([]);
             setMeta(result.error);
             return;
           }
-          setMatches(result.matches);
-          const files = new Set(result.matches.map((m) => m.path)).size;
+          const all = [...result.matches, ...provided.matches];
+          setMatches(all);
+          const truncated = result.truncated || provided.truncated;
+          const files = new Set(all.map((m) => m.path)).size;
           setMeta(
-            result.matches.length
-              ? `${result.matches.length}${result.truncated ? "+" : ""} result${result.matches.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
+            all.length
+              ? `${all.length}${truncated ? "+" : ""} result${all.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
               : "No results found.",
           );
         } catch {
@@ -102,9 +103,9 @@ export function SearchView({ workspaceRoot, focusToken, replaceToken, initialQue
       })();
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, caseSensitive, wholeWord, regex, include, exclude, workspaceRoot, version]);
+  }, [query, caseSensitive, wholeWord, regex, include, exclude, workspaceRoot, providerRoots, version]);
 
-  if (!workspaceRoot) return <div className="tree-empty">Open a folder to search</div>;
+  if (!workspaceRoot && !providerRoots.length) return <div className="tree-empty">Open a folder to search</div>;
 
   const groups = new Map<string, SearchMatch[]>();
   for (const m of matches) {
@@ -136,22 +137,20 @@ export function SearchView({ workspaceRoot, focusToken, replaceToken, initialQue
       ],
     });
     if (choice !== "replace") return;
-    const result = await api().request.replaceInFiles({
-      root: workspaceRoot,
-      query,
-      replacement,
-      caseSensitive,
-      wholeWord,
-      regex,
-      include,
-      exclude,
-      paths,
-    });
-    if (result.error) {
-      toast(result.error, "error");
+    const options = { caseSensitive, wholeWord, regex, include, exclude };
+    const result = workspaceRoot
+      ? await api().request.replaceInFiles({ root: workspaceRoot, query, replacement, ...options, paths })
+      : { replacements: 0, files: 0, error: undefined as string | undefined };
+    const provided = providerRoots.length
+      ? await extensionService.call("providerReplaceFiles", providerRoots, query, replacement, options, paths)
+      : { replacements: 0, files: 0, error: undefined as string | undefined };
+    if (result.error || provided.error) {
+      toast(result.error ?? provided.error ?? "Replace failed", "error");
       return;
     }
-    toast(`Replaced ${result.replacements} occurrence${result.replacements === 1 ? "" : "s"} in ${result.files} file${result.files === 1 ? "" : "s"}`, "success");
+    const replacements = result.replacements + provided.replacements;
+    const files = result.files + provided.files;
+    toast(`Replaced ${replacements} occurrence${replacements === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`, "success");
     onReplaced();
     setVersion((v) => v + 1);
   };

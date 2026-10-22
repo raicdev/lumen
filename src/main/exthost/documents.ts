@@ -1,5 +1,6 @@
 import { EndOfLine, Position, Range, Uri } from "./types.ts";
 import type { HostContentChange, HostDocumentData } from "../../shared/extensions.ts";
+import { normalizeFileSystemKey } from "../../shared/file-systems.ts";
 
 /**
  * The extension host's copy of an open document. The view sends the text
@@ -20,7 +21,7 @@ export type TextLine = {
 
 /** A document of an extension's file system: its key is the URI itself (`memfs:/a.txt`). */
 export function isVirtualKey(path: string): boolean {
-  return /^[a-zA-Z][\w+.-]+:/.test(path) && !path.startsWith("untitled:");
+  return /^\w[\w+.-]+:/.test(path) && !path.startsWith("untitled:");
 }
 
 /** `untitled:Name` → untitled URI, `scheme:…` → that URI, anything else is a file path. */
@@ -37,9 +38,12 @@ export function keyOfUri(uri: Uri): string {
   return uri.fsPath;
 }
 
-/** Map key: paths compare case-insensitively on Windows. */
+/**
+ * Map key: paths compare case-insensitively on Windows, and provider paths
+ * follow their file system's isCaseSensitive (registerFileSystemProvider).
+ */
 export function normalizeKey(path: string): string {
-  if (path.startsWith("untitled:") || isVirtualKey(path)) return path;
+  if (path.startsWith("untitled:") || isVirtualKey(path)) return normalizeFileSystemKey(path);
   return process.platform === "win32" ? path.replace(/\//g, "\\").toLowerCase() : path;
 }
 

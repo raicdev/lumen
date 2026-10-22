@@ -70,6 +70,15 @@ export class ExtensionHostClient {
     return !!this.#worker;
   }
 
+  /** pid → id of the extension that started the process. */
+  #childProcesses = new Map<number, string>();
+
+  /** Extensions' processes among `alive` (entries for processes that are gone are dropped). */
+  childProcessOwners(alive: Set<number>): Map<number, string> {
+    for (const pid of this.#childProcesses.keys()) if (!alive.has(pid)) this.#childProcesses.delete(pid);
+    return this.#childProcesses;
+  }
+
   /** Bytes of JavaScript heap in use (all extensions together), or null while stopped. */
   async heapUsed(): Promise<number | null> {
     const stats = await this.#worker?.getHeapStatistics().catch(() => null);
@@ -200,6 +209,9 @@ export class ExtensionHostClient {
           (result) => this.#post({ type: "mainReply", id: message.id, result }),
           (error: unknown) => this.#post({ type: "mainReply", id: message.id, error: error instanceof Error ? error.message : String(error) }),
         );
+        break;
+      case "childProcess":
+        this.#childProcesses.set(message.pid, message.extensionId);
         break;
       case "shutdownDone":
         break;

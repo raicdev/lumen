@@ -192,6 +192,7 @@ export const APP_MENU: MenuGroup[] = [
       cmd("workbench.action.openIssueReporter", "Report Issue…"),
       cmd("workbench.action.openProcessExplorer", "Open Process Explorer"),
       sep,
+      cmd("update.checkForUpdate", "Check for Updates…"),
       cmd("workbench.action.showAboutDialog", "About"),
     ],
   },

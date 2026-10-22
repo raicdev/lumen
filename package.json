@@ -1,6 +1,6 @@
 {
   "name": "lumen",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Lumen — a fast, beautiful code editor. Zed alternative built with Lumen Shell, Node.js & TypeScript.",
   "type": "module",

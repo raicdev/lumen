@@ -1,8 +1,13 @@
 import type { ViewFeature } from "./types";
+import { explorerRoots, type ExplorerRoot } from "./workspace-misc/roots";
 
-/** Window side of the "workspace-misc" area: the "Open URI…" command that hands a lumen:// URI to an extension's URI handler. Styles: feature-workspace-misc.css. */
+/** Window side of the "workspace-misc" area: the "Open URI…" command that hands a lumen:// URI to an extension's URI handler, and the extra workspace folders of the explorer. Styles: feature-workspace-misc.css. */
 export const workspaceMiscView: ViewFeature = {
   area: "workspace-misc",
+  onHostMessage: (payload) => {
+    const message = payload as { type?: string; folders?: ExplorerRoot[] } | null;
+    if (message?.type === "folders" && Array.isArray(message.folders)) explorerRoots.set(message.folders);
+  },
   commands: [
     {
       id: "workbench.action.openUri",

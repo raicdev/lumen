@@ -1,4 +1,5 @@
 import { EXTENSION_PROFILE_PREFIX, terminalService, type TerminalEvent, type TerminalIcon } from "../lib/terminals";
+import { showContextMenu } from "../lib/context-menu";
 import type { ViewFeature, ViewFeatureApi } from "./types";
 import type {
   CreateTerminalRequest,
@@ -24,6 +25,77 @@ let hostReady = false;
 const announced = new Map<string, string>();
 /** True while `create` runs: the terminal it makes is reported by the host's own request, not as "opened". */
 let creating = false;
+
+/** A fix an extension's terminal quick fix provider returned (terminal/quickfix.ts). */
+type TerminalQuickFixWire = { fixId: string; label: string; kind: "default" | "explain" };
+/** `host.postFeature` message of the "terminal" area: the fixes to show for a terminal. */
+type TerminalQuickFixMessage = { kind: "quickFixes"; id: string; fixes: TerminalQuickFixWire[] };
+
+/** Fixes waiting in a terminal, until a new command starts or one is picked. */
+const quickFixes = new Map<string, TerminalQuickFixWire[]>();
+let lightbulb: HTMLButtonElement | null = null;
+let lightbulbTerminal: string | null = null;
+
+function removeLightbulb() {
+  lightbulb?.remove();
+  lightbulb = null;
+  lightbulbTerminal = null;
+}
+
+/** The terminal whose fixes to show: the active one, else the first with fixes. */
+function terminalWithFixes(): string | undefined {
+  const snapshot = terminalService.getSnapshot();
+  const withFixes = snapshot.instances.filter((instance) => !instance.hidden && quickFixes.get(instance.id)?.length);
+  return (withFixes.find((instance) => instance.id === snapshot.activeId) ?? withFixes[0])?.id;
+}
+
+/** The lightbulb lives in the terminal's own host element (the terminal can move between panel and editor). */
+function updateLightbulb(api: ViewFeatureApi) {
+  const terminalId = terminalWithFixes();
+  if (!terminalId) {
+    removeLightbulb();
+    return;
+  }
+  const terminalElement = [...document.querySelectorAll<HTMLElement>(".terminal-instance")].find((element) => element.dataset.terminalId === terminalId);
+  const host = terminalElement?.parentElement;
+  if (!host) {
+    removeLightbulb();
+    return;
+  }
+  if (!lightbulb) {
+    lightbulb = document.createElement("button");
+    lightbulb.type = "button";
+    lightbulb.className = "terminal-quickfix-lightbulb";
+    lightbulb.title = "Show Quick Fixes";
+    lightbulb.textContent = "💡";
+    lightbulb.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (lightbulbTerminal) showQuickFixMenu(api, lightbulbTerminal);
+    });
+  }
+  lightbulbTerminal = terminalId;
+  if (lightbulb.parentElement !== host) host.appendChild(lightbulb);
+}
+
+function showQuickFixMenu(api: ViewFeatureApi, terminalId: string) {
+  const fixes = quickFixes.get(terminalId) ?? [];
+  if (!fixes.length) return;
+  const rect = lightbulb?.getBoundingClientRect();
+  const x = rect ? Math.min(rect.right, window.innerWidth - 8) : window.innerWidth / 2;
+  const y = rect ? Math.min(rect.bottom + 4, window.innerHeight - 8) : window.innerHeight / 2;
+  void showContextMenu(
+    x,
+    y,
+    fixes.map((fix) => ({ type: "item" as const, label: fix.label, action: fix.fixId })),
+  ).then((fixId) => {
+    if (!fixId) return;
+    // The host runs the fix; the menu is gone until the next command matches.
+    quickFixes.delete(terminalId);
+    updateLightbulb(api);
+    void api.requestHost("quickFix", [terminalId, fixId]).catch((error) => console.error("terminal quick fix failed", error));
+  });
+}
 
 function toIcon(wire: TerminalIconWire | undefined): TerminalIcon | undefined {
   return wire;
@@ -68,6 +140,8 @@ function forward(api: ViewFeatureApi, event: TerminalEvent) {
       send(api, { kind: "shell", id: event.id, event: event.event });
       return;
     case "started":
+      quickFixes.delete(event.id);
+      updateLightbulb(api);
       send(api, { kind: "started", id: event.id, pid: event.pid, shell: event.shell });
       return;
     case "exited":
@@ -75,6 +149,8 @@ function forward(api: ViewFeatureApi, event: TerminalEvent) {
       return;
     case "closed":
       announced.delete(event.id);
+      quickFixes.delete(event.id);
+      updateLightbulb(api);
       send(api, { kind: "closed", id: event.id, code: event.code });
       return;
   }
@@ -101,6 +177,7 @@ function wire(api: ViewFeatureApi) {
   wired = true;
   terminalService.onEvent((event) => forward(api, event));
   terminalService.subscribe(() => sync(api));
+  terminalService.subscribe(() => updateLightbulb(api));
   terminalService.setProfileResolver(async (profileId, terminalId) => {
     const resolved = await api.requestHost<ResolvedProfileWire | null>("resolveProfile", [profileId, terminalId, terminalService.size(terminalId)]);
     if (!resolved) return null;
@@ -158,13 +235,15 @@ export const terminalView: ViewFeature = {
     // A (re)started host knows no terminals and no link providers.
     hostReady = true;
     announced.clear();
+    quickFixes.clear();
+    removeLightbulb();
     terminalService.setLinkProvider(null);
     terminalService.setExtensionProfiles(contributedProfiles(api));
     sync(api);
   },
 
   onHostMessage(payload, api) {
-    const message = payload as TerminalHostMessage;
+    const message = payload as TerminalHostMessage | TerminalQuickFixMessage;
     switch (message.kind) {
       case "write":
         terminalService.writeData(message.id, message.data);
@@ -184,6 +263,11 @@ export const terminalView: ViewFeature = {
               }
             : null,
         );
+        return;
+      case "quickFixes":
+        if (message.fixes.length) quickFixes.set(message.id, message.fixes);
+        else quickFixes.delete(message.id);
+        updateLightbulb(api);
         return;
     }
   },
@@ -217,6 +301,16 @@ export const terminalView: ViewFeature = {
         const id = terminalService.create({ profileId: profile.id });
         // The host asks the workbench to show the panel with this terminal (its terminalShow request).
         await api.requestHost("show", [id]).catch(() => {});
+      },
+    },
+    {
+      id: "workbench.action.terminal.showQuickFixes",
+      title: "Show Terminal Quick Fixes",
+      category: "Terminal",
+      enabled: () => terminalWithFixes() !== undefined,
+      run(api) {
+        const terminalId = terminalWithFixes();
+        if (terminalId) showQuickFixMenu(api, terminalId);
       },
     },
   ],

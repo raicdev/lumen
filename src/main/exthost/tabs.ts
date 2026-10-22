@@ -1,7 +1,7 @@
 import type { HostTab, HostTabGroup } from "../../shared/extensions.ts";
 import type { ExtensionHost } from "./host.ts";
-import { uriOfKey } from "./documents.ts";
-import { TabInputCustom, TabInputTerminal, TabInputText, TabInputWebview } from "./compat-types.ts";
+import { normalizeKey, uriOfKey } from "./documents.ts";
+import { TabInputCustom, TabInputTerminal, TabInputText, TabInputTextDiff, TabInputWebview } from "./compat-types.ts";
 import * as T from "./types.ts";
 import { hostFeatures } from "./features/registry.ts";
 
@@ -93,7 +93,9 @@ export class TabGroup {
 
 function inputOf(tab: HostTab): unknown {
   if (tab.kind === "custom" && tab.uri) return new TabInputCustom(uriOfKey(tab.uri), tab.viewType ?? "");
-  if (tab.kind === "webview") return new TabInputWebview(tab.label);
+  // VS Code reports a webview panel's view type as `mainThreadWebview-<viewType>`.
+  if (tab.kind === "webview") return new TabInputWebview(tab.viewType ? `mainThreadWebview-${tab.viewType}` : tab.label);
+  if (tab.kind === "diff" && tab.original && tab.modified) return new TabInputTextDiff(uriOfKey(tab.original), uriOfKey(tab.modified));
   if (tab.kind === "terminal") return new TabInputTerminal();
   if (tab.kind === "feature" && tab.uri) {
     for (const feature of hostFeatures) {
@@ -125,6 +127,19 @@ export class TabGroups {
 
   get activeTabGroup(): TabGroup {
     return this.#groups.find((group) => group.isActive) ?? this.#groups[0] ?? new TabGroup(1, true);
+  }
+
+  /**
+   * The view column of the group a document is shown in (`TextEditor.viewColumn`).
+   * Prefers the group where the document is the visible tab; a document open in more
+   * than one group reports the group that shows it.
+   */
+  viewColumnOf(path: string | null | undefined): number | undefined {
+    if (!path) return undefined;
+    const key = normalizeKey(path);
+    const shows = (tab: Tab | undefined) => !!tab && tab.viewPath() !== null && normalizeKey(tab.viewPath()!) === key;
+    const visible = this.#groups.find((group) => shows(group.activeTab));
+    return (visible ?? this.#groups.find((group) => group.tabs.some(shows)))?.viewColumn;
   }
 
   /** The view reported its layout: rebuild the groups and fire what changed. */

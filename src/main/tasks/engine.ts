@@ -10,8 +10,18 @@ import { MatcherRunner, createMatcherRegistry, resolveMatchedFile, resolveProble
 import type { MatcherRegistry, ProblemMatch, ProblemMatcherDef } from "./problem-matchers.ts";
 import { runProcess, stripAnsi } from "./process.ts";
 import type { RunningProcess } from "./process.ts";
-import { InputCancelled, dependenciesOf, expandDeep, expandVariables, expandVariablesSync, groupOf, matchersOf, parseTasksJson } from "./tasks-json.ts";
-import type { InputDef, JsonTask, VariableContext } from "./tasks-json.ts";
+import {
+  InputCancelled,
+  dependenciesOf,
+  expandDeep,
+  expandVariables,
+  expandVariablesSync,
+  groupOf,
+  matchersOf,
+  parseTasksJson,
+  taskDefinitionIssues,
+} from "./tasks-json.ts";
+import type { InputDef, JsonTask, TaskDefinitionContribution, TaskDefinitionIssue, VariableContext } from "./tasks-json.ts";
 import { CustomExecution, ProcessExecution, ShellExecution, Task, TaskGroup, TaskRevealKind } from "./task-types.ts";
 import type { TaskExecutionKind } from "./task-types.ts";
 
@@ -263,6 +273,28 @@ function matcherRegistry(host: ExtensionHost): MatcherRegistry {
   return createMatcherRegistry(contributions);
 }
 
+/** The `contributes.taskDefinitions` entry for a task type (the first extension that contributes it). */
+function taskDefinitionOf(host: ExtensionHost, type: string | undefined): TaskDefinitionContribution | undefined {
+  if (!type) return undefined;
+  for (const runtime of host.runtimes.values()) {
+    const contributions = (runtime.description.manifest.contributes ?? {}) as { taskDefinitions?: TaskDefinitionContribution[] };
+    const definition = [contributions.taskDefinitions ?? []].flat().find((candidate) => candidate && candidate.type === type);
+    if (definition) return definition;
+  }
+  return undefined;
+}
+
+/** tasks.json tasks of a contributed type must match its taskDefinitions `properties` / `required`. */
+function taskValidationIssues(host: ExtensionHost, task: Task): TaskDefinitionIssue[] {
+  if (task.source !== "Workspace") return [];
+  return taskDefinitionIssues(task.definition, taskDefinitionOf(host, task.definition.type));
+}
+
+/** Whether a file is open in an editor tab (`problemMatcher.applyTo`). */
+function isOpenInEditor(host: ExtensionHost, file: string): boolean {
+  return host.document(file)?.open === true || host.editors.has(normalizeKey(file));
+}
+
 function activeFile(host: ExtensionHost): { file: string | null; line?: number; selectedText?: string } {
   const key = host.activeEditorKey;
   if (!key || !isAbsolute(key)) return { file: null };
@@ -437,6 +469,11 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
         expand: (text) => (variables ? expandVariablesSync(text, variables) : text),
         exists: existsSync,
       });
+      // `applyTo` limits reporting to files that are (or are not) open in an editor.
+      if (matcher.applyTo !== "allDocuments") {
+        const open = isOpenInEditor(host, file);
+        if (matcher.applyTo === "openDocuments" ? !open : open) return;
+      }
       const lines = linesOf(file);
       const line = Math.max(0, (problem.line || 1) - 1);
       const lineText = lines?.[line];
@@ -490,6 +527,15 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
 
     let exitCode: number | null | undefined;
     try {
+      // A tasks.json task of a contributed type is validated like VS Code's tasks.json schema.
+      const issues = taskValidationIssues(host, task);
+      for (const issue of issues) {
+        emit(`${issue.severity === "error" ? "Error" : "Warning"}: ${issue.message}\n`);
+        if (issue.severity === "warning") host.log("warning", `task '${task.name}': ${issue.message}`);
+      }
+      const invalid = issues.filter((issue) => issue.severity === "error");
+      if (invalid.length) throw new Error(`The task '${task.name}' is not run because its definition is invalid (${invalid.length} error${invalid.length === 1 ? "" : "s"}).`);
+
       // Tasks this one depends on run first.
       const label = task.name;
       const dependencies = dependenciesOf(task.definition);

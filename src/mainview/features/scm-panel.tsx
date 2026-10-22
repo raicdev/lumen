@@ -2,8 +2,9 @@ import { Check, ChevronRight } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import type { ScmControlData, ScmGroupData, ScmViewMessage } from "../../shared/scm-protocol";
 import { FileIcon } from "../components/FileIcon";
+import { WithCodicons } from "../components/Codicon";
 import { featureApi } from "./registry";
-import { scmInputs, scmStore } from "./scm-store";
+import { resourceIcon, scmDarkTheme, scmInputs, scmStore, type ScmResourceIcon } from "./scm-store";
 import { useStore } from "./store";
 import { MenuActions } from "./menus-walkthroughs/MenuActions";
 import { refArg, showContributedMenu, uriArg } from "./menus-walkthroughs/menus";
@@ -44,6 +45,21 @@ function scmLookup(control: ScmControlData, group?: ScmGroupData, contextValue?:
   };
 }
 
+/** The icon of a resource state: the extension's `decorations.iconPath` (light/dark variant, or a theme icon), else the file's type icon. */
+function ResourceIcon({ name, icon }: { name: string; icon?: ScmResourceIcon }) {
+  const dark = useStore(scmDarkTheme);
+  if (icon?.codicon) {
+    return (
+      <span className="scm-resource-icon scm-resource-codicon" aria-hidden="true">
+        <WithCodicons text={`$(${icon.codicon})`} size={14} />
+      </span>
+    );
+  }
+  const src = dark ? (icon?.dark ?? icon?.light) : (icon?.light ?? icon?.dark);
+  if (src) return <img className="scm-resource-icon" src={src} alt="" aria-hidden="true" />;
+  return <FileIcon name={name} />;
+}
+
 function ResourceRow({ control, group, index }: { control: ScmControlData; group: ScmGroupData; index: number }) {
   const resource = group.resources[index]!;
   const open = () => {
@@ -66,7 +82,7 @@ function ResourceRow({ control, group, index }: { control: ScmControlData; group
       onContextMenu={(e) => showContributedMenu(e, "scm/resourceState/context", lookup, args)}
       title={resource.tooltip ? `${resource.path} • ${resource.tooltip}` : resource.path}
     >
-      <FileIcon name={resource.label} />
+      <ResourceIcon name={resource.label} icon={resourceIcon(resource)} />
       <span className={`scm-name${resource.strikeThrough ? " deleted" : ""}${resource.faded ? " scm-faded" : ""}`}>{resource.label}</span>
       <span className="scm-dir" onContextMenu={folderMenu}>
         {resource.description}
@@ -167,7 +183,7 @@ function Control({ control }: { control: ScmControlData }) {
             </button>
           ))}
         </span>
-        <MenuActions menuId="scm/repository" lookup={scmLookup(control)} args={[controlRef(control)]} inline={["inline"]} overflow={false} />
+        <MenuActions menuId="scm/sourceControl" lookup={scmLookup(control)} args={[controlRef(control)]} inline={["inline"]} overflow={false} />
         <MenuActions menuId="scm/title" lookup={scmLookup(control)} args={[controlRef(control)]} />
         <span className="badge">{control.count}</span>
       </div>

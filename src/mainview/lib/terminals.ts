@@ -327,6 +327,7 @@ class TerminalService {
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    term.attachCustomKeyEventHandler((event) => this.clipboardKey(id, event));
     const instance: Instance = {
       id,
       title: options.title ?? options.initialTitle ?? "terminal",
@@ -566,6 +567,57 @@ class TerminalService {
     const instance = id ? this.instances.get(id) : null;
     // The element may have just been attached: focus on the next frame.
     if (instance) requestAnimationFrame(() => instance.term.focus());
+  }
+
+  /* ── clipboard ────────────────────────────────────────────────────────── */
+
+  hasSelection(id: string | null): boolean {
+    return !!(id && this.instances.get(id)?.term.hasSelection());
+  }
+
+  /** Copy the selected text (and clear the selection, like VS Code). False when nothing is selected. */
+  copySelection(id: string | null): boolean {
+    const instance = id ? this.instances.get(id) : null;
+    const text = instance?.term.getSelection();
+    if (!instance || !text) return false;
+    void navigator.clipboard.writeText(text).catch(() => {});
+    instance.term.clearSelection();
+    return true;
+  }
+
+  /** Paste the clipboard as input (bracketed when the shell asked for it). */
+  async paste(id: string | null): Promise<void> {
+    const instance = id ? this.instances.get(id) : null;
+    if (!instance) return;
+    const text = await navigator.clipboard.readText().catch(() => "");
+    if (text) instance.term.paste(text);
+    instance.term.focus();
+  }
+
+  /**
+   * The terminal's clipboard keys, as in VS Code: Ctrl+C copies when text is selected
+   * (and stays ^C otherwise), Ctrl+Shift+C / Ctrl+Insert copy, Ctrl+V / Ctrl+Shift+V /
+   * Shift+Insert paste; Cmd+C / Cmd+V on macOS. False: xterm does not see the key.
+   */
+  private clipboardKey(id: string, event: KeyboardEvent): boolean {
+    if (event.type !== "keydown" || event.altKey) return true;
+    const key = event.key.toLowerCase();
+    const mod = event.ctrlKey !== event.metaKey && (event.ctrlKey || event.metaKey);
+    const copy = (mod && key === "c") || (event.ctrlKey && !event.shiftKey && key === "insert");
+    const paste = (mod && key === "v") || (event.shiftKey && !event.ctrlKey && !event.metaKey && key === "insert");
+    if (copy) {
+      // Ctrl+C without a selection is the interrupt; Ctrl+Shift+C without one does nothing.
+      if (!this.hasSelection(id) && event.ctrlKey && !event.shiftKey && key === "c") return true;
+      event.preventDefault();
+      this.copySelection(id);
+      return false;
+    }
+    if (paste) {
+      event.preventDefault();
+      void this.paste(id);
+      return false;
+    }
+    return true;
   }
 
   rename(id: string, title: string) {

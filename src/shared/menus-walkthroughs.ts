@@ -6,6 +6,8 @@
  * Node: tests run it directly (test/features/menus-walkthroughs.test.ts).
  */
 
+import { matchGlob } from "./glob.ts";
+
 type Localized = string | { value?: string; original?: string } | undefined;
 
 /** The slice of an extension these functions read. */
@@ -14,6 +16,8 @@ export type ContributionSource = {
   manifest: { contributes?: Record<string, unknown> };
   /** Data URLs of contributed commands' icon files by command (window only). */
   commandIcons?: Record<string, string>;
+  /** Data URL of the extension's icon (window only; the default walkthrough icon). */
+  iconUrl?: string;
 };
 
 const text = (value: unknown): string => (typeof value === "string" ? value : ((value as { value?: string } | undefined)?.value ?? ""));
@@ -134,8 +138,14 @@ export type Walkthrough = {
   id: string;
   title: string;
   description: string;
-  /** File extensions / language ids it is featured for ("featuredFor"). */
+  /** Relative path to the walkthrough's icon (defaults to the extension icon in the Welcome page). */
+  icon?: string;
+  /** Data URL of the extension's icon, when the walkthrough has no icon of its own. */
+  iconUrl?: string;
+  /** File extensions / glob patterns it is featured for ("featuredFor"), matched against workspace files. */
   featuredFor: string[];
+  /** Set by the window when a `featuredFor` pattern matches a file of the workspace (VS Code ranks these first). */
+  featured?: boolean;
   when?: string;
   steps: WalkthroughStep[];
 };
@@ -147,9 +157,45 @@ function mediaOf(raw: unknown): WalkthroughMedia | undefined {
   for (const kind of ["image", "svg", "markdown"] as const) {
     const value = media[kind];
     if (typeof value === "string" && value) return { kind, path: value, alt };
-    if (kind === "image" && value && typeof value === "object") return { kind, path: value as { light?: string; dark?: string }, alt };
+    if (kind === "image" && value && typeof value === "object") {
+      return { kind, path: value as { light?: string; dark?: string; hc?: string; hcLight?: string }, alt };
+    }
   }
   return undefined;
+}
+
+/** A line holding nothing but a Markdown link: its label and href (VS Code renders it as a button). */
+export function soleLink(line: string): { label: string; href: string } | null {
+  const match = /^\s*\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)\s*$/.exec(line);
+  return match ? { label: match[1] ?? "", href: match[2]! } : null;
+}
+
+/** The lines of a step description, with the ones that are a lone link shown as buttons. */
+export function parseStepDescription(description: string): { text: string; button?: { label: string; href: string } }[] {
+  return description
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .filter((line) => !!line.trim())
+    .map((line) => {
+      const link = soleLink(line);
+      return link ? { text: line, button: link } : { text: line };
+    });
+}
+
+/**
+ * Completion events VS Code derives for a step without any: the command / link
+ * of each button (a lone link of the description). Steps with no buttons then
+ * complete when selected.
+ */
+export function defaultCompletionEvents(description: string): string[] {
+  const out: string[] = [];
+  for (const line of parseStepDescription(description)) {
+    if (!line.button) continue;
+    const link = parseCommandLink(line.button.href);
+    if (link) out.push(`onCommand:${link.command}`);
+    else if (/^https?:\/\//i.test(line.button.href)) out.push(`onLink:${line.button.href}`);
+  }
+  return out;
 }
 
 /** Walkthroughs of the extensions whose `when` holds, in manifest order (steps filtered by their own `when`). */
@@ -165,14 +211,28 @@ export function parseWalkthroughs(sources: ContributionSource[], when: (clause: 
         // The legacy `doneOn: { command }` is `onCommand:<command>`.
         const doneOn = step.doneOn as { command?: string } | undefined;
         if (doneOn?.command) events.push(`onCommand:${doneOn.command}`);
-        steps.push({ id: step.id, title: text(step.title) || step.id, description: text(step.description), media: mediaOf(step.media), completionEvents: events, when: step.when as string | undefined });
+        // No events: the step's buttons, else its selection (VS Code's registerDoneListeners).
+        const completionEvents = events.length ? events : defaultCompletionEvents(text(step.description));
+        if (!completionEvents.length) completionEvents.push("onStepSelected");
+        steps.push({
+          id: step.id,
+          title: text(step.title) || step.id,
+          description: text(step.description),
+          media: mediaOf(step.media),
+          completionEvents,
+          when: step.when as string | undefined,
+        });
       }
+      // A walkthrough without visible steps is not listed in VS Code either.
+      if (!steps.length) continue;
       out.push({
         key: `${source.id}#${raw.id}`,
         extensionId: source.id,
         id: raw.id,
         title: text(raw.title) || raw.id,
         description: text(raw.description),
+        icon: typeof raw.icon === "string" ? raw.icon : undefined,
+        iconUrl: source.iconUrl,
         featuredFor: list<string>(raw.featuredFor).filter((entry) => typeof entry === "string"),
         when: raw.when as string | undefined,
         steps,
@@ -186,6 +246,17 @@ export function parseWalkthroughs(sources: ContributionSource[], when: (clause: 
 export function findWalkthrough(walkthroughs: Walkthrough[], key: string): Walkthrough | undefined {
   const lower = key.toLowerCase();
   return walkthroughs.find((walkthrough) => walkthrough.key.toLowerCase() === lower);
+}
+
+/** `workbench.welcomePage.hiddenCategories` after hiding (`hidden: true`) or showing a walkthrough again. */
+export function setWalkthroughHidden(categories: readonly string[] | undefined, key: string, hidden: boolean): string[] {
+  const lower = key.toLowerCase();
+  const current = categories ?? [];
+  const already = current.some((category) => category.toLowerCase() === lower);
+  if (already === hidden) return [...current];
+  const out = current.filter((category) => category.toLowerCase() !== lower);
+  if (hidden) out.push(key);
+  return out;
 }
 
 export type CompletionEvent =
@@ -207,7 +278,8 @@ export function parseCompletionEvent(event: string): CompletionEvent | null {
   if (!arg) return null;
   switch (name) {
     case "onCommand":
-      return { kind: "command", arg };
+      // `command:toSide:` links are `onCommand:` events in VS Code.
+      return { kind: "command", arg: arg.replace(/^toSide:/, "") };
     case "onSettingChanged":
       return { kind: "settingChanged", arg };
     case "onContext":
@@ -215,6 +287,7 @@ export function parseCompletionEvent(event: string): CompletionEvent | null {
     case "onView":
       return { kind: "view", arg };
     case "extensionInstalled":
+    case "onExtensionInstalled":
       return { kind: "extensionInstalled", arg };
     case "onLink":
       return { kind: "link", arg };
@@ -229,23 +302,77 @@ export function completesOnSelect(step: WalkthroughStep): boolean {
   return !step.completionEvents.length || events.some((event) => event.kind === "stepSelected");
 }
 
-/** `[label](command:id?%5B…args%5D)`: the command and its JSON arguments. */
-export function parseCommandLink(href: string): { command: string; args: unknown[] } | null {
-  const match = /^command:([^?#]+)(?:\?(.*))?$/.exec(href.trim());
-  if (!match) return null;
-  const command = decodeURIComponent(match[1]!);
-  if (!match[2]) return { command, args: [] };
+/** `[label](command:id?%5B…args%5D)`, also `command:toSide:`: the command, its JSON arguments and whether it opens besides. */
+export function parseCommandLink(href: string): { command: string; args: unknown[]; toSide: boolean } | null {
+  let rest = href.trim();
+  if (!rest.startsWith("command:")) return null;
+  rest = rest.slice("command:".length);
+  const toSide = rest.startsWith("toSide:");
+  if (toSide) rest = rest.slice("toSide:".length);
+  const hash = rest.indexOf("#");
+  if (hash >= 0) rest = rest.slice(0, hash);
+  const question = rest.indexOf("?");
+  const path = question < 0 ? rest : rest.slice(0, question);
+  if (!path) return null;
+  const command = decodeURIComponent(path);
+  if (question < 0) return { command, args: [], toSide };
   try {
-    const parsed: unknown = JSON.parse(decodeURIComponent(match[2]));
-    return { command, args: Array.isArray(parsed) ? parsed : [parsed] };
+    const parsed: unknown = JSON.parse(decodeURIComponent(rest.slice(question + 1)));
+    return { command, args: Array.isArray(parsed) ? parsed : [parsed], toSide };
   } catch {
-    return { command, args: [] };
+    return { command, args: [], toSide };
   }
 }
 
-/** Whether a walkthrough is featured for a file (by extension or language id). */
-export function featuredFor(walkthrough: Walkthrough, fileName: string, languageId?: string): boolean {
-  return walkthrough.featuredFor.some((entry) => entry === languageId || (entry.startsWith(".") && fileName.toLowerCase().endsWith(entry.toLowerCase())));
+/** Whether a walkthrough is featured for a file of the workspace (its `featuredFor` glob patterns). */
+export function featuredFor(walkthrough: Walkthrough, relativePath: string): boolean {
+  const path = relativePath.replace(/\\/g, "/");
+  return walkthrough.featuredFor.some((pattern) => matchGlob(pattern, path));
+}
+
+/** Marks the walkthroughs matching a workspace file and puts them first, as VS Code ranks featured categories. */
+export function orderWalkthroughs(walkthroughs: Walkthrough[], isFeatured: (walkthrough: Walkthrough) => boolean): Walkthrough[] {
+  return walkthroughs
+    .map((walkthrough) => ({ ...walkthrough, featured: isFeatured(walkthrough) }))
+    .sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+}
+
+export type MediaThemeKind = "dark" | "light" | "hcDark" | "hcLight";
+
+/**
+ * The path of a media image for a theme kind: VS Code's `hc`, `hcLight`, `light`
+ * and `dark` variants (a missing variant falls back to the other kind).
+ */
+export function mediaPathFor(media: WalkthroughMedia, kind: MediaThemeKind): string | undefined {
+  if (typeof media.path === "string") return media.path;
+  const { dark, light, hc, hcLight } = media.path;
+  if (kind === "hcDark") return hc ?? dark ?? light ?? hcLight;
+  if (kind === "hcLight") return hcLight ?? light ?? hc ?? dark;
+  if (kind === "light") return light ?? hcLight ?? dark ?? hc;
+  return dark ?? hc ?? light ?? hcLight;
+}
+
+/** The relative sources of the images in a Markdown document (`![alt](src)` and `<img src>`), in document order. */
+export function markdownImageSources(markdown: string): string[] {
+  const found: { index: number; source: string }[] = [];
+  const markdownImages = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
+  for (let match = markdownImages.exec(markdown); match; match = markdownImages.exec(markdown)) found.push({ index: match.index, source: match[1]! });
+  const htmlImages = /<img\b[^>]*\bsrc="([^"]+)"/gi;
+  for (let match = htmlImages.exec(markdown); match; match = htmlImages.exec(markdown)) found.push({ index: match.index, source: match[1]! });
+  return [...new Set(found.sort((a, b) => a.index - b.index).map((entry) => entry.source))];
+}
+
+/** Rewrites the image sources of a Markdown document with `resolve` (relative extension media becomes data URLs). */
+export function replaceMarkdownImages(markdown: string, resolve: (source: string) => string | undefined): string {
+  return markdown
+    .replace(/(!\[[^\]]*\]\(\s*<?)([^)\s>]+)(>?(?:\s+"[^"]*")?\s*\))/g, (match, before: string, source: string, after: string) => {
+      const replacement = resolve(source);
+      return replacement ? `${before}${replacement}${after}` : match;
+    })
+    .replace(/(<img\b[^>]*\bsrc=")([^"]+)(")/gi, (match, before: string, source: string, after: string) => {
+      const replacement = resolve(source);
+      return replacement ? `${before}${replacement}${after}` : match;
+    });
 }
 
 /* ── resource label formatters ───────────────────────────────────────── */
@@ -268,7 +395,7 @@ export type ResourceParts = { scheme: string; authority: string; path: string };
 
 /** Splits a resource key of the window (`scheme://authority/path`) into its parts; null for plain file paths. */
 export function parseResourceKey(key: string): ResourceParts | null {
-  const match = /^([a-zA-Z][a-zA-Z0-9+.-]+):(?:\/\/([^/?#]*))?([^?#]*)/.exec(key);
+  const match = /^(\w[\w+.-]+):(?:\/\/([^/?#]*))?([^?#]*)/.exec(key);
   if (!match || match[1] === "untitled") return null;
   let path = match[3] ?? "";
   try {

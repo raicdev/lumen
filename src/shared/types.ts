@@ -5,6 +5,8 @@ export type FileEntry = {
   name: string;
   path: string;
   isDirectory: boolean;
+  /** FilePermission.Readonly from a file system provider's stat (single read-only files). */
+  readOnly?: boolean;
   children?: FileEntry[];
 };
 
@@ -150,6 +152,35 @@ export type AppInfo = {
   platform: string;
 };
 
+/** `update.mode`: default checks at startup and every few hours and downloads in the background; manual only on Help > Check for Updates; none never. */
+export type UpdateMode = "default" | "manual" | "none";
+
+/** A newer Lumen release (GitHub Releases). */
+export type UpdateRelease = {
+  version: string;
+  title: string;
+  /** Release notes (Markdown). */
+  notes: string;
+  /** Release page. */
+  url: string;
+};
+
+/**
+ * Where the app's update stands. `manual` marks what Help > Check for Updates
+ * started, so the view reports it; background checks stay quiet until an
+ * update is ready.
+ */
+export type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking"; manual: boolean }
+  | { kind: "upToDate"; manual: boolean }
+  /** This copy cannot install updates (portable or dev): the release page has the download. */
+  | { kind: "available"; release: UpdateRelease; manual: boolean }
+  | { kind: "downloading"; release: UpdateRelease; percent: number | null; manual: boolean }
+  /** Downloaded and verified; installs on restart. */
+  | { kind: "ready"; release: UpdateRelease; manual: boolean }
+  | { kind: "error"; message: string; manual: boolean };
+
 /** A row of the Process Explorer: a process of the app's tree, or a thread's JavaScript heap. */
 export type ProcessRow = {
   id: string;
@@ -160,6 +191,8 @@ export type ProcessRow = {
   /** What the process is for ("WebView2: GPU", "Terminal: PowerShell 7"…). */
   label: string;
   kind: "app" | "thread" | "webview" | "terminal" | "process";
+  /** Display name of the extension the process works for (it started it, or it renders its webview). */
+  extension: string | null;
   commandLine: string;
   /** Bytes: the private working set (Windows) / resident set, or the JS heap in use for threads. */
   memory: number;
@@ -498,6 +531,21 @@ export type LumenRPC = {
         params: { url: string };
         response: { ok: boolean };
       };
+      /** `update.mode` changed (also sent once at startup): schedules the background checks. */
+      updateConfigure: {
+        params: { mode: UpdateMode };
+        response: { state: UpdateState };
+      };
+      /** Help > Check for Updates: check now and download what is found. */
+      updateCheck: {
+        params: Record<string, never>;
+        response: { state: UpdateState };
+      };
+      /** Quit (asking about unsaved changes) and install the downloaded update; the app starts again. */
+      updateInstall: {
+        params: Record<string, never>;
+        response: { ok: boolean; error?: string };
+      };
     };
     messages: {
       log: { msg: string };
@@ -522,6 +570,8 @@ export type LumenRPC = {
       workspaceChanged: { paths: string[]; git: boolean };
       /** Messages from the extension host. */
       extHost: { message: HostToView };
+      /** The app's update moved on (checking, downloading, ready…). */
+      updateState: { state: UpdateState };
     };
   };
 };

@@ -160,6 +160,51 @@ export function fontCharacterOf(value: string): string {
   return match ? String.fromCodePoint(parseInt(match[1]!, 16)) : value;
 }
 
+/* ── contributes.icons ──────────────────────────────────────────────────── */
+
+/** An icon an extension defines (contributes.icons): a glyph of one of its fonts, or another icon id. */
+export type ContributedIcon = { extensionId: string; fontPath: string; fontCharacter: string } | { extensionId: string; alias: string };
+
+/**
+ * The `contributes.icons` of the extensions by icon id. `fontPath` is resolved
+ * against the extension folder (the host checks it stays inside); the first
+ * extension that defines an id keeps it, as in VS Code.
+ */
+export function contributedIcons(extensions: readonly { id: string; location: string; manifest: { contributes?: unknown } }[]): Map<string, ContributedIcon> {
+  const icons = new Map<string, ContributedIcon>();
+  for (const extension of extensions) {
+    const declared = isRecord(extension.manifest.contributes) ? extension.manifest.contributes.icons : undefined;
+    if (!isRecord(declared)) continue;
+    const separator = extension.location.includes("\\") ? "\\" : "/";
+    for (const [id, value] of Object.entries(declared)) {
+      if (icons.has(id) || !/^[\w-]+$/.test(id) || !isRecord(value)) continue;
+      const fallback = value.default;
+      if (typeof fallback === "string") {
+        icons.set(id, { extensionId: extension.id, alias: fallback });
+      } else if (isRecord(fallback) && typeof fallback.fontPath === "string" && typeof fallback.fontCharacter === "string") {
+        const fontPath = `${extension.location.replace(/[\\/]+$/, "")}${separator}${fallback.fontPath.replace(/^\.?[\\/]+/, "").replace(/[\\/]/g, separator)}`;
+        icons.set(id, { extensionId: extension.id, fontPath, fontCharacter: fallback.fontCharacter });
+      }
+    }
+  }
+  return icons;
+}
+
+/**
+ * Follow a contributed icon's aliases to a font glyph, or to the id of an icon that is
+ * not contributed (a built-in codicon). `undefined` when `id` is not contributed.
+ */
+export function resolveContributedIcon(id: string, icons: Map<string, ContributedIcon>): { extensionId: string; fontPath: string; fontCharacter: string } | { codicon: string } | undefined {
+  let current = id;
+  for (let depth = 0; depth < 10; depth++) {
+    const icon = icons.get(current);
+    if (!icon) return current === id ? undefined : { codicon: current };
+    if (!("alias" in icon)) return icon;
+    current = icon.alias;
+  }
+  return undefined;
+}
+
 export type IconTarget = { kind: "file"; name: string; languageId?: string } | { kind: "folder"; name: string; expanded: boolean; root?: boolean };
 
 function lookup(associations: IconAssociations | undefined, target: IconTarget): string | undefined {

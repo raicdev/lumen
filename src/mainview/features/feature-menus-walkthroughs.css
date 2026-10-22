@@ -75,6 +75,17 @@
   gap: 6px;
 }
 
+.welcome-walkthrough-row {
+  position: relative;
+  display: flex;
+}
+
+.welcome-walkthrough-row .welcome-walkthrough {
+  flex: 1;
+  min-width: 0;
+  padding-right: 28px;
+}
+
 .welcome-walkthrough {
   display: flex;
   flex-direction: column;
@@ -89,6 +100,61 @@
 
 .welcome-walkthrough:hover {
   background: var(--bg-hover);
+}
+
+.welcome-walkthrough.featured {
+  border-color: var(--vscode-textLink-foreground);
+}
+
+.welcome-walkthrough-hide {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.welcome-walkthrough-row:hover .welcome-walkthrough-hide,
+.welcome-walkthrough-hide:focus-visible {
+  opacity: 1;
+}
+
+.welcome-walkthrough-hide:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.welcome-walkthrough .walkthrough-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  margin-right: 4px;
+}
+
+.welcome-walkthrough-featured {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-textLink-foreground);
+  border: 1px solid var(--border-soft);
+}
+
+.welcome-walkthroughs-more {
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .welcome-walkthrough-title {
@@ -154,6 +220,27 @@
   font-size: 22px;
   font-weight: 400;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.walkthrough-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.walkthrough-featured {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-textLink-foreground);
+  border: 1px solid var(--border-soft);
 }
 
 .walkthrough-head p {
@@ -165,6 +252,21 @@
   margin-left: auto;
   font-size: 12px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.walkthrough-reset {
+  color: var(--text-muted);
+}
+
+.walkthrough-reset:hover {
+  color: var(--text);
+}
+
+.walkthrough-description .walkthrough-line p {
+  margin: 6px 0;
 }
 
 .walkthrough-body {
@@ -256,6 +358,23 @@
 .walkthrough-media img {
   max-width: 100%;
   max-height: 60vh;
+}
+
+.walkthrough-media.svg-body {
+  display: block;
+  width: 100%;
+}
+
+.walkthrough-media.svg-body > div {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.walkthrough-media svg {
+  max-width: 100%;
+  max-height: 60vh;
+  height: auto;
 }
 
 .walkthrough-media.markdown-body {

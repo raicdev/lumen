@@ -4,7 +4,7 @@ import { RangeSetBuilder } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import { Decoration, EditorView, GutterMarker, ViewPlugin, gutter } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
-import { Bug, ChevronDown, ChevronRight, Circle, CircleAlert, CircleCheck, CircleMinus, CircleX, Clock, FlaskConical, ListChecks, LoaderCircle, Play, RefreshCw, ShieldCheck, Square, X } from "lucide-react";
+import { Bug, ChevronDown, ChevronRight, Circle, CircleAlert, CircleCheck, CircleMinus, CircleX, Clock, FlaskConical, ListChecks, LoaderCircle, Play, RefreshCw, Repeat, ShieldCheck, Square, X } from "lucide-react";
 import { STATE_PRIORITY, TEST_ID_SEPARATOR } from "../../shared/testing";
 import type {
   TestRunArgs,
@@ -50,17 +50,33 @@ type RunInfo = {
   coverage: TestWireCoverageFile[];
 };
 
+/** An active continuous run (host event `continuous`): one per profile and set of included items. */
+type ContinuousInfo = {
+  key: string;
+  profileId: string;
+  controllerId: string;
+  label: string;
+  kind: number;
+  testIds: string[];
+  running: boolean;
+  runId?: string;
+};
+
+type ContinuousEvent = { kind: "continuous"; runs: ContinuousInfo[] };
+
 type TestingState = {
   controllers: TestWireController[];
   results: Record<string, TestResult>;
   runs: RunInfo[];
+  /** Active continuous runs, as last sent by the host. */
+  continuous: ContinuousInfo[];
   expanded: Record<string, true>;
   selected: string | null;
   /** Detailed coverage of files (by normalised path) of the shown coverage run. */
   coverage: Record<string, TestWireCoverageDetail[]>;
 };
 
-const store = createStore<TestingState>({ controllers: [], results: {}, runs: [], expanded: {}, selected: null, coverage: {} });
+const store = createStore<TestingState>({ controllers: [], results: {}, runs: [], continuous: [], expanded: {}, selected: null, coverage: {} });
 let featureApi: ViewFeatureApi | undefined;
 
 const MAX_RUNS = 20;
@@ -112,10 +128,13 @@ function findItem(controllers: TestWireController[], id: string): TestWireItem |
 
 const controllerOf = (id: string) => id.split(TEST_ID_SEPARATOR)[0]!;
 
-function applyEvent(event: TestingHostEvent): void {
+function applyEvent(event: TestingHostEvent | ContinuousEvent): void {
   switch (event.kind) {
     case "tree":
       store.set((state) => ({ ...state, controllers: event.controllers }));
+      break;
+    case "continuous":
+      store.set((state) => ({ ...state, continuous: event.runs }));
       break;
     case "runStart":
       store.set((state) => ({
@@ -218,8 +237,65 @@ function failedLeafIds(): string[] {
     .map((leaf) => leaf.id);
 }
 
+/** Profiles that can continuously run these items (empty items = the whole controller). */
+function continuousProfilesFor(controller: TestWireController, items: TestWireItem[]): TestWireProfile[] {
+  return controller.profiles.filter(
+    (profile) => profile.supportsContinuousRun && (!profile.tag || items.length === 0 || items.every((item) => item.tags.includes(profile.tag!))),
+  );
+}
+
+/** Active continuous runs covering an item: runs of everything and runs that include it. */
+function continuousCovering(state: TestingState, id: string): ContinuousInfo[] {
+  return state.continuous.filter((run) => run.testIds.length === 0 || run.testIds.includes(id));
+}
+
+function hasContinuousAvailable(state: TestingState): boolean {
+  return state.controllers.some((controller) => controller.profiles.some((profile) => profile.supportsContinuousRun));
+}
+
 function anyRunning(state: TestingState): boolean {
   return state.runs.some((run) => !run.ended);
+}
+
+/**
+ * Start a continuous run (VS Code's "Start Continuous Run"): the profile's
+ * handler is called once with `continuous: true` and runs until stopped. An
+ * empty `ids` covers the whole controller; `onlyController` limits the start to
+ * one controller (its header button).
+ */
+async function startContinuous(ids: string[] = [], onlyController?: string): Promise<void> {
+  const api = featureApi;
+  if (!api) return;
+  const { controllers } = store.get();
+  const items = ids.map((id) => findItem(controllers, id)).filter((item): item is TestWireItem => !!item);
+  const wanted = ids.length ? new Set(ids.map(controllerOf)) : onlyController ? new Set([onlyController]) : null;
+  let started = 0;
+  for (const controller of controllers) {
+    if (wanted && !wanted.has(controller.id)) continue;
+    const mine = items.filter((item) => controllerOf(item.id) === controller.id);
+    const candidates = continuousProfilesFor(controller, mine);
+    if (!candidates.length) continue;
+    const defaults = candidates.filter((profile) => profile.isDefault);
+    let profile: TestWireProfile | undefined = defaults[0] ?? (candidates.length === 1 ? candidates[0] : undefined);
+    if (!profile) {
+      const picked = await api.showQuickPick(
+        candidates.map((candidate) => ({ label: candidate.label, description: `${controller.label} (${["", "Run", "Debug", "Coverage"][candidate.kind] ?? candidate.kind})`, picked: candidate.isDefault })),
+        { title: "Start Continuous Run", placeholder: controller.label },
+      );
+      if (!picked?.length) continue;
+      profile = candidates[picked[0]!]!;
+    }
+    api.sendToHost({ kind: "startContinuous", profileId: profile.id, ids: mine.map((item) => item.id) });
+    started++;
+  }
+  if (!started) void api.showMessage("info", "No test profile supports continuous runs here.");
+}
+
+/** Stop the given continuous runs (default: all of them). */
+function stopContinuous(runs?: ContinuousInfo[]): void {
+  const api = featureApi;
+  if (!api) return;
+  for (const run of runs ?? store.get().continuous) api.sendToHost({ kind: "stopContinuous", key: run.key });
 }
 
 async function selectDefaultProfiles(api: ViewFeatureApi): Promise<void> {
@@ -341,13 +417,14 @@ function profilesMenu(event: React.MouseEvent, kind: number): void {
   void showContextMenu(event.clientX, event.clientY, items);
 }
 
-function RowButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+function RowButton({ title, onClick, children, active }: { title: string; onClick: () => void; children: ReactNode; active?: boolean }) {
   return (
     <button
       type="button"
-      className="icon-btn tst-row-btn"
+      className={`icon-btn tst-row-btn${active ? " tst-continuous-on" : ""}`}
       title={title}
       aria-label={title}
+      aria-pressed={active}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -364,6 +441,7 @@ function TestRow({ item, depth, controller, state }: { item: TestWireItem; depth
   const result = stateOf(item, state.results);
   const duration = state.results[item.id]?.duration;
   const has = (kind: number) => profilesFor(controller, kind, [item]).length > 0;
+  const continuous = continuousCovering(state, item.id).filter((run) => run.controllerId === controller.id);
   return (
     <>
       <div
@@ -407,6 +485,15 @@ function TestRow({ item, depth, controller, state }: { item: TestWireItem; depth
               <ShieldCheck size={13} />
             </RowButton>
           ) : null}
+          {continuous.length ? (
+            <RowButton title="Stop Continuous Run" active onClick={() => stopContinuous(continuous)}>
+              <Repeat size={13} />
+            </RowButton>
+          ) : continuousProfilesFor(controller, [item]).length ? (
+            <RowButton title="Start Continuous Run" onClick={() => void startContinuous([item.id])}>
+              <Repeat size={13} />
+            </RowButton>
+          ) : null}
         </span>
       </div>
       {open ? item.children.map((child) => <TestRow key={child.id} item={child} depth={depth + 1} controller={controller} state={state} />) : null}
@@ -426,6 +513,32 @@ function SummaryLine({ state }: { state: TestingState }) {
       {tally.skipped ? <span className="tst-skipped">{tally.skipped} skipped</span> : null}
       {tally.running + tally.queued ? <span className="tst-running">{tally.running + tally.queued} running</span> : null}
       <span className="tst-total">of {tally.total}</span>
+    </div>
+  );
+}
+
+function continuousScope(state: TestingState, run: ContinuousInfo): string {
+  const controller = state.controllers.find((candidate) => candidate.id === run.controllerId);
+  if (!run.testIds.length) return `${controller?.label ?? run.controllerId}: all tests`;
+  if (run.testIds.length === 1) return findItem(state.controllers, run.testIds[0]!)?.label ?? "1 test";
+  return `${run.testIds.length} tests`;
+}
+
+/** The active continuous runs under the summary: click the stop button to end one. */
+function ContinuousBar({ state }: { state: TestingState }) {
+  if (!state.continuous.length) return null;
+  return (
+    <div className="tst-continuous">
+      {state.continuous.map((run) => (
+        <div key={run.key} className="tst-continuous-row" title={`Continuous run of ${run.label}`}>
+          <Repeat size={12} className="tst-continuous-icon" />
+          <span className="tst-label">{run.label}</span>
+          <span className="tst-desc">{continuousScope(state, run)}</span>
+          <RowButton title="Stop Continuous Run" onClick={() => stopContinuous([run])}>
+            <Square size={11} />
+          </RowButton>
+        </div>
+      ))}
     </div>
   );
 }
@@ -455,6 +568,18 @@ function TestingSidebar() {
               <ShieldCheck size={15} />
             </button>
           ) : null}
+          {hasContinuousAvailable(state) || state.continuous.length ? (
+            <button
+              type="button"
+              className={`icon-btn${state.continuous.length ? " tst-continuous-on" : ""}`}
+              title={state.continuous.length ? "Stop Continuous Run" : "Start Continuous Run"}
+              aria-label={state.continuous.length ? "Stop Continuous Run" : "Start Continuous Run"}
+              aria-pressed={state.continuous.length > 0}
+              onClick={() => (state.continuous.length ? stopContinuous() : void startContinuous())}
+            >
+              <Repeat size={15} />
+            </button>
+          ) : null}
           {running ? (
             <button type="button" className="icon-btn" title="Cancel Test Run" aria-label="Cancel Test Run" onClick={() => api?.sendToHost({ kind: "cancel" })}>
               <Square size={14} />
@@ -471,6 +596,7 @@ function TestingSidebar() {
         </span>
       </div>
       <SummaryLine state={state} />
+      <ContinuousBar state={state} />
       <div className="tst-tree" role="tree">
         {state.controllers.length === 0 ? (
           <div className="tst-empty">No tests have been found. Extensions that provide tests (for example language test runners) show them here.</div>
@@ -486,6 +612,19 @@ function TestingSidebar() {
                       <RefreshCw size={13} className={controller.refreshing ? "tst-spin" : undefined} />
                     </RowButton>
                   ) : null}
+                  {(() => {
+                    const active = state.continuous.filter((run) => run.controllerId === controller.id);
+                    if (!active.length && !controller.profiles.some((profile) => profile.supportsContinuousRun)) return null;
+                    return (
+                      <RowButton
+                        title={active.length ? "Stop Continuous Run" : "Start Continuous Run"}
+                        active={active.length > 0}
+                        onClick={() => (active.length ? stopContinuous(active) : void startContinuous([], controller.id))}
+                      >
+                        <Repeat size={13} />
+                      </RowButton>
+                    );
+                  })()}
                 </div>
                 {controller.items.map((item) => <TestRow key={item.id} item={item} depth={0} controller={controller} state={state} />)}
                 {controller.items.length === 0 ? <div className="tst-empty tst-empty-small">No tests discovered{controller.refreshing ? " yet..." : "."}</div> : null}
@@ -560,7 +699,8 @@ function ResultsPanel() {
           {state.runs.map((candidate, index) => (
             <option key={candidate.id} value={index}>
               {candidate.name}
-              {candidate.ended ? "" : " (running)"}
+              {state.continuous.some((run) => run.runId === candidate.id) ? " (continuous)" : ""}
+              {candidate.ended || state.continuous.some((run) => run.runId === candidate.id) ? "" : " (running)"}
             </option>
           ))}
         </select>
@@ -784,7 +924,7 @@ export const testingView: ViewFeature = {
   onHostReady(api) {
     featureApi = api;
     // A restarted host forgets every controller and run.
-    store.set((state) => ({ ...state, controllers: [], results: {}, runs: state.runs.map((run) => ({ ...run, ended: true })), coverage: {} }));
+    store.set((state) => ({ ...state, controllers: [], results: {}, runs: state.runs.map((run) => ({ ...run, ended: true })), continuous: [], coverage: {} }));
     loadSnapshot(api);
   },
 
@@ -799,6 +939,20 @@ export const testingView: ViewFeature = {
     { id: "workbench.action.testing.coverageAll", title: "Run All Tests with Coverage", category: "Test", run: () => runTests(KIND_COVERAGE) },
     { id: "workbench.action.testing.reRunFailed", title: "Re-run Failed Tests", category: "Test", run: () => runTests(KIND_RUN, failedLeafIds()), enabled: () => failedLeafIds().length > 0 },
     { id: "workbench.action.testing.cancelRun", title: "Cancel Test Run", category: "Test", run: (api) => api.sendToHost({ kind: "cancel" }), enabled: () => anyRunning(store.get()) },
+    {
+      id: "workbench.action.testing.startContinuousRun",
+      title: "Start Continuous Run",
+      category: "Test",
+      run: () => startContinuous(),
+      enabled: () => hasContinuousAvailable(store.get()) && store.get().continuous.length === 0,
+    },
+    {
+      id: "workbench.action.testing.stopContinuousRun",
+      title: "Stop Continuous Run",
+      category: "Test",
+      run: () => stopContinuous(),
+      enabled: () => store.get().continuous.length > 0,
+    },
     {
       id: "workbench.action.testing.refresh",
       title: "Refresh Tests",
@@ -860,6 +1014,21 @@ export const testingView: ViewFeature = {
         const tally = counts(store.get());
         return tally.failed + tally.errored ? "var(--danger)" : undefined;
       },
+    },
+    {
+      id: "testing.continuous",
+      side: "left",
+      priority: 6,
+      text: () => {
+        const continuous = store.get().continuous;
+        return continuous.length ? `$(sync~spin) ${continuous.length === 1 ? continuous[0]!.label : `${continuous.length} continuous`}` : "";
+      },
+      tooltip: () => {
+        const continuous = store.get().continuous;
+        if (!continuous.length) return "";
+        return `Continuous test run: ${continuous.map((run) => run.label).join(", ")}. Click to stop.`;
+      },
+      command: "workbench.action.testing.stopContinuousRun",
     },
   ],
 };

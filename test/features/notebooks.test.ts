@@ -8,6 +8,7 @@ import type { HostToView } from "../../src/shared/extensions.ts";
 import type { NbWireDoc } from "../../src/shared/notebooks.ts";
 import { globMatches } from "../../src/main/exthost/features/notebooks/model.ts";
 import { parseIpynb, stringifyIpynb } from "../../src/main/exthost/features/notebooks/ipynb.ts";
+import { matchingNotebooks, opensAsNotebook } from "../../src/mainview/features/notebooks/contributions.ts";
 import { reviveMenuArg } from "../../src/main/exthost/features/menus-walkthroughs.ts";
 import "../../src/main/exthost/features/registry.ts";
 
@@ -80,6 +81,95 @@ test("filename patterns of contributed notebooks", () => {
   assert.ok(globMatches("*.{ipynb,nb}", "C:\\a\\c.nb"));
   assert.ok(globMatches("**/notes/*.md", "/x/y/notes/a.md"));
   assert.ok(!globMatches("*.ipynb", "/a/b/c.txt"));
+});
+
+test("a notebook contribution with priority \"option\" does not open files by default", () => {
+  const entries = [
+    { type: "option-nb", displayName: "Option Notebook", priority: "option", selector: [{ filenamePattern: "*.mine" }] },
+    { type: "default-nb", priority: "default", selector: [{ filenamePattern: "*.def" }] },
+    { type: "plain-nb", selector: [{ filenamePattern: "*.plain" }] },
+    { type: "jupyter-notebook", selector: [{ filenamePattern: "*" }] },
+  ];
+  // "option": Open With lists the notebook editor, but the file opens as text.
+  assert.equal(opensAsNotebook(entries, "/a/x.mine", "jupyter-notebook"), false);
+  assert.deepEqual(matchingNotebooks(entries, "/a/x.mine", "jupyter-notebook").map((entry) => entry.type), ["option-nb"]);
+  // "default" and a missing priority open it.
+  assert.equal(opensAsNotebook(entries, "/a/x.def", "jupyter-notebook"), true);
+  assert.equal(opensAsNotebook(entries, "C:\\a\\x.plain", "jupyter-notebook"), true);
+  // The built-in type of the .ipynb serializer never counts as an extension contribution.
+  assert.equal(opensAsNotebook(entries, "/a/x.other", "jupyter-notebook"), false);
+  assert.deepEqual(matchingNotebooks(entries, "/a/x.other", "jupyter-notebook"), []);
+});
+
+test("showNotebookDocument sends the view column and preserveFocus to the window", async () => {
+  const { host, dir } = startedHost();
+  const api = host.apiFor(null) as Api;
+  const file = join(dir, "w.ipynb");
+  writeFileSync(file, JSON.stringify(SAMPLE));
+  await request(host, "open", file);
+  let shown: { path: string; options: any } | undefined;
+  // The window: records the "show" request, then mounts the notebook and shows its editor.
+  host.post = (message) => {
+    if (message.type !== "request") return;
+    const [area, method, args] = (message as any).args as [string, string, unknown[]];
+    if (area !== "notebooks" || method !== "show") return;
+    shown = { path: String(args[0]), options: args[1] };
+    queueMicrotask(() => {
+      host.handleView({ type: "reply", id: (message as any).id, result: true } as never);
+      host.handleView({ type: "feature", area: "notebooks", payload: { t: "visible", path: args[0], visible: true } });
+    });
+  };
+  const doc = api.workspace.notebookDocuments[0];
+  const editor = await api.window.showNotebookDocument(doc, { viewColumn: api.ViewColumn.Two, preserveFocus: true });
+  assert.ok(editor);
+  assert.equal(shown?.path, file);
+  assert.equal(shown?.options.viewColumn, 2);
+  assert.equal(shown?.options.preserveFocus, true);
+  assert.equal(shown?.options.beside, false);
+
+  // Beside still comes through as its own flag.
+  await api.window.showNotebookDocument(doc, { viewColumn: api.ViewColumn.Beside });
+  assert.equal(shown?.options.viewColumn, -2);
+  assert.equal(shown?.options.beside, true);
+});
+
+test("\"Open in Notebook Editor\" opens the active text file as a notebook", async () => {
+  const { host, dir } = startedHost();
+  const api = host.apiFor(null) as Api;
+  const file = join(dir, "active.txtnb");
+  writeFileSync(file, "one\ntwo");
+  api.workspace.registerNotebookSerializer("jupyter-notebook", {
+    deserializeNotebook: (bytes: Uint8Array) => new api.NotebookData(new TextDecoder().decode(bytes).split("\n").map((line: string) => new api.NotebookCellData(2, line, "plaintext"))),
+    serializeNotebook: () => new Uint8Array(),
+  });
+  // A contribution claims the files, so "Open in Notebook Editor" offers the notebook here.
+  host.runtimes.set("test.notebooks", { id: "test.notebooks", description: { manifest: { contributes: { notebooks: [{ type: "jupyter-notebook", selector: [{ filenamePattern: "*.txtnb" }] }] } } }, activated: true, activationEvents: [] } as never);
+  const tabs = (path: string, kind: "text" | "feature" = "text") => ({
+    type: "tabs",
+    groups: [{ viewColumn: 1, isActive: true, tabs: [{ path, label: "active.txtnb", kind, isActive: true, isDirty: false, isPinned: false, isPreview: false, ...(kind === "feature" ? { uri: file, viewType: "notebooks.editor" } : {}) }] }],
+  });
+  host.handleView(tabs(file) as never);
+  host.post = (message) => {
+    if (message.type !== "request") return;
+    const [area, method, args] = (message as any).args as [string, string, unknown[]];
+    if (area !== "notebooks" || method !== "show") return;
+    queueMicrotask(() => {
+      host.handleView({ type: "reply", id: (message as any).id, result: true } as never);
+      host.handleView({ type: "feature", area: "notebooks", payload: { t: "visible", path: args[0], visible: true } });
+    });
+  };
+  assert.equal(await request(host, "openWith"), true);
+  assert.equal(api.workspace.notebookDocuments.length, 1);
+  assert.equal(api.workspace.notebookDocuments[0].cellCount, 2);
+  // No notebook editor is contributed for another text file.
+  const other = join(dir, "plain.txt");
+  writeFileSync(other, "text");
+  host.handleView(tabs(other) as never);
+  await assert.rejects(() => request(host, "openWith"), /No notebook editor/);
+  // The active tab already is the notebook: nothing to do.
+  host.handleView(tabs(`feature-editor:notebooks.editor:${file}`, "feature") as never);
+  assert.equal(await request(host, "openWith"), true);
+  assert.equal(api.workspace.notebookDocuments.length, 1);
 });
 
 test("a notebook opens, runs through a controller, is edited by an extension and saves", async () => {

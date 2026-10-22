@@ -35,3 +35,30 @@ img.terminal-ext-icon {
 .terminal-ext-icon:not(:empty) + .terminal-default-icon {
   display: none;
 }
+
+/* Lightbulb of contributes.terminal.quickFixes: shown in the terminal after a matching command. */
+.terminal-quickfix-lightbulb {
+  position: absolute;
+  right: 18px;
+  bottom: 10px;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.terminal-quickfix-lightbulb:hover {
+  background: var(--bg-hover, var(--bg-elevated));
+}
+

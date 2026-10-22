@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { CircleCheck } from "lucide-react";
-import { WalkthroughView } from "../features/menus-walkthroughs/WalkthroughView";
-import { progressOf, useWalkthroughProgress, useWalkthroughs } from "../features/menus-walkthroughs/state";
+import { CircleCheck, X } from "lucide-react";
+import { WalkthroughIcon, WalkthroughView } from "../features/menus-walkthroughs/WalkthroughView";
+import {
+  announceWalkthrough,
+  hideWalkthrough,
+  pickWalkthrough,
+  progressOf,
+  useHiddenWalkthroughs,
+  useWalkthroughProgress,
+  useWalkthroughs,
+} from "../features/menus-walkthroughs/state";
 
 type Props = {
   recent: string[];
@@ -20,7 +28,7 @@ function parent(path: string) {
 }
 
 const START = [
-  { id: "workbench.action.files.newUntitledFile", label: "New File…" },
+  { id: "welcome.showNewFileEntries", label: "New File…" },
   { id: "workbench.action.files.openFile", label: "Open File…" },
   { id: "workbench.action.files.openFolder", label: "Open Folder…" },
 ];
@@ -38,27 +46,49 @@ const HELP = [
 function Walkthroughs({ onOpen }: { onOpen: (key: string) => void }) {
   const walkthroughs = useWalkthroughs();
   const progress = useWalkthroughProgress();
+  const hidden = useHiddenWalkthroughs();
   if (!walkthroughs.length) return null;
+  const visible = walkthroughs.filter((walkthrough) => !hidden.has(walkthrough.key.toLowerCase()));
   return (
     <>
       <h2>Walkthroughs</h2>
       <div className="welcome-walkthroughs">
-        {walkthroughs.map((walkthrough) => {
+        {visible.map((walkthrough) => {
           const { done, total } = progressOf(progress, walkthrough);
           return (
-            <button key={walkthrough.key} type="button" className="welcome-walkthrough" onClick={() => onOpen(walkthrough.key)}>
-              <span className="welcome-walkthrough-title">
-                {done === total && total > 0 && <CircleCheck size={13} />}
-                {walkthrough.title}
-              </span>
-              {walkthrough.description && <span className="muted welcome-walkthrough-description">{walkthrough.description}</span>}
-              <span className="welcome-walkthrough-bar" aria-hidden="true">
-                <span style={{ width: total ? `${(done / total) * 100}%` : "0%" }} />
-              </span>
-            </button>
+            <div key={walkthrough.key} className="welcome-walkthrough-row">
+              <button type="button" className={`welcome-walkthrough${walkthrough.featured ? " featured" : ""}`} onClick={() => onOpen(walkthrough.key)}>
+                <span className="welcome-walkthrough-title">
+                  {walkthrough.icon ? (
+                    <WalkthroughIcon extensionId={walkthrough.extensionId} path={walkthrough.icon} size={20} />
+                  ) : walkthrough.iconUrl ? (
+                    <img className="walkthrough-icon" src={walkthrough.iconUrl} alt="" width={20} height={20} />
+                  ) : null}
+                  {done === total && total > 0 && <CircleCheck size={13} />}
+                  {walkthrough.title}
+                  {walkthrough.featured && <span className="welcome-walkthrough-featured">Featured</span>}
+                </span>
+                {walkthrough.description && <span className="muted welcome-walkthrough-description">{walkthrough.description}</span>}
+                <span className="welcome-walkthrough-bar" aria-hidden="true">
+                  <span style={{ width: total ? `${(done / total) * 100}%` : "0%" }} />
+                </span>
+              </button>
+              <button
+                type="button"
+                className="welcome-walkthrough-hide"
+                title="Hide"
+                aria-label={`Hide ${walkthrough.title}`}
+                onClick={() => hideWalkthrough(walkthrough)}
+              >
+                <X size={12} />
+              </button>
+            </div>
           );
         })}
       </div>
+      <button type="button" className="welcome-link welcome-walkthroughs-more" onClick={() => void pickWalkthrough()}>
+        More…
+      </button>
     </>
   );
 }
@@ -106,7 +136,12 @@ export function Welcome({ recent, keys, onRun, onOpenRecent }: Props) {
                 More…
               </button>
             )}
-            <Walkthroughs onOpen={setWalkthroughKey} />
+            <Walkthroughs
+              onOpen={(key) => {
+                announceWalkthrough(key);
+                setWalkthroughKey(key);
+              }}
+            />
           </section>
           <section>
             <h2>Shortcuts</h2>

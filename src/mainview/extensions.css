@@ -806,14 +806,18 @@
 
 .notification-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   padding: 0 10px 10px 34px;
 }
 
+/* Basis 0 + min-width keeps the source from forcing a wrap; long action
+   labels move to their own line and wrap inside the button instead. */
 .notification-source {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -821,9 +825,18 @@
   font-size: 11.5px;
 }
 
+.notification-source:empty {
+  display: none;
+}
+
 .notification-action {
-  height: 24px;
-  padding: 0 10px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 3px 10px;
+  line-height: 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   border: 1px solid var(--border);
   border-radius: 2px;
   background: var(--bg-hover);

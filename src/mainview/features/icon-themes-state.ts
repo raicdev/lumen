@@ -1,8 +1,11 @@
 import { useSyncExternalStore } from "react";
 import type { ExtensionDescription, LanguageContribution } from "../../shared/extensions";
 import {
+  contributedIcons,
   fontCharacterOf,
   iconIdFor,
+  resolveContributedIcon,
+  type ContributedIcon,
   type ContributedIconTheme,
   type FileIconTheme,
   type IconDefinition,
@@ -164,6 +167,11 @@ function syncFontFaces(state: State): void {
       rules.push(`@font-face{font-family:"${family}";src:url("${source.uri}") format("${source.format}");font-weight:${weight};font-style:${style};font-display:block}`);
     }
   }
+  for (const [path, family] of contributedFamilies) {
+    const uri = state.assets[path];
+    const format = FONT_FORMAT_OF[path.split(".").pop()?.toLowerCase() ?? ""];
+    if (uri && format) rules.push(`@font-face{font-family:"${family}";src:url("${uri}") format("${format}");font-display:block}`);
+  }
   if (!fontStyle) {
     fontStyle = document.createElement("style");
     fontStyle.id = "lumen-icon-theme-fonts";
@@ -223,6 +231,46 @@ export function bindIconThemes(api: ViewFeatureApi): void {
   // A restarted host forgot the themes it loaded: ask for the assets again.
   requested.clear();
   collectLanguages(api.getExtensions());
+  collectIcons(api.getExtensions());
+}
+
+/* ── contributes.icons ──────────────────────────────────────────────────── */
+
+let iconContributions = new Map<string, ContributedIcon>();
+/** Font path → font family of the fonts contributed icons use. */
+const contributedFamilies = new Map<string, string>();
+const FONT_FORMAT_OF: Record<string, string> = { woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype" };
+
+function collectIcons(extensions: ExtensionDescription[]): void {
+  iconContributions = contributedIcons(extensions);
+  store.set((state) => ({ ...state, version: state.version + 1 }));
+}
+
+function wantIconFont(extensionId: string, path: string): void {
+  const id = `icons\n${path}`;
+  const api = currentApi;
+  if (!api || requested.has(id)) return;
+  requested.add(id);
+  api
+    .requestHost<string | null>("iconFont", [extensionId, path])
+    .then((uri) => setAssets({ [path]: uri }))
+    .catch(() => undefined);
+}
+
+/**
+ * An icon of `contributes.icons` by id: a glyph of the extension's font (once it is loaded),
+ * or the codicon an alias ends at. `undefined` when no extension contributes the id.
+ */
+export function contributedIcon(id: string, state: State = store.get()): { char: string; family: string } | { codicon: string } | undefined {
+  const icon = resolveContributedIcon(id, iconContributions);
+  if (!icon || "codicon" in icon) return icon;
+  let family = contributedFamilies.get(icon.fontPath);
+  if (!family) contributedFamilies.set(icon.fontPath, (family = `lumen-contributed-icons-${contributedFamilies.size}`));
+  if (!state.assets[icon.fontPath]) {
+    wantIconFont(icon.extensionId, icon.fontPath);
+    return undefined;
+  }
+  return { char: fontCharacterOf(icon.fontCharacter), family };
 }
 
 /* ── lookup ─────────────────────────────────────────────────────────────── */
@@ -340,7 +388,10 @@ export function watchIconThemeInputs(api: ViewFeatureApi): () => void {
     void applyProductIconTheme(api);
   });
   const offTheme = onColorThemeChange(() => store.set((state) => ({ ...state, version: state.version + 1 })));
-  const offExtensions = extensionService.subscribe(() => collectLanguages(api.getExtensions()));
+  const offExtensions = extensionService.subscribe(() => {
+    collectLanguages(api.getExtensions());
+    collectIcons(api.getExtensions());
+  });
   return () => {
     offSettings();
     offTheme();

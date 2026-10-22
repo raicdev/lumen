@@ -215,6 +215,110 @@ test("coverage classes and detailed coverage", async () => {
   assert.equal(detail[2].kind, "declaration");
 });
 
+test("continuous runs call the handler once with continuous and stop by cancelling", async () => {
+  const { host, api, events } = startedHost();
+  const controller = api.tests.createTestController("c", "C");
+  const a = controller.createTestItem("a", "a");
+  const b = controller.createTestItem("b", "b");
+  controller.items.replace([a, b]);
+  let calls = 0;
+  let seen: any;
+  let cancelled = false;
+  const profile = controller.createRunProfile(
+    "Watch",
+    api.TestRunProfileKind.Run,
+    (request: any, token: any) => {
+      calls++;
+      seen = request;
+      controller.createTestRun(request);
+      return new Promise<void>((done) => token.onCancellationRequested(() => ((cancelled = true), done())));
+    },
+    true,
+    undefined,
+    true,
+  );
+  assert.equal(profile.supportsContinuousRun, true);
+  assert.equal(profile.toWire().supportsContinuousRun, true);
+  const continuous = () => (events() as any[]).filter((e) => e.kind === "continuous").at(-1) as any;
+
+  send(host, { kind: "startContinuous", profileId: profile.id, ids: [] });
+  await wait();
+  assert.equal(calls, 1);
+  assert.equal(seen.continuous, true);
+  assert.equal(seen.include, undefined);
+  assert.equal(continuous().runs.length, 1);
+  assert.equal(continuous().runs[0].profileId, profile.id);
+  assert.deepEqual(continuous().runs[0].testIds, []);
+  // A test run created for the continuous request uses its token and is linked to the state.
+  const runStart = events().filter((e) => e.kind === "runStart").at(-1) as any;
+  assert.equal(continuous().runs[0].runId, runStart.runId);
+
+  // Starting the same continuous run again does not call the handler twice.
+  send(host, { kind: "startContinuous", profileId: profile.id, ids: [] });
+  await wait();
+  assert.equal(calls, 1);
+
+  send(host, { kind: "stopContinuous", key: continuous().runs[0].key });
+  await wait();
+  assert.ok(cancelled);
+  assert.equal(continuous().runs.length, 0);
+  assert.equal(events().filter((e) => e.kind === "runEnd" && e.runId === runStart.runId).length, 1);
+});
+
+test("continuous runs can target one item, use commands, and stop when unsupported or deleted", async () => {
+  const { host, api, events } = startedHost();
+  const controller = api.tests.createTestController("c", "C");
+  const a = controller.createTestItem("a", "a");
+  const b = controller.createTestItem("b", "b");
+  controller.items.replace([a, b]);
+  const requests: any[] = [];
+  const makeProfile = (label: string, supported: boolean) =>
+    controller.createRunProfile(
+      label,
+      api.TestRunProfileKind.Run,
+      (request: any) => {
+        requests.push(request);
+        return new Promise<void>(() => {});
+      },
+      true,
+      undefined,
+      supported,
+    );
+  const profile = makeProfile("Watch", true);
+  const unsupported = makeProfile("Plain", false);
+
+  await host.executeCommand("testing.startContinuousRun", [{ profileId: profile.id, testIds: ["c\u0000a"] }]);
+  await wait();
+  assert.equal(requests.length, 1);
+  assert.deepEqual(
+    requests[0].include.map((item: any) => item.id),
+    ["a"],
+  );
+  assert.equal(requests[0].continuous, true);
+  const active = () => (events() as any[]).filter((e) => e.kind === "continuous").at(-1) as any;
+  assert.deepEqual(active().runs[0].testIds, ["c\u0000a"]);
+
+  // Unknown / unsupported profiles do not start anything.
+  const result = (await host.executeCommand("testing.startContinuousRun", [{ profileId: unsupported.id }])) as string[];
+  await wait();
+  assert.deepEqual(result, []);
+  assert.equal(requests.length, 1);
+
+  // Turning supportsContinuousRun off stops the run.
+  profile.supportsContinuousRun = false;
+  await wait();
+  assert.equal(active().runs.length, 0);
+
+  // Deleting the item / stopping through the command with all runs.
+  profile.supportsContinuousRun = true;
+  await host.executeCommand("testing.startContinuousRun", [{ profileId: profile.id, testIds: ["c\u0000b"] }]);
+  await wait();
+  assert.equal(active().runs.length, 1);
+  await host.executeCommand("testing.stopContinuousRun");
+  await wait();
+  assert.equal(active().runs.length, 0);
+});
+
 test("TestMessage, TestRunRequest and friends", () => {
   const { api } = startedHost();
   const message = new api.TestMessage("x");

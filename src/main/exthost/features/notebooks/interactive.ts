@@ -45,7 +45,7 @@ export async function openInteractive(service: NotebookService, host: ExtensionH
     service.scheduleSnapshot(doc);
   }
   if (typeof controllerId === "string" && controllerId && service.controllers.get(controllerId)?.matches(doc.notebookType)) service.selectController(doc, controllerId);
-  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preserveFocus: options.preserveFocus ?? false, beside: options.viewColumn === T.ViewColumn.Beside }]);
+  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preserveFocus: options.preserveFocus ?? false, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside }]);
   let editor: unknown;
   for (let waited = 0; waited < 5000 && !editor; waited += 50) {
     editor = service.editorOf(doc);

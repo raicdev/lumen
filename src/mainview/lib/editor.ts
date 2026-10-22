@@ -268,6 +268,19 @@ function themeExtensions(): Extension[] {
   return [chromeThemes[isDarkTheme() ? "dark" : "light"], syntaxHighlighting(themeHighlighter())];
 }
 
+/** A standalone editor view (the side-by-side diff): settings, theme, language and read-only. */
+export function diffEditorExtensions(language: string, readOnly: boolean): Extension[] {
+  return [
+    settingsExtensions(getSettings()),
+    ...themeExtensions(),
+    languageExtension(language),
+    languageConfigExtensions(extensionService.languageConfiguration(language)),
+    ...readOnlyExtensions(readOnly),
+    history(),
+    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+  ];
+}
+
 function languageExtension(language: string): Extension {
   switch (language) {
     case "typescript":
@@ -335,7 +348,7 @@ export function isUntitled(path: string) {
 
 /** A document of a file system an extension provides (`memfs:/notes.md`). */
 export function isVirtualDocument(path: string | null | undefined): path is string {
-  return !!path && /^[a-zA-Z][\w+.-]+:/.test(path) && !/^(untitled|terminal|webview):/.test(path);
+  return !!path && /^\w[\w+.-]+:/.test(path) && !/^(untitled|terminal|webview):/.test(path);
 }
 
 /** Documents the language service never sees: untitled ones and those of extension file systems. */
@@ -603,6 +616,8 @@ export class EditorController {
     });
     this.unsubscribeTheme = onColorThemeChange(() => {
       this.view?.dispatch({ effects: themeConf.reconfigure(themeExtensions()) });
+      // Light / dark decoration options (and themed before / after icons) are picked when building.
+      this.refreshExtensionDecorations();
     });
     this.unsubscribeDecorations = extensionService.onDecorationsChange((path) => {
       if (!this.current || (path && path.toLowerCase() !== this.current.path.toLowerCase())) return;

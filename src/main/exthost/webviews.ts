@@ -52,6 +52,7 @@ export class WebviewManager {
       enableForms: raw.enableForms ?? !!raw.enableScripts,
       enableCommandUris: !!raw.enableCommandUris,
       retainContextWhenHidden: !!raw.retainContextWhenHidden,
+      enableFindWidget: !!raw.enableFindWidget,
     };
   }
 

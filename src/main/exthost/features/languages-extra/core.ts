@@ -371,8 +371,11 @@ export class LanguagesExtra {
       if (entry.file) {
         const { name, path, base64 } = entry.file;
         const bytes = base64 ? new Uint8Array(Buffer.from(base64, "base64")) : undefined;
-        const file = { name, uri: path ? T.Uri.file(path) : undefined, data: async () => bytes ?? new Uint8Array(await readFile(path!)) };
+        const uri = path ? T.Uri.file(path) : undefined;
+        const file = { name, uri, data: async () => bytes ?? new Uint8Array(await readFile(path!)) };
         transfer.set(entry.mime, new DataTransferItem(undefined, file));
+        // A dropped OS file with a known path is also a URI list (VS Code sets both), unless the window sent one.
+        if (uri && !transfer.get("text/uri-list")) transfer.set("text/uri-list", new DataTransferItem(uri.toString()));
       } else transfer.set(entry.mime, new DataTransferItem(entry.value ?? ""));
     }
     return transfer;

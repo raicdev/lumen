@@ -1,4 +1,6 @@
-import { basename } from "path";
+import { createHash } from "crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { basename, join } from "path";
 import type { CustomEditorContribution } from "../../shared/extensions.ts";
 import { customEditorContributions } from "../../shared/extensions.ts";
 import { matchesSelector } from "../../shared/glob.ts";
@@ -14,6 +16,9 @@ import * as T from "./types.ts";
  * (openCustomDocument + resolveCustomEditor) and CustomEditorProvider (the same,
  * plus onDidChangeCustomDocument / save / saveAs / revert / undo / redo).
  * The panel is an ordinary webview panel; the view shows it in an editor tab.
+ * With supportsMultipleEditorsPerDocument a document can be shown by several
+ * panels (one per editor group); a backed-up document (hot exit) is reopened
+ * from its backup.
  */
 
 export type CustomEditorProviderKind = "text" | "readonly" | "editable";
@@ -34,13 +39,16 @@ type Registration = {
   options: { webviewOptions?: RawWebviewOptions; supportsMultipleEditorsPerDocument?: boolean };
 };
 
+/** One webview panel showing a document. */
+type Editor = { id: string; panel: Record<string, any>; disposeListener: { dispose(): unknown } | null };
+
+/** A document opened in a custom editor, and the editors showing it. */
 type Instance = {
-  id: string;
   viewType: string;
   extensionId: string;
   path: string;
   key: string;
-  panel: Record<string, any>;
+  editors: Editor[];
   registration: Registration;
   /** The file's text document (CustomTextEditorProvider). */
   textDocument: ExtHostDocument | null;
@@ -51,7 +59,6 @@ type Instance = {
   undoStack: (() => unknown)[];
   redoStack: (() => unknown)[];
   changeListener: { dispose(): unknown } | null;
-  disposeListener: { dispose(): unknown } | null;
 };
 
 const keyOf = (viewType: string, path: string) => `${viewType}\u0000${normalizeKey(path)}`;
@@ -124,9 +131,10 @@ export class CustomEditorManager {
     const uri = uriOfKey(path);
     const key = keyOf(viewType, path);
     const existing = this.#instances.get(key);
-    if (existing && !restoreId) {
-      (existing.panel.reveal as (column?: number, preserveFocus?: boolean) => void)?.();
-      return { id: existing.id, kind: registration.kind };
+    // One editor per document unless the provider supports more (restored tabs always get theirs).
+    if (existing?.editors[0] && !restoreId && !registration.options.supportsMultipleEditorsPerDocument) {
+      (existing.editors[0].panel.reveal as (column?: number, preserveFocus?: boolean) => void)?.();
+      return { id: existing.editors[0].id, kind: registration.kind };
     }
     const webviewOptions = registration.options.webviewOptions ?? {};
     // Custom editors show extension pages: scripts are on and context is kept by default (like VS Code).
@@ -145,13 +153,12 @@ export class CustomEditorManager {
       restoreId,
       { uri: keyOfUri(uri), dirty: false, customKind: registration.kind },
     ) as Record<string, any>;
-    const instance: Instance = {
-      id: String(panel.id),
+    const instance: Instance = existing ?? {
       viewType,
       extensionId: registration.extensionId,
       path,
       key,
-      panel,
+      editors: [],
       registration,
       textDocument: null,
       customDocument: null,
@@ -159,35 +166,48 @@ export class CustomEditorManager {
       undoStack: [],
       redoStack: [],
       changeListener: null,
-      disposeListener: null,
     };
+    const editor: Editor = { id: String(panel.id), panel, disposeListener: null };
+    instance.editors.push(editor);
     this.#instances.set(key, instance);
-    instance.disposeListener = (panel.onDidDispose as (callback: () => void) => { dispose(): unknown })(() => this.#disposeInstance(instance));
+    editor.disposeListener = (panel.onDidDispose as (callback: () => void) => { dispose(): unknown })(() => this.#disposeEditor(instance, editor));
     try {
-      await this.#resolve(instance, uri);
+      if (!existing) await this.#openDocument(instance, uri);
+      await this.#resolveEditor(instance, panel);
     } catch (error) {
       this.#host.log("error", `resolving the custom editor ${viewType} for ${path} failed: ${error instanceof Error ? (error.stack ?? error.message) : error}`, registration.extensionId);
       (panel.dispose as () => void)();
       return null;
     }
-    return { id: instance.id, kind: registration.kind };
+    if (instance.dirty) this.#host.post({ type: "webviewUpdate", id: editor.id, dirty: true });
+    return { id: editor.id, kind: registration.kind };
   }
 
-  async #resolve(instance: Instance, uri: T.Uri): Promise<void> {
+  /** The text document, or the extension's CustomDocument (from its backup when there is one). */
+  async #openDocument(instance: Instance, uri: T.Uri): Promise<void> {
     const { provider, kind } = instance.registration;
-    const token = new T.CancellationTokenSource().token;
     if (kind === "text") {
-      const document = await this.#host.openDocument(uri);
-      instance.textDocument = document;
-      await provider.resolveCustomTextEditor(document.toApi(), instance.panel, token);
+      instance.textDocument = await this.#host.openDocument(uri);
       return;
     }
-    const customDocument = (await provider.openCustomDocument(uri, { backupId: undefined, untitledDocumentData: undefined }, token)) as Record<string, any>;
-    instance.customDocument = customDocument;
+    const backupId = kind === "editable" ? this.#backups()[instance.key] : undefined;
+    const token = new T.CancellationTokenSource().token;
+    instance.customDocument = (await provider.openCustomDocument(uri, { backupId, untitledDocumentData: undefined }, token)) as Record<string, any>;
     if (kind === "editable" && typeof provider.onDidChangeCustomDocument === "function") {
       instance.changeListener = provider.onDidChangeCustomDocument((event: Record<string, any>) => this.#onChange(instance, event)) as { dispose(): unknown };
     }
-    await provider.resolveCustomEditor(customDocument, instance.panel, token);
+    if (backupId !== undefined) {
+      // The document has the unsaved changes of the backup: dirty until saved or reverted.
+      this.#forgetBackup(instance.key);
+      instance.dirty = true;
+    }
+  }
+
+  async #resolveEditor(instance: Instance, panel: Record<string, any>): Promise<void> {
+    const { provider, kind } = instance.registration;
+    const token = new T.CancellationTokenSource().token;
+    if (kind === "text") await provider.resolveCustomTextEditor(instance.textDocument!.toApi(), panel, token);
+    else await provider.resolveCustomEditor(instance.customDocument, panel, token);
   }
 
   /** Bring back a custom editor tab saved with the window (same panel id, provider asked again). */
@@ -213,7 +233,7 @@ export class CustomEditorManager {
   #setDirty(instance: Instance, dirty: boolean): void {
     if (instance.dirty === dirty) return;
     instance.dirty = dirty;
-    this.#host.post({ type: "webviewUpdate", id: instance.id, dirty });
+    for (const editor of instance.editors) this.#host.post({ type: "webviewUpdate", id: editor.id, dirty });
   }
 
   #instance(path: string, viewType: string): Instance | undefined {
@@ -261,8 +281,10 @@ export class CustomEditorManager {
     instance.path = keyOfUri(uri);
     instance.key = keyOf(instance.viewType, instance.path);
     this.#instances.set(instance.key, instance);
-    instance.panel.title = basename(instance.path);
-    this.#host.post({ type: "webviewUpdate", id: instance.id, uri: instance.path });
+    for (const editor of instance.editors) {
+      editor.panel.title = basename(instance.path);
+      this.#host.post({ type: "webviewUpdate", id: editor.id, uri: instance.path });
+    }
     this.#clearHistory(instance);
     return true;
   }
@@ -309,32 +331,75 @@ export class CustomEditorManager {
     return true;
   }
 
-  /** backupCustomDocument: the extension returns a backup id (hot exit). */
-  async backup(path: string, viewType: string, context: { destination?: T.Uri; cancelled?: boolean } = {}): Promise<string | null> {
+  /**
+   * backupCustomDocument (hot exit): the extension writes the unsaved changes to
+   * `destination` and returns a backup, whose id the next openCustomDocument of
+   * the file gets back as `openContext.backupId`.
+   */
+  async backup(path: string, viewType: string, context: { destination?: T.Uri } = {}): Promise<string | null> {
     const instance = this.#instance(path, viewType);
     if (!instance || instance.registration.kind !== "editable" || typeof instance.registration.provider.backupCustomDocument !== "function") return null;
+    const destination = context.destination ?? T.Uri.file(join(this.#backupFolder(), createHash("sha1").update(instance.key).digest("hex").slice(0, 20)));
     try {
-      const id = await instance.registration.provider.backupCustomDocument(instance.customDocument, context, new T.CancellationTokenSource().token);
-      return typeof id === "string" ? id : null;
+      mkdirSync(this.#backupFolder(), { recursive: true });
+      const backup = await instance.registration.provider.backupCustomDocument(instance.customDocument, { destination }, new T.CancellationTokenSource().token);
+      // A CustomDocumentBackup is { id, delete() }; some extensions return the id itself.
+      const id = typeof backup === "string" ? backup : typeof backup?.id === "string" ? (backup.id as string) : null;
+      if (id !== null) this.#writeBackups({ ...this.#backups(), [instance.key]: id });
+      return id;
     } catch (error) {
       this.#host.log("error", `backing up the custom editor ${viewType} failed: ${error instanceof Error ? error.message : error}`, instance.extensionId);
       return null;
     }
   }
 
+  #backupFolder(): string {
+    return join(this.#host.init.userData, "customEditorBackups");
+  }
+
+  /** Backup ids by document key, kept across restarts. */
+  #backups(): Record<string, string> {
+    try {
+      const parsed = JSON.parse(readFileSync(join(this.#backupFolder(), "backups.json"), "utf8")) as unknown;
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  #writeBackups(backups: Record<string, string>): void {
+    try {
+      mkdirSync(this.#backupFolder(), { recursive: true });
+      writeFileSync(join(this.#backupFolder(), "backups.json"), JSON.stringify(backups));
+    } catch (error) {
+      this.#host.log("warning", `cannot store custom editor backups: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  #forgetBackup(key: string): void {
+    const backups = this.#backups();
+    if (!(key in backups)) return;
+    delete backups[key];
+    this.#writeBackups(backups);
+  }
+
   #clearHistory(instance: Instance): void {
     instance.undoStack = [];
     instance.redoStack = [];
     this.#setDirty(instance, false);
+    // Saved or reverted: an older backup must not come back.
+    this.#forgetBackup(instance.key);
   }
 
   /* ── disposal ──────────────────────────────────────────────────────── */
 
-  #disposeInstance(instance: Instance): void {
-    if (this.#instances.get(instance.key) !== instance) return;
+  /** An editor closed: the document goes with its last editor. */
+  #disposeEditor(instance: Instance, editor: Editor): void {
+    editor.disposeListener?.dispose();
+    instance.editors = instance.editors.filter((candidate) => candidate !== editor);
+    if (instance.editors.length || this.#instances.get(instance.key) !== instance) return;
     this.#instances.delete(instance.key);
     instance.changeListener?.dispose();
-    instance.disposeListener?.dispose();
     try {
       if (instance.customDocument && typeof instance.customDocument.dispose === "function") instance.customDocument.dispose();
     } catch (error) {

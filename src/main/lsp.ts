@@ -480,6 +480,9 @@ export class LanguageServiceHub {
   private rebuildService() {
     const root = this.workspaceRoot;
 
+    // Drop the texts the previous program read from disk (e.g. another
+    // workspace's files); the new one reads what it needs on demand.
+    this.hostFiles.clear();
     for (const [p, doc] of this.docs) {
       if (isTypeScriptFamily(doc.language)) {
         this.hostFiles.set(p, doc.content);

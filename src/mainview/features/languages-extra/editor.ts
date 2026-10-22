@@ -1,5 +1,5 @@
 import { snippet, type Completion } from "@codemirror/autocomplete";
-import { EditorSelection, StateEffect, StateField, type ChangeSpec, type Extension, type Text } from "@codemirror/state";
+import { EditorSelection, StateEffect, StateField, type ChangeSet, type ChangeSpec, type Extension, type Text, type Transaction } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { TextEdit, TextRange } from "../../../shared/types";
 import type { WireDocumentEdit, WireEvaluatable, WireInlineValue, WireTransferItem } from "../../../shared/languages-extra";
@@ -200,9 +200,38 @@ function evaluateHover(path: string, api: ViewFeatureApi): Extension {
 
 type Span = { from: number; to: number };
 
+/** The edit applied to the document: where it landed, and how to take it back. */
+export type AppliedDocumentEdit = {
+  /** Offset right after the inserted text, where the other-edits widget goes. */
+  anchor: number;
+  /** Undo the applied edit; false when the document changed since (nothing is done then). */
+  revert(): boolean;
+};
+
 /** Insert an edit of a drop / paste provider at the ranges (a snippet gets its tab stops when there is a single range). */
-export function applyDocumentEdit(view: EditorView, ranges: Span[], edit: WireDocumentEdit, userEvent: string): void {
+export function applyDocumentEdit(view: EditorView, ranges: Span[], edit: WireDocumentEdit, userEvent: string): AppliedDocumentEdit | null {
   const doc = view.state.doc;
+  const steps: { changes: ChangeSet; before: Text }[] = [];
+  const record = (tr: Transaction) => {
+    if (tr.docChanged) steps.push({ changes: tr.changes, before: tr.startState.doc });
+  };
+  const applied = (): AppliedDocumentEdit => {
+    let anchor = view.state.selection.main.to;
+    for (const step of steps) step.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => (anchor = Math.max(anchor, toB)));
+    const after = view.state.doc;
+    return {
+      anchor,
+      revert() {
+        if (!view.state.doc.eq(after)) return false;
+        for (let index = steps.length - 1; index >= 0; index--) {
+          const step = steps[index]!;
+          // Changes are undone newest first, so each inverse sees the document it was made for.
+          view.dispatch(view.state.update({ changes: step.changes.invert(step.before), userEvent: "undo" }));
+        }
+        return true;
+      },
+    };
+  };
   const additional: ChangeSpec[] = edit.additional.map((entry: TextEdit) => ({
     from: offsetOf(doc, entry.startLine, entry.startCharacter),
     to: offsetOf(doc, entry.endLine, entry.endCharacter),
@@ -216,27 +245,115 @@ export function applyDocumentEdit(view: EditorView, ranges: Span[], edit: WireDo
       const changes = view.state.changes(additional);
       from = changes.mapPos(from, -1);
       to = changes.mapPos(to, 1);
-      view.dispatch({ changes, userEvent });
+      const tr = view.state.update({ changes, userEvent });
+      view.dispatch(tr);
+      record(tr);
     }
-    snippet(snippetToTemplate(edit.insertText))(view, null as unknown as Completion, from, to);
-    return;
+    // snippet() only reads the state and dispatches one transaction: capture it so the edit can be reverted.
+    const target = {
+      get state() {
+        return view.state;
+      },
+      dispatch(tr: Transaction) {
+        view.dispatch(tr);
+        record(tr);
+      },
+    };
+    snippet(snippetToTemplate(edit.insertText))(target as unknown as EditorView, null as unknown as Completion, from, to);
+    return steps.length ? applied() : null;
   }
   const main: ChangeSpec[] = ranges.map((range) => ({ from: range.from, to: range.to, insert }));
   for (const changes of [[...main, ...additional], main]) {
     try {
       const set = view.state.changes(changes);
-      view.dispatch({
+      const tr = view.state.update({
         changes: set,
         selection: EditorSelection.create(ranges.map((range) => EditorSelection.cursor(set.mapPos(range.to, 1))), ranges.length - 1),
         scrollIntoView: true,
         userEvent,
       });
-      return;
+      view.dispatch(tr);
+      record(tr);
+      return applied();
     } catch {
       // Overlapping additional edits: retry with the main edit alone.
     }
   }
+  return null;
 }
+
+/* ── post-drop / post-paste widget ──────────────────────────────────────── */
+
+type DropPasteWidgetState = {
+  /** Offset right after the inserted text. */
+  pos: number;
+  /** "Drop" or "Paste": titles the widget and its close button. */
+  label: string;
+  active: number;
+  options: { title: string; detail?: string }[];
+  pick: (index: number) => void;
+  dismiss: () => void;
+};
+
+const setDropPasteWidget = StateEffect.define<DropPasteWidgetState | null>();
+
+/** VS Code style widget after a drop / paste: switch to another edit the providers offered. */
+class DropPasteWidget extends WidgetType {
+  readonly state: DropPasteWidgetState;
+
+  constructor(state: DropPasteWidgetState) {
+    super();
+    this.state = state;
+  }
+
+  eq(other: DropPasteWidget) {
+    return other.state === this.state;
+  }
+
+  toDOM() {
+    const dom = document.createElement("span");
+    dom.className = "cm-drop-paste-widget";
+    dom.setAttribute("role", "toolbar");
+    dom.setAttribute("aria-label", `${this.state.label} actions`);
+    this.state.options.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "cm-drop-paste-option";
+      button.textContent = option.title;
+      button.title = option.detail ? `${option.title} (${option.detail})` : option.title;
+      if (index === this.state.active) {
+        button.classList.add("active");
+        button.setAttribute("aria-pressed", "true");
+      }
+      // Keep the editor selection where it was when the widget appeared.
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => {
+        if (index !== this.state.active) this.state.pick(index);
+      });
+      dom.append(button);
+    });
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "cm-drop-paste-close";
+    close.textContent = "×";
+    close.title = `Hide ${this.state.label.toLowerCase()} actions`;
+    close.setAttribute("aria-label", close.title);
+    close.addEventListener("mousedown", (event) => event.preventDefault());
+    close.addEventListener("click", () => this.state.dismiss());
+    dom.append(close);
+    return dom;
+  }
+}
+
+const dropPasteWidgetField = StateField.define<DropPasteWidgetState | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) if (effect.is(setDropPasteWidget)) return effect.value;
+    // An edit or a moved cursor makes the offer stale.
+    return tr.docChanged || tr.selection ? null : value;
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => (value ? Decoration.set([Decoration.widget({ widget: new DropPasteWidget(value), side: 1 }).range(Math.max(0, value.pos))]) : Decoration.none)),
+});
 
 /** The edit's own host-side leftovers (files it creates, edits of other documents) run once the window applied it. */
 function commit(api: ViewFeatureApi, edit: WireDocumentEdit): void {
@@ -250,8 +367,10 @@ async function resolved(api: ViewFeatureApi, edit: WireDocumentEdit): Promise<Wi
 
 /* ── clipboard / drag data ──────────────────────────────────────────────── */
 
+const pathOf = (file: File): string | undefined => (file as File & { path?: string }).path || undefined;
+
 async function fileItem(file: File): Promise<WireTransferItem> {
-  const path = (file as File & { path?: string }).path || undefined;
+  const path = pathOf(file);
   let base64: string | undefined;
   if (file.size <= MAX_FILE_BYTES) {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -262,7 +381,7 @@ async function fileItem(file: File): Promise<WireTransferItem> {
   return { mime: file.type || "application/octet-stream", file: { name: file.name, path, base64 } };
 }
 
-const fileUri = (path: string) => `file:///${encodeURI(path.replace(/\\/g, "/")).replace(/^\/+/, "")}`;
+const fileUri = (path: string) => `file:///${path.replace(/\\/g, "/").split("/").filter((part) => part.length > 0).map((part) => encodeURIComponent(part)).join("/")}`;
 
 /** Strings are read synchronously (the data store is only readable during the event); files are read later. */
 function stringItems(data: DataTransfer): WireTransferItem[] {
@@ -279,9 +398,58 @@ function stringItems(data: DataTransfer): WireTransferItem[] {
   return items;
 }
 
-const transferTypes = (data: DataTransfer) => [...Array.from(data.types).map((type) => (type === FILE_DRAG_TYPE ? "text/uri-list" : type)), ...Array.from(data.files).map((file) => file.type || "application/octet-stream")];
+/** Everything the drop / paste providers may look for, with a file URI for the files whose path the window knows. */
+async function transferItems(data: DataTransfer): Promise<WireTransferItem[]> {
+  const items = stringItems(data);
+  const files = Array.from(data.files);
+  if (!files.length) return items;
+  const uris = files.map(pathOf).filter((path): path is string => !!path).map(fileUri);
+  if (uris.length && !items.some((item) => item.mime === "text/uri-list")) items.push({ mime: "text/uri-list", value: uris.join("\r\n") });
+  items.push(...(await Promise.all(files.map(fileItem))));
+  return items;
+}
+
+function transferTypes(data: DataTransfer): string[] {
+  const types = Array.from(data.types).map((type) => (type === FILE_DRAG_TYPE ? "text/uri-list" : type));
+  const files = Array.from(data.files);
+  // Browsers hide the file list while dragging, so "Files" also stands for the URI list the window adds on drop.
+  if (types.includes("Files") || files.some((file) => !!pathOf(file))) types.push("text/uri-list");
+  types.push(...files.map((file) => file.type || "application/octet-stream"));
+  return types;
+}
 
 /* ── drop and paste ─────────────────────────────────────────────────────── */
+
+/** More than one edit: show the widget that lets the user replace the applied one (VS Code's drop / paste widget). */
+function offerEdits(api: ViewFeatureApi, view: EditorView, ranges: Span[], edits: WireDocumentEdit[], active: number, userEvent: string, appliedEdit: AppliedDocumentEdit, label: string): void {
+  if (edits.length < 2) return;
+  const switchTo = (index: number) => {
+    if (index === active) return;
+    const chosen = edits[index];
+    if (!chosen) return;
+    void (async () => {
+      if (!appliedEdit.revert()) {
+        view.dispatch({ effects: setDropPasteWidget.of(null) });
+        return;
+      }
+      const edit = await resolved(api, chosen);
+      const next = applyDocumentEdit(view, ranges, edit, userEvent);
+      commit(api, edit);
+      if (next) offerEdits(api, view, ranges, edits, index, userEvent, next, label);
+      view.focus();
+    })();
+  };
+  view.dispatch({
+    effects: setDropPasteWidget.of({
+      pos: Math.min(appliedEdit.anchor, view.state.doc.length),
+      label,
+      active,
+      options: edits.map((edit) => ({ title: edit.title || "Edit", detail: edit.kind })),
+      pick: switchTo,
+      dismiss: () => view.dispatch({ effects: setDropPasteWidget.of(null) }),
+    }),
+  });
+}
 
 function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Extension {
   let internalDrag = false;
@@ -314,14 +482,12 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
       if (inside || !accepted || !data || !mimeAccepted(accepted, transferTypes(data), data.files.length > 0)) return false;
       event.preventDefault();
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head;
-      const strings = stringItems(data);
-      const files = Array.from(data.files);
       const plain = data.getData("text/plain");
       const doc = view.state.doc;
       void (async () => {
         let edits: WireDocumentEdit[] = [];
         try {
-          const items = [...strings, ...(await Promise.all(files.map(fileItem)))];
+          const items = await transferItems(data);
           const line = doc.lineAt(pos);
           edits = await withTimeout(api.requestHost<WireDocumentEdit[]>("dropEdits", [path, line.number - 1, pos - line.from, items]), HOST_TIMEOUT);
         } catch {
@@ -332,8 +498,10 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
         const target = stale ? view.state.selection.main.head : pos;
         if (edits[0]) {
           const edit = await resolved(api, edits[0]);
-          applyDocumentEdit(view, [{ from: target, to: target }], edit, "input.drop");
+          const ranges = [{ from: target, to: target }];
+          const appliedEdit = applyDocumentEdit(view, ranges, edit, "input.drop");
           commit(api, edit);
+          if (appliedEdit) offerEdits(api, view, ranges, edits, 0, "input.drop", appliedEdit, "Drop");
         } else insertPlain(view, plain, target, target, "input.drop");
         view.focus();
       })();
@@ -350,15 +518,13 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
       const data = event.clipboardData;
       if (!accepted || !data || !mimeAccepted(accepted, transferTypes(data), data.files.length > 0)) return false;
       event.preventDefault();
-      const strings = stringItems(data);
-      const files = Array.from(data.files);
       const text = data.getData("text/plain");
       const doc = view.state.doc;
       const ranges = view.state.selection.ranges.map((range) => ({ from: range.from, to: range.to }));
       void (async () => {
         let edits: WireDocumentEdit[] = [];
         try {
-          const items = [...strings, ...(await Promise.all(files.map(fileItem)))];
+          const items = await transferItems(data);
           const copyId = lastCopy && lastCopy.text === text ? await lastCopy.id : null;
           edits = await withTimeout(api.requestHost<WireDocumentEdit[]>("pasteEdits", [path, ranges.map((range) => toRange(doc, range.from, range.to)), items, { copyId, triggerKind: 0 }]), HOST_TIMEOUT);
         } catch {
@@ -368,8 +534,9 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
         const target = stale ? view.state.selection.ranges.map((range) => ({ from: range.from, to: range.to })) : ranges;
         if (edits[0]) {
           const edit = await resolved(api, edits[0]);
-          applyDocumentEdit(view, target, edit, "input.paste");
+          const appliedEdit = applyDocumentEdit(view, target, edit, "input.paste");
           commit(api, edit);
+          if (appliedEdit) offerEdits(api, view, target, edits, 0, "input.paste", appliedEdit, "Paste");
         } else if (text) {
           view.dispatch({ ...view.state.replaceSelection(text), scrollIntoView: true, userEvent: "input.paste" });
         }
@@ -422,8 +589,9 @@ export async function pasteAs(api: ViewFeatureApi, view: EditorView, path: strin
   const chosen = edits[picked];
   if (chosen) {
     const edit = await resolved(api, chosen);
-    applyDocumentEdit(view, ranges, edit, "input.paste");
+    const appliedEdit = applyDocumentEdit(view, ranges, edit, "input.paste");
     commit(api, edit);
+    if (appliedEdit) offerEdits(api, view, ranges, edits, picked, "input.paste", appliedEdit, "Paste");
   } else if (plain !== undefined) applyDocumentEdit(view, ranges, { handle: 0, title: "", insertText: plain, snippet: false, additional: [] }, "input.paste");
   view.focus();
 }
@@ -452,5 +620,5 @@ function trackEditor(path: string, languageId: string): Extension {
 export function languagesExtraEditorExtensions(path: string, languageId: string, api: ViewFeatureApi): Extension[] {
   // Prefetch what the providers can do for this document.
   availabilityFor(api, path, languageId);
-  return [trackEditor(path, languageId), inlineValueField, inlineValuesPlugin(path, languageId, api), evaluateHover(path, api), dropAndPaste(path, languageId, api)];
+  return [trackEditor(path, languageId), inlineValueField, inlineValuesPlugin(path, languageId, api), evaluateHover(path, api), dropAndPaste(path, languageId, api), dropPasteWidgetField];
 }

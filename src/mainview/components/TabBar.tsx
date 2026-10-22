@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { FileIcon } from "./FileIcon";
 import { showContextMenu } from "../lib/context-menu";
 import { FILE_DRAG_TYPE, TAB_DRAG_TYPE } from "./EditorDropTarget";
+import { useFeaturesVersion } from "../features/store";
+import { resourceTabLabel } from "../features/menus-walkthroughs/state";
 
 export type TabInfo = {
   path: string;
@@ -51,6 +53,9 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
   const barRef = useRef<HTMLDivElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  // A registered / contributed resourceLabelFormatter can arrive (or go away) after the tabs opened.
+  useFeaturesVersion();
+  const nameOf = (tab: TabInfo) => (tab.path.startsWith("terminal:") ? tab.name : resourceTabLabel(tab.path, tab.name));
 
   // Keep the active tab visible.
   useEffect(() => {
@@ -171,7 +176,7 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
           }}
         >
           {tab.path.startsWith("terminal:") ? <SquareTerminal className="terminal-glyph" size={14} /> : <FileIcon name={tab.name} />}
-          <span className="tab-name">{tab.name}</span>
+          <span className="tab-name">{nameOf(tab)}</span>
           {tab.hint && <span className="tab-hint">{tab.hint}</span>}
           <button
             className="tab-close"

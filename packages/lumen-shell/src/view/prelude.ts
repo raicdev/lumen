@@ -81,7 +81,8 @@ export const PRELUDE = `
       if (pressed) button.setAttribute("data-pressed", ""); else button.removeAttribute("data-pressed");
     },
     invoke: function (channel, data) {
-      return nativeInvoke(channel, typeof data === "string" ? data : JSON.stringify(data === undefined ? null : data));
+      // The webview library drops messages holding a raw U+007F (DEL).
+      return nativeInvoke(channel, typeof data === "string" ? data : JSON.stringify(data === undefined ? null : data).replace(/\\x7f/g, "\\\\u007f"));
     },
     receive: function (raw) {
       if (typeof raw !== "string") return;

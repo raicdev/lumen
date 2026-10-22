@@ -6,7 +6,7 @@ import { showContextMenu, type ContextMenuItem } from "./context-menu";
 import { contributedMenuItems } from "../features/menus-walkthroughs/menus";
 import { activeColorTheme, onColorThemeChange, themeVariables } from "./theme";
 import { themeBodyClass } from "../../shared/color-theme";
-import type { WebviewTheme } from "../../shared/webview-document";
+import { webviewFindAction, type WebviewFindAction, type WebviewTheme } from "../../shared/webview-document";
 
 /** The active color theme as webview pages get it. */
 function webviewTheme(): WebviewTheme {
@@ -19,8 +19,12 @@ function webviewTheme(): WebviewTheme {
  * (scripts only when the extension enables them, never the window's origin,
  * so it cannot reach the app or its bridge). The iframes live in one layer
  * above the workbench and are placed over the "slot" element of the tab or
- * view showing them — moving or hiding a slot never reloads the page, like
- * VS Code's retainContextWhenHidden.
+ * view showing them, so moving a slot never reloads the page.
+ *
+ * As in VS Code, a hidden webview keeps its page only with
+ * retainContextWhenHidden: without it the page is dropped (freeing its
+ * renderer memory) and loaded again from its html and saved state
+ * (setState) when it is shown.
  */
 
 export type WebviewInfo = {
@@ -63,6 +67,8 @@ type Record_ = WebviewInfo & {
   url?: string;
   /** Bumped for every new page (reloads the frame). */
   version: number;
+  /** The page was dropped while hidden (no retainContextWhenHidden); messages to it are dropped too. */
+  unloaded: boolean;
 };
 
 const TAB_PREFIX = "webview:";
@@ -197,8 +203,11 @@ class WebviewService {
       shown: false,
       reported: "",
       rect: "",
+      unloaded: false,
     };
     iframe.addEventListener("load", () => {
+      // about:blank of a dropped page is not the webview.
+      if (record.unloaded) return;
       record.loaded = true;
       // The theme may have changed since the frame's name was set.
       iframe.contentWindow?.postMessage({ __lumenTheme: webviewTheme() }, "*");
@@ -215,10 +224,30 @@ class WebviewService {
     record.loaded = false;
     record.version++;
     if (!record.url) return;
+    if (this.#keepsPage(record)) this.#load(record);
+    else this.#unload(record);
+  }
+
+  /** Whether the webview's page stays loaded: shown, or retained while hidden. */
+  #keepsPage(record: Record_): boolean {
+    return record.shown || record.options.retainContextWhenHidden;
+  }
+
+  #load(record: Record_) {
+    record.unloaded = false;
+    record.loaded = false;
     // The bootstrap reads the saved state and the theme from the frame's name.
     const handoff = record.state === undefined ? { theme: webviewTheme() } : { state: record.state, theme: webviewTheme() };
     record.iframe.name = `lumen-webview:${JSON.stringify(handoff)}`;
     record.iframe.src = `${record.url}?v=${record.version}`;
+  }
+
+  /** Drop a hidden page (VS Code without retainContextWhenHidden); `#load` brings it back. */
+  #unload(record: Record_) {
+    record.unloaded = true;
+    record.loaded = false;
+    record.queue = [];
+    record.iframe.src = "about:blank";
   }
 
   #remove(id: string) {
@@ -376,6 +405,10 @@ class WebviewService {
       if (visible !== record.shown) {
         record.shown = visible;
         record.iframe.style.visibility = visible ? "visible" : "hidden";
+        if (record.html && record.url && !record.restoring && !record.options.retainContextWhenHidden) {
+          if (visible && record.unloaded) this.#load(record);
+          else if (!visible && !record.unloaded) this.#unload(record);
+        }
       }
       const active = record.kind === "panel" ? visible && this.#activePanels.has(record.id) : visible;
       const report = `${visible}:${active}`;
@@ -437,7 +470,8 @@ class WebviewService {
       }
       case "webviewPost": {
         const record = this.#records.get(message.id);
-        if (!record) return;
+        // A dropped page gets nothing, as in VS Code (it asks again when shown).
+        if (!record || record.unloaded) return;
         if (record.loaded) record.iframe.contentWindow?.postMessage(message.message, "*");
         else record.queue.push(message.message);
         return;
@@ -477,6 +511,23 @@ class WebviewService {
     if (!own.length && !contributed.length) return;
     const rect = record.iframe.getBoundingClientRect();
     void showContextMenu(rect.left + menu.x, rect.top + menu.y, own.length && contributed.length ? [...contributed, { type: "separator" }, ...own] : [...contributed, ...own]);
+  }
+
+  #find(record: Record_, action: WebviewFindAction) {
+    if (!record.loaded) return;
+    record.iframe.focus();
+    record.iframe.contentWindow?.postMessage({ __lumenFind: action }, "*");
+  }
+
+  /**
+   * The webview find commands (editor.action.webvieweditor.showFind, ...): the active
+   * panel's find bar, when it was created with enableFindWidget. False when there is none.
+   */
+  find(action: WebviewFindAction): boolean {
+    const record = [...this.#records.values()].find((candidate) => candidate.kind === "panel" && candidate.shown && this.#activePanels.has(candidate.id) && candidate.options.enableFindWidget);
+    if (!record) return false;
+    this.#find(record, action);
+    return true;
   }
 
   #onFrameMessage(event: MessageEvent) {
@@ -519,6 +570,12 @@ class WebviewService {
       }
       case "keydown": {
         const init = data.data as KeyboardEventInit;
+        // Ctrl+F / F3 in a panel with enableFindWidget: the page's own find bar.
+        const find = record.kind === "panel" && record.options.enableFindWidget ? webviewFindAction(init) : null;
+        if (find) {
+          this.#find(record, find);
+          return;
+        }
         window.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
         return;
       }

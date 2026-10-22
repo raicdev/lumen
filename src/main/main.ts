@@ -1,6 +1,6 @@
-import { app, BrowserWindow, defineMainRPC, dialog, shell } from "@lumen/shell/main";
+import { app, autoUpdater, BrowserWindow, defineMainRPC, dialog, shell } from "@lumen/shell/main";
 import { tsServerPluginsOf } from "./menus-walkthroughs-ts-plugins.ts";
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "fs";
 import { isAbsolute, join, relative, resolve } from "path";
 import { homedir } from "os";
 import type { LumenRPC } from "../shared/types.ts";
@@ -21,15 +21,19 @@ import { WorkspaceStateStore } from "./workspace-state.ts";
 import { contributedThemes, loadColorTheme } from "./themes.ts";
 import { terminalProfiles, terminals } from "./terminal.ts";
 import { killProcess, listProcesses } from "./process-explorer.ts";
+import { forwardToRunningInstance, instanceSocketPath, serveInstance } from "./single-instance.ts";
+import { UpdateService } from "./updates.ts";
 import { CompatCache, ExtensionManager, analyzeVsix, compareVersions } from "./extensions/manager.ts";
 import { ExtensionHostClient, openExternal } from "./extensions/host-client.ts";
 import { downloadFromMarketplace, latestVersion, marketplaceDetails, searchMarketplace } from "./extensions/marketplace.ts";
 import { WebviewResourceServer } from "./extensions/webview-server.ts";
 import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.ts";
+import type { ExtensionDescription } from "../shared/extensions.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
 
-const APP_VERSION = "0.1.1";
+const APP_VERSION = "0.2.0";
 const APP_NAME = "Lumen";
+const APP_IDENTIFIER = "dev.lumen.editor";
 
 let mainWindow: BrowserWindow<LumenRPC> | null = null;
 let workspaceRoot: string | null = null;
@@ -53,8 +57,18 @@ const extensionManager = new ExtensionManager();
 /** Compatibility of Open VSX packages checked before install. */
 const compatCache = new CompatCache();
 
-/** lumen:// URIs this process was started with (an OS protocol handler would pass them as arguments). */
+/** lumen:// URIs this process was started with (the OS protocol handler passes them as arguments), until the extension host runs. */
 const launchUris = process.argv.filter((arg) => arg.startsWith("lumen://"));
+let extensionHostStarted = false;
+
+/** lumen://<extension id>/... URIs go to the extension's URI handler. */
+function handleLaunchUris(uris: string[]): void {
+  if (!extensionHostStarted) {
+    launchUris.push(...uris);
+    return;
+  }
+  for (const uri of uris) extensionHost.postFromView({ type: "executeCommand", command: "lumen.handleUri", args: [uri] });
+}
 
 const extensionHost = new ExtensionHostClient({
   appName: APP_NAME,
@@ -130,6 +144,12 @@ function contributedGrammars(): ExtensionGrammar[] {
   return grammars;
 }
 
+/** An extension's name for people: its displayName unless that is an unresolved %nls.key%. */
+function extensionDisplayName(extension: ExtensionDescription): string {
+  const displayName = extension.manifest.displayName;
+  return typeof displayName === "string" && displayName && !/^%.+%$/.test(displayName) ? displayName : extension.id;
+}
+
 /** Install, then restart the extension host so the new code is loaded. */
 async function installExtension(run: () => Promise<ExtensionInstallResult["extension"]>): Promise<ExtensionInstallResult> {
   try {
@@ -144,6 +164,15 @@ async function installExtension(run: () => Promise<ExtensionInstallResult["exten
 
 /** Per-project layout (editors, panels, terminals) — see workspace-state.ts. */
 const workspaceState = new WorkspaceStateStore(APP_NAME);
+
+/* ── updates ──────────────────────────────────────────────────────────── */
+
+autoUpdater.configure({ repository: "raicdev/lumen", name: APP_NAME, version: APP_VERSION, identifier: APP_IDENTIFIER });
+
+const updates = new UpdateService({
+  publish: (state) => mainWindow?.webContents.send.updateState({ state }),
+  quit: async () => (mainWindow ? await mainWindow.requestClose() : true),
+});
 
 const rpc = defineMainRPC<LumenRPC>({
   handlers: {
@@ -333,6 +362,9 @@ const rpc = defineMainRPC<LumenRPC>({
             { label: "File search", heapUsed: () => fsWorker.heapUsed() },
           ],
           terminals: terminals.processes(),
+          extensions: extensionManager.list().map((extension) => ({ id: extension.id, name: extensionDisplayName(extension) })),
+          extensionProcesses: (alive) => extensionHost.childProcessOwners(alive),
+          webviewFrames: async () => (mainWindow ? await mainWindow.native.processFrames() : null),
         }),
       }),
 
@@ -508,8 +540,9 @@ const rpc = defineMainRPC<LumenRPC>({
 
       extensionsStart: async ({ config, workspace }) => {
         const count = await extensionHost.start(config, workspace ?? workspaceRoot);
-        // lumen://<extension id>/... URIs given on the command line go to the extension's URI handler (once).
-        for (const uri of launchUris.splice(0)) extensionHost.postFromView({ type: "executeCommand", command: "lumen.handleUri", args: [uri] });
+        // lumen://<extension id>/... URIs given on the command line (or by later launches) go to the extension's URI handler (once).
+        extensionHostStarted = true;
+        handleLaunchUris(launchUris.splice(0));
         return { count };
       },
 
@@ -524,6 +557,18 @@ const rpc = defineMainRPC<LumenRPC>({
       },
 
       openExternal: ({ url }) => ({ ok: openExternal(url) }),
+
+      updateConfigure: ({ mode }) => {
+        updates.configure(mode);
+        return { state: updates.state };
+      },
+
+      updateCheck: () => {
+        void updates.check(true);
+        return { state: updates.state };
+      },
+
+      updateInstall: async () => await updates.install(),
     },
     messages: {
       log: ({ msg }) => {
@@ -537,7 +582,7 @@ const rpc = defineMainRPC<LumenRPC>({
 app.configure({
   name: APP_NAME,
   version: APP_VERSION,
-  identifier: "dev.lumen.editor",
+  identifier: APP_IDENTIFIER,
 });
 
 app.on("ready", () => {
@@ -603,4 +648,22 @@ app.on("before-quit", () => {
 // Last chance for queued layout writes (e.g. the process is asked to exit).
 process.on("exit", () => workspaceState.flush());
 
-void app.run();
+/**
+ * A launch for lumen:// URIs (the OS protocol handler) hands them to a running Lumen and
+ * exits; otherwise this instance starts and receives the URIs of such launches.
+ */
+async function start(): Promise<void> {
+  const socket = instanceSocketPath(APP_IDENTIFIER);
+  if (launchUris.length && (await forwardToRunningInstance(socket, launchUris))) {
+    process.exit(0);
+  }
+  // A socket file nobody listens on is left over from a crash.
+  if (process.platform !== "win32" && existsSync(socket) && !(await forwardToRunningInstance(socket, []))) rmSync(socket, { force: true });
+  void serveInstance(socket, (uris) => {
+    handleLaunchUris(uris);
+    mainWindow?.focus();
+  });
+  void app.run();
+}
+
+void start();

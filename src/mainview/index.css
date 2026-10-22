@@ -1695,6 +1695,81 @@ kbd {
   color: var(--text-muted);
 }
 
+/* Side-by-side diff (@codemirror/merge MergeView) */
+.editor-diff {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.editor-diff-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--vscode-panel-border, var(--border));
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.editor-diff-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-diff-spacer {
+  flex: 1;
+}
+
+.editor-diff-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.editor-diff-toolbar button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.editor-diff-views {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.editor-diff-views .cm-mergeView {
+  height: 100%;
+}
+
+.editor-diff-views .cm-editor {
+  height: 100%;
+}
+
+.editor-diff-views .cm-mergeView .cm-scroller {
+  overflow: auto;
+}
+
+.editor-diff-error {
+  margin: auto;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 /* Inline diff (@codemirror/merge) */
 .editor-root .cm-changedLine {
   background: var(--vscode-diffEditor-insertedLineBackground) !important;
@@ -2775,6 +2850,7 @@ kbd {
 .process-kind-app { --process-color: #e5a442; }
 .process-kind-webview { --process-color: #4f9cf0; }
 .process-kind-terminal { --process-color: #4cbf7a; }
+.process-kind-extension { --process-color: #e0679b; }
 .process-kind-process { --process-color: #a07ce0; }
 .process-kind-thread { --process-color: transparent; }
 
@@ -2793,6 +2869,22 @@ kbd {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+}
+
+.process-extension {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--process-color) 22%, transparent);
+}
+
+.process-extension-inherited {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .process-kind-thread td {

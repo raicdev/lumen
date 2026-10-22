@@ -45,6 +45,9 @@ export const rpc = defineViewRPC<LumenRPC>({
       extHost: ({ message }) => {
         window.dispatchEvent(new CustomEvent("lumen:ext-host", { detail: message }));
       },
+      updateState: ({ state }) => {
+        window.dispatchEvent(new CustomEvent("lumen:update-state", { detail: state }));
+      },
       terminalExit: ({ id, code }) => {
         window.dispatchEvent(
           new CustomEvent("lumen:terminal-exit", { detail: { id, code } }),

@@ -57,6 +57,34 @@ function readManifest(dir: string): ExtensionManifest | null {
   }
 }
 
+/**
+ * Replace "%key%" strings (titles, categories, descriptions…) with their text
+ * from package.nls.json, as VS Code does. The UI is English, so only the
+ * default bundle is read; keys it lacks stay as they are.
+ */
+function localizeManifest(dir: string, manifest: ExtensionManifest): ExtensionManifest {
+  let bundle: Record<string, unknown>;
+  try {
+    bundle = JSON.parse(readFileSync(join(dir, "package.nls.json"), "utf8")) as Record<string, unknown>;
+  } catch {
+    return manifest;
+  }
+  const localize = (value: unknown): unknown => {
+    if (typeof value === "string") {
+      const key = /^%(.+)%$/.exec(value)?.[1];
+      const text = key === undefined ? undefined : bundle[key];
+      // Entries may also be { message, comment } objects.
+      if (typeof text === "string") return text;
+      if (text && typeof text === "object" && typeof (text as { message?: unknown }).message === "string") return (text as { message: string }).message;
+      return value;
+    }
+    if (Array.isArray(value)) return value.map(localize);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, localize(item)]));
+    return value;
+  };
+  return localize(manifest) as ExtensionManifest;
+}
+
 function readReport(dir: string, manifest: ExtensionManifest): CompatReport | undefined {
   try {
     return refreshReport(JSON.parse(readFileSync(join(dir, "lumen-compat.json"), "utf8")) as CompatReport, manifest);
@@ -289,6 +317,7 @@ export class ExtensionManager {
       }
       compat = report;
     }
+    manifest = localizeManifest(location, manifest);
     return {
       id: extensionId(manifest),
       manifest,

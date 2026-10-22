@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ExtensionHost } from "../src/main/exthost/host.ts";
 import { chatLmState } from "../src/main/exthost/features/chat-lm/core.ts";
+import { chatLmFeature } from "../src/main/exthost/features/chat-lm.ts";
 import type { ChatHostMessage } from "../src/shared/chat-lm.ts";
 
 /**
@@ -96,6 +97,92 @@ test("a chat participant streams parts, history and followups", async () => {
 
   participant.dispose();
   assert.equal(state.listParticipants().length, 0);
+});
+
+test("a participant's iconPath is sent to the panel as an image or a codicon", () => {
+  const { api, state } = startedHost();
+  const dir = mkdtempSync(join(tmpdir(), "lumen-chat-icon-"));
+  const lightPath = join(dir, "light.png");
+  const darkPath = join(dir, "dark.svg");
+  writeFileSync(lightPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  writeFileSync(darkPath, "<svg xmlns='http://www.w3.org/2000/svg'/>");
+  const participant = api.chat.createChatParticipant("test.icon", async () => ({}));
+  const icon = () => (state.wireState().participants[0] as any).icon;
+
+  assert.equal(icon(), undefined);
+  participant.iconPath = new api.ThemeIcon("rocket", new api.ThemeColor("charts.blue"));
+  assert.deepEqual(icon(), { codicon: "rocket", color: "charts.blue" });
+  participant.iconPath = new api.ThemeIcon("rocket");
+  assert.deepEqual(icon(), { codicon: "rocket" });
+
+  participant.iconPath = api.Uri.file(lightPath);
+  assert.match(icon().url, /^data:image\/png;base64,/);
+
+  participant.iconPath = { light: api.Uri.file(lightPath), dark: api.Uri.file(darkPath) };
+  assert.match(icon().url, /^data:image\/png;base64,/);
+  assert.match(icon().dark, /^data:image\/svg\+xml;base64,/);
+
+  participant.iconPath = api.Uri.parse("https://example.test/icon.svg");
+  assert.deepEqual(icon(), { url: "https://example.test/icon.svg" });
+
+  participant.iconPath = api.Uri.file(join(dir, "missing.png"));
+  assert.equal(icon(), undefined);
+  participant.dispose();
+});
+
+test("lm.invokeTool hands tokenization options to the tool", async () => {
+  const { api, chat, state } = startedHost();
+  const counted: string[] = [];
+  const registration = api.lm.registerLanguageModelChatProvider("acme", {
+    provideLanguageModelChatInformation: async () => [{ id: "m1", name: "Model", maxInputTokens: 4096, capabilities: { toolCalling: true } }],
+    provideLanguageModelChatResponse: async (_model: any, messages: any[], _options: any, progress: any) => {
+      const last = messages[messages.length - 1];
+      if (last.content.some((part: any) => part instanceof api.LanguageModelToolResultPart)) progress.report(new api.LanguageModelTextPart("done"));
+      else progress.report(new api.LanguageModelToolCallPart("c1", "test.tokens", {}));
+    },
+    provideTokenCount: async (_model: any, text: any) => {
+      counted.push(String(text));
+      return String(text).length * 2;
+    },
+  });
+  const seen: any[] = [];
+  const counts: number[] = [];
+  const tool = api.lm.registerTool("test.tokens", {
+    invoke: async (options: any) => {
+      seen.push(options.tokenizationOptions);
+      if (options.tokenizationOptions) counts.push(await options.tokenizationOptions.countTokens("abc"));
+      return new api.LanguageModelToolResult([new api.LanguageModelTextPart("result")]);
+    },
+  });
+
+  // The budget of the caller is kept; counting goes through the selected model's provider.
+  await api.lm.invokeTool("test.tokens", { input: {}, tokenizationOptions: { tokenBudget: 77 } });
+  assert.equal(seen[0].tokenBudget, 77);
+  assert.equal(typeof seen[0].countTokens, "function");
+  assert.equal(counts[0], 6);
+
+  // Without tokenizationOptions (an extension's plain tool call) the tool gets none, like VS Code.
+  await api.lm.invokeTool("test.tokens", { input: {} });
+  assert.equal(seen[1], undefined);
+
+  // The tool call of the chat loop gets the model's input size as its budget.
+  await state.run({ id: 1, text: "go" });
+  assert.equal(doneOf(chat, 1).error, undefined);
+  assert.equal(markdownOf(chat, 1), "done");
+  assert.equal(seen[2].tokenBudget, 4096);
+  assert.equal(counts[1], 6);
+
+  // An empty tokenizationOptions still gets a budget and a counter.
+  await api.lm.invokeTool("test.tokens", { input: {}, tokenizationOptions: {} });
+  assert.equal(seen[3].tokenBudget, 4096);
+
+  // Without a model the counter approximates (about four characters per token).
+  registration.dispose();
+  await api.lm.invokeTool("test.tokens", { input: {}, tokenizationOptions: { tokenBudget: 5 } });
+  assert.equal(seen[4].tokenBudget, 5);
+  assert.equal(counts[3], 1);
+  assert.ok(counted.includes("abc"));
+  tool.dispose();
 });
 
 test("a message without a participant or a model explains what is missing", async () => {
@@ -216,4 +303,70 @@ test("a declined MCP server is not started", async () => {
   assert.equal(server!.status, "error");
   assert.match(server!.error ?? "", /did not allow/);
   registration.dispose();
+});
+
+test("sending through another extension's model asks for consent once per pair", async () => {
+  const { api, state } = startedHost();
+  const asked: [string, string, string, string | undefined][] = [];
+  state.modelConsent = async (extensionId, providerExtensionId, vendor, justification) => {
+    asked.push([extensionId, providerExtensionId, vendor, justification]);
+    return true;
+  };
+  let responses = 0;
+  const registration = state.registerProvider("provider.ext", "acme", {
+    provideLanguageModelChatInformation: async () => [{ id: "m1", name: "Model", family: "fam", version: "1", maxInputTokens: 1000 }],
+    provideLanguageModelChatResponse: async (_model: any, _messages: any[], _options: any, progress: any) => {
+      responses++;
+      progress.report("ok");
+    },
+  });
+  const [model] = await state.selectChatModels({ vendor: "acme" }, "consumer.ext");
+  assert.deepEqual(await drain((await model!.sendRequest([api.LanguageModelChatMessage.User("hi")], { justification: "summarise the file" })).text), ["ok"]);
+  assert.deepEqual(asked, [["consumer.ext", "provider.ext", "acme", "summarise the file"]]);
+
+  // The pair is remembered: no second prompt for the same extension and provider.
+  assert.deepEqual(await drain((await model!.sendRequest([api.LanguageModelChatMessage.User("again")])).text), ["ok"]);
+  assert.equal(asked.length, 1);
+
+  // The provider itself needs no consent, and neither does code that is not an extension (the Chat panel).
+  await drain((await (await state.selectChatModels({ vendor: "acme" }, "provider.ext"))[0]!.sendRequest([api.LanguageModelChatMessage.User("x")])).text);
+  await drain((await (await state.selectChatModels({ vendor: "acme" }))[0]!.sendRequest([api.LanguageModelChatMessage.User("x")])).text);
+  assert.equal(asked.length, 1);
+
+  // A justification passed to selectChatModels is shown when the user is asked.
+  const [quiet] = await state.selectChatModels({ vendor: "acme", justification: "from the selector" }, "other.ext");
+  await drain((await quiet!.sendRequest([api.LanguageModelChatMessage.User("x")])).text);
+  assert.deepEqual(asked[1], ["other.ext", "provider.ext", "acme", "from the selector"]);
+
+  // A denial remembers itself and rejects with LanguageModelError.NoPermissions.
+  state.modelConsent = async () => false;
+  const [denied] = await state.selectChatModels({ vendor: "acme" }, "denied.ext");
+  const before = responses;
+  await assert.rejects(denied!.sendRequest([api.LanguageModelChatMessage.User("x")]), (error: any) => error.code === "NoPermissions");
+  await assert.rejects(denied!.sendRequest([api.LanguageModelChatMessage.User("x")]), (error: any) => error.code === "NoPermissions");
+  assert.equal(responses, before);
+  assert.equal(asked.length, 2);
+  registration.dispose();
+});
+
+test("the Manage Language Models view lists provider, vendor, family and id", async () => {
+  const { api, host } = startedHost();
+  const registration = api.lm.registerLanguageModelChatProvider("acme.html", {
+    provideLanguageModelChatInformation: async () => [
+      { id: "fast", name: "Fast", family: "fam-a", version: "1" },
+      { id: "smart", name: "Smart", family: "fam-b", version: "2" },
+    ],
+    provideLanguageModelChatResponse: async () => {},
+  });
+  await api.lm.selectChatModels({ vendor: "acme.html" });
+  const result = (await chatLmFeature.onViewRequest!(host, "models", [])) as { models: any[] };
+  assert.deepEqual(
+    result.models.map((model) => [model.id, model.vendor, model.family, model.extensionId]),
+    [
+      ["acme.html/fast", "acme.html", "fam-a", "unknown"],
+      ["acme.html/smart", "acme.html", "fam-b", "unknown"],
+    ],
+  );
+  registration.dispose();
+  assert.deepEqual(((await chatLmFeature.onViewRequest!(host, "models", [])) as { models: any[] }).models, []);
 });

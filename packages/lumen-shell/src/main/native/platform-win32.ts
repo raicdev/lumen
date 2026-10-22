@@ -751,14 +751,53 @@ async function showOpenDialog(options: OpenDialogOptions): Promise<string[]> {
   const directory = options.properties?.includes("openDirectory");
 
   if (directory) {
+    const multi = options.properties?.includes("multiSelections") ?? false;
+    const title = psString(options.title ?? "Select a folder");
+    const initial = options.defaultPath ? psString(options.defaultPath) : null;
+    // The Explorer-style folder picker (IFileOpenDialog with FOS_PICKFOLDERS), reached through
+    // WinForms' own Vista dialog by reflection, since compiling C# is not an option (see dialogPrelude).
+    // Should those internals ever be missing, the old tree-style FolderBrowserDialog is used.
     const script = guarded(`
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = ${psString(options.title ?? "Select a folder")}
-$dialog.ShowNewFolderButton = $true
-${options.defaultPath ? `if (Test-Path ${psString(options.defaultPath)}) { $dialog.SelectedPath = ${psString(options.defaultPath)} }` : ""}
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-  [Console]::Out.WriteLine($dialog.SelectedPath)
-}`);
+$picked = @()
+$modern = $false
+try {
+  $flags = [System.Reflection.BindingFlags]'Instance, Public, NonPublic'
+  $assembly = [System.Windows.Forms.FileDialog].Assembly
+  $iFileDialog = $assembly.GetType('System.Windows.Forms.FileDialogNative+IFileDialog', $true)
+  $fos = $assembly.GetType('System.Windows.Forms.FileDialogNative+FOS', $true)
+  $eventsType = $assembly.GetType('System.Windows.Forms.FileDialog+VistaDialogEvents', $true)
+  $picker = [System.Windows.Forms.OpenFileDialog]::new()
+  $picker.AddExtension = $false
+  $picker.CheckFileExists = $false
+  $picker.DereferenceLinks = $true
+  $picker.Filter = "Folders|\`n"
+  $picker.Multiselect = ${multi ? "$true" : "$false"}
+  $picker.Title = ${title}
+  ${initial ? `if (Test-Path ${initial}) { $picker.InitialDirectory = ${initial} }` : ""}
+  $vista = [System.Windows.Forms.OpenFileDialog].GetMethod('CreateVistaDialog', $flags).Invoke($picker, $null)
+  [System.Windows.Forms.FileDialog].GetMethod('OnBeforeVistaDialog', $flags).Invoke($picker, [object[]]@($vista)) | Out-Null
+  $pickFolders = [uint32][System.Windows.Forms.FileDialog].GetMethod('GetOptions', $flags).Invoke($picker, $null) -bor [uint32]0x20
+  $iFileDialog.GetMethod('SetOptions').Invoke($vista, [object[]]@([System.Enum]::ToObject($fos, $pickFolders))) | Out-Null
+  $events = $eventsType.GetConstructors($flags)[0].Invoke([object[]]@($picker.psobject.BaseObject))
+  $advise = [object[]]@($events, [uint32]0)
+  $iFileDialog.GetMethod('Advise').Invoke($vista, $advise) | Out-Null
+  # From here on a failure is the dialog's own, not missing internals: no fallback.
+  $modern = $true
+  try {
+    $hr = $iFileDialog.GetMethod('Show').Invoke($vista, [object[]]@([IntPtr]::Zero))
+    if ($hr -eq 0) { $picked = $picker.FileNames }
+  } finally {
+    $iFileDialog.GetMethod('Unadvise').Invoke($vista, [object[]]@($advise[1])) | Out-Null
+  }
+} catch {
+  if ($modern) { throw }
+  $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+  $dialog.Description = ${title}
+  $dialog.ShowNewFolderButton = $true
+  ${initial ? `if (Test-Path ${initial}) { $dialog.SelectedPath = ${initial} }` : ""}
+  if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $picked = @($dialog.SelectedPath) }
+}
+foreach ($folder in $picked) { [Console]::Out.WriteLine($folder) }`);
     const result = await powershell(script);
     assertDialogOk(result);
     return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);

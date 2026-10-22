@@ -8,6 +8,14 @@ import type {
 import type { MenuGroup } from "../shared/menu.ts";
 import { RpcEndpoint, createApi } from "../shared/rpc.ts";
 
+/**
+ * JSON for the native bridge. The webview library drops any message holding a
+ * raw U+007F (DEL, what Backspace sends to a terminal), so it goes as an escape.
+ */
+function bridgeJson(envelope: unknown): string {
+  return JSON.stringify(envelope).replace(/\x7f/g, "\\u007f");
+}
+
 export type WindowState = "normal" | "maximized" | "minimized";
 
 /** Window chrome controls for frameless windows (`frame: false`). */
@@ -112,7 +120,7 @@ export function defineViewRPC<S extends RPCSchema>(options: ViewRPCOptions<S> = 
     timeoutMs: options.timeoutMs ?? 60_000,
     log: options.log ?? ((message) => console.warn(`[lumen-shell] ${message}`)),
     outbound: async (envelope) => {
-      const response = await shell.invoke("__lumen:ipc", JSON.stringify(envelope));
+      const response = await shell.invoke("__lumen:ipc", bridgeJson(envelope));
       return (response ?? null) as ResEnvelope | null;
     },
   });
@@ -120,7 +128,7 @@ export function defineViewRPC<S extends RPCSchema>(options: ViewRPCOptions<S> = 
   shell.onEnvelope((raw) => {
     // Requests from the main process expect their response back over the bridge.
     void endpoint.receive(raw).then((response) => {
-      if (response) void shell.invoke("__lumen:ipc", JSON.stringify(response)).catch(() => {});
+      if (response) void shell.invoke("__lumen:ipc", bridgeJson(response)).catch(() => {});
     });
   });
 

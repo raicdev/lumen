@@ -11,6 +11,8 @@ import { interactiveInputs } from "./notebooks/state";
 /** The area's API (the Notebook Variables panel asks the host through it). */
 let notebooksApi: ViewFeatureApi | null = null;
 import { activePath, call, docs, hostEpoch, loadDoc, onHostMessage, pickController, runCells, selectCell, selectedCell } from "./notebooks/state";
+import { matchingNotebooks, opensAsNotebook } from "./notebooks/contributions";
+import type { NotebookContribution } from "./notebooks/contributions";
 
 /**
  * Window side of the "notebooks" area: the notebook editor (an editor opener for
@@ -20,36 +22,10 @@ import { activePath, call, docs, hostEpoch, loadDoc, onHostMessage, pickControll
  * feature-notebooks.css.
  */
 
-type ContributedNotebook = { type: string; selector?: { filenamePattern?: string }[] };
+type ContributedNotebook = NotebookContribution;
 
-/** Patterns of contributes.notebooks (`*`, `**`, `?`, `{a,b}`), matched against the file name or the path. */
-function globMatches(pattern: string, path: string): boolean {
-  const normalized = path.replace(/\\/g, "/");
-  const target = pattern.includes("/") ? normalized : normalized.slice(normalized.lastIndexOf("/") + 1);
-  let source = "";
-  let depth = 0;
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i]!;
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        i++;
-        if (pattern[i + 1] === "/") {
-          i++;
-          source += "(?:.*/)?";
-        } else source += ".*";
-      } else source += "[^/]*";
-    } else if (ch === "?") source += "[^/]";
-    else if (ch === "{") {
-      depth++;
-      source += "(?:";
-    } else if (ch === "}" && depth) {
-      depth--;
-      source += ")";
-    } else if (ch === "," && depth) source += "|";
-    else source += ch.replace(/[.+^$()|[\]\\,]/g, "\\$&");
-  }
-  return new RegExp(`^${pattern.includes("/") && !pattern.startsWith("**") ? "(?:.*/)?" : ""}${source}$`, "i").test(target);
-}
+/** Files the user asked to open in the notebook editor although no contribution opens them by default. */
+const forcedNotebooks = new Set<string>();
 
 function contributedNotebooks(): ContributedNotebook[] {
   return extensionService
@@ -60,8 +36,10 @@ function contributedNotebooks(): ContributedNotebook[] {
 
 function matches(path: string): boolean {
   if (path.startsWith("untitled:")) return false;
+  // "Open in Notebook Editor": the user chose it for this file (a "priority": "option" contribution).
+  if (forcedNotebooks.has(path)) return true;
   if (path.toLowerCase().endsWith(".ipynb")) return true;
-  return contributedNotebooks().some((entry) => entry.type !== DEFAULT_NOTEBOOK_TYPE && entry.selector?.some((selector) => selector.filenamePattern && globMatches(selector.filenamePattern, path)));
+  return opensAsNotebook(contributedNotebooks(), path, DEFAULT_NOTEBOOK_TYPE);
 }
 
 /* ── commands (they act on the notebook that has the focus) ──────────────── */
@@ -89,7 +67,22 @@ function command(id: string, title: string, run: (api: ViewFeatureApi, path: str
 
 const insert = (offset: 0 | 1, kind: 1 | 2) => (api: ViewFeatureApi, path: string, _cell: string | null, index: number) => call(api, path, "insert", index + offset, kind);
 
+/** "Open in Notebook Editor": Reopen With for notebook contributions, including `"priority": "option"` ones. */
+const openInNotebookEditor: FeatureCommand = {
+  id: "notebook.openWith",
+  title: "Open in Notebook Editor",
+  category: "Notebook",
+  run: async (api) => {
+    try {
+      await api.requestHost("openWith", []);
+    } catch (error) {
+      void api.showMessage("error", error instanceof Error ? error.message : String(error));
+    }
+  },
+};
+
 const commands: FeatureCommand[] = [
+  openInNotebookEditor,
   command("notebook.execute", "Run All", (api, path) => runCells(api, path, "all")),
   command("notebook.cell.execute", "Execute Cell", (api, path, cell) => (cell ? runCells(api, path, [cell]) : undefined)),
   command("notebook.cell.executeAndSelectBelow", "Execute Notebook Cell and Select Below", async (api, path, cell, index) => {
@@ -145,8 +138,20 @@ export const notebooksView: ViewFeature = {
 
   onHostRequest: async (method, args, api) => {
     if (method === "show") {
-      const [path, options] = args as [string, { preview?: boolean; preserveFocus?: boolean; beside?: boolean } | undefined];
-      return await api.openFile(path, { preview: options?.preview, focus: !options?.preserveFocus, beside: options?.beside });
+      const [path, options] = args as [string, { preview?: boolean; preserveFocus?: boolean; beside?: boolean; viewColumn?: number } | undefined];
+      // Like window.showTextDocument: the window's openFile knows "beside", not a column,
+      // so One..Four first focuses that editor group (creating it, as VS Code does);
+      // Active (-1) and Five..Nine open in the active group.
+      const column = options?.viewColumn;
+      if (column !== undefined && column > 0) {
+        const name = ["First", "Second", "Third", "Fourth"][column - 1];
+        if (name) {
+          api.executeCommand(`workbench.action.focus${name}EditorGroup`);
+          // The workbench runs commands on the next microtask; the group is active afterwards.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      return await api.openFile(path, { preview: options?.preview, focus: !options?.preserveFocus, beside: options?.beside || column === -2 });
     }
     // interactive.execute: the input box of that Interactive Window (or of the active one).
     if (method === "interactiveExecute") {

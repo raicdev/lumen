@@ -19,10 +19,34 @@ import type {
  * on the extension host itself.
  */
 
+/** State of a continuous run: one per profile and set of included tests. */
+export type ContinuousRunInfo = {
+  key: string;
+  profileId: string;
+  controllerId: string;
+  label: string;
+  kind: number;
+  /** Included item ids; empty means every test of the controller. */
+  testIds: string[];
+  running: boolean;
+  /** The latest run the handler created for the request. */
+  runId?: string;
+};
+
+/** Host -> window message listing the active continuous runs. */
+export type TestingContinuousEvent = { kind: "continuous"; runs: ContinuousRunInfo[] };
+
+export type TestingEvent = TestingHostEvent | TestingContinuousEvent;
+
 export type TestingSink = {
-  post(event: TestingHostEvent): void;
+  post(event: TestingEvent): void;
   log(level: "info" | "warning" | "error", message: string): void;
 };
+
+/** Key of a continuous run: its profile and included tests (the window builds the same one). */
+export function continuousKey(profileId: string, testIds: readonly string[]): string {
+  return `${profileId}${TEST_ID_SEPARATOR}${[...testIds].sort().join("\u0001")}`;
+}
 
 type Thenable<T> = PromiseLike<T>;
 
@@ -407,7 +431,9 @@ export class TestRunProfileImpl {
     return this.#supportsContinuousRun;
   }
   set supportsContinuousRun(value: boolean) {
+    if (value === this.#supportsContinuousRun) return;
     this.#supportsContinuousRun = value;
+    if (!value) this.#controller.stopContinuous(this);
     this.#controller.schedule();
   }
   dispose(): void {
@@ -577,6 +603,7 @@ export class ControllerImpl {
     return profile;
   }
   removeProfile(profile: TestRunProfileImpl): void {
+    this.stopContinuous(profile);
     const index = this.profiles.indexOf(profile);
     if (index >= 0) this.profiles.splice(index, 1);
     this.schedule();
@@ -587,6 +614,10 @@ export class ControllerImpl {
   invalidateTestResults(items?: TestItemImpl | readonly TestItemImpl[]): void {
     const ids = items === undefined ? null : [items].flat().map((item) => item.wireId);
     this.#model.post({ kind: "invalidate", ids });
+  }
+  /** Stop the controller's continuous runs (or those of one of its profiles). */
+  stopContinuous(profile?: TestRunProfileImpl): void {
+    this.#model.stopContinuous(profile ? { profileId: profile.id } : { controllerId: this.id });
   }
   /** Look an item up by the path of ids (below the controller). */
   find(path: string[]): TestItemImpl | undefined {
@@ -633,6 +664,7 @@ export class ControllerImpl {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.#model.stopContinuous({ controllerId: this.id });
     this.#model.removeController(this);
   }
   toWire(): TestWireController {
@@ -663,6 +695,15 @@ export class ControllerImpl {
 
 const KEPT_RUNS = 10;
 
+type ContinuousSession = {
+  key: string;
+  profile: TestRunProfileImpl;
+  testIds: string[];
+  request: TestRunRequest;
+  source: CancellationTokenSource;
+  runIds: string[];
+};
+
 export class TestingModel {
   readonly controllers = new Map<string, ControllerImpl>();
   readonly sink: TestingSink;
@@ -671,6 +712,9 @@ export class TestingModel {
   /** Cancellation sources of everything that is running. */
   readonly #sessions = new Map<string, CancellationTokenSource>();
   readonly #requestSessions = new WeakMap<TestRunRequest, string>();
+  /** Active continuous runs by key (profile + included tests). */
+  readonly #continuous = new Map<string, ContinuousSession>();
+  readonly #continuousRequests = new WeakMap<TestRunRequest, ContinuousSession>();
   #runCounter = 0;
   #sessionCounter = 0;
   #timer: ReturnType<typeof setTimeout> | undefined;
@@ -690,7 +734,7 @@ export class TestingModel {
   message(runId: string, testId: string, index: number): TestMessage | undefined {
     return this.#messages.get(`${runId} ${testId}`)?.[index];
   }
-  post(event: TestingHostEvent): void {
+  post(event: TestingEvent): void {
     this.sink.post(event);
   }
   scheduleTree(): void {
@@ -719,7 +763,8 @@ export class TestingModel {
   }
   createRun(controller: ControllerImpl, request: TestRunRequest, name: string | undefined, persist: boolean): TestRunImpl {
     const sessionId = this.#requestSessions.get(request);
-    let token = sessionId ? this.#sessions.get(sessionId)?.token : undefined;
+    const continuous = this.#continuousRequests.get(request);
+    let token = continuous ? continuous.source.token : sessionId ? this.#sessions.get(sessionId)?.token : undefined;
     const runId = `run-${++this.#runCounter}`;
     if (!token) {
       // A run an extension starts on its own: the window can still cancel it.
@@ -736,6 +781,10 @@ export class TestingModel {
         this.#sessions.delete(runId);
       }
     });
+    if (continuous) {
+      continuous.runIds.push(runId);
+      this.postContinuous();
+    }
     while (this.#runs.size > KEPT_RUNS) this.#runs.delete(this.#runs.keys().next().value!);
     return run;
   }
@@ -748,6 +797,134 @@ export class TestingModel {
   findProfile(id: string): TestRunProfileImpl | undefined {
     const [controllerId] = id.split(TEST_ID_SEPARATOR);
     return this.controllers.get(controllerId!)?.profiles.find((profile) => profile.id === id);
+  }
+
+  /** Send the active continuous runs to the window. */
+  postContinuous(): void {
+    this.post({
+      kind: "continuous",
+      runs: [...this.#continuous.values()].map((session) => ({
+        key: session.key,
+        profileId: session.profile.id,
+        controllerId: session.profile.controller.id,
+        label: session.profile.label,
+        kind: session.profile.kind,
+        testIds: session.testIds,
+        running: true,
+        runId: session.runIds.at(-1),
+      })),
+    });
+  }
+
+  /**
+   * Start a continuous run: the profile's run handler is called once with
+   * `continuous: true` and keeps running until the token is cancelled (or the
+   * handler returns, as the API asks continuous handlers not to).
+   */
+  startContinuous(profile: TestRunProfileImpl, testIds: string[] = []): { started: number; key?: string; error?: string } {
+    if (!profile.supportsContinuousRun) return { started: 0, error: `Test profile "${profile.label}" does not support continuous runs.` };
+    const include = testIds.map((id) => this.findItem(id)).filter((item): item is TestItemImpl => !!item && item.controller === profile.controller);
+    if (profile.tag && include.some((item) => !hasTag(item, profile.tag!))) {
+      return { started: 0, error: `Test profile "${profile.label}" does not apply to these tests.` };
+    }
+    const ids = include.map((item) => item.wireId);
+    const key = continuousKey(profile.id, ids);
+    const existing = this.#continuous.get(key);
+    if (existing) return { started: 0, key };
+    const request = new TestRunRequest(include.length ? include : undefined, undefined, profile, true, true);
+    const source = new CancellationTokenSource();
+    const session: ContinuousSession = { key, profile, testIds: ids, request, source, runIds: [] };
+    this.#continuous.set(key, session);
+    this.#continuousRequests.set(request, session);
+    this.postContinuous();
+    void (async () => {
+      try {
+        await profile.runHandler(request, source.token);
+      } catch (error) {
+        const message = `Continuous test run of "${profile.label}" failed: ${error instanceof Error ? error.message : String(error)}`;
+        this.sink.log("error", message);
+        this.post({ kind: "error", message });
+      } finally {
+        this.#continuousRequests.delete(request);
+        // Do not leave runs of a stopped continuous request spinning in the window.
+        for (const runId of session.runIds) this.#runs.get(runId)?.end();
+        if (this.#continuous.get(key) === session) this.#continuous.delete(key);
+        source.dispose();
+        this.postContinuous();
+      }
+    })();
+    return { started: 1, key };
+  }
+
+  /** Start continuous runs from a command argument: a profile id or `{ profileId, controllerId, testIds, kind }`. */
+  startContinuousByArgs(args?: unknown): { started: number; keys: string[]; error?: string } {
+    const options: { profileId?: string; controllerId?: string; testIds?: string[]; kind?: number } =
+      typeof args === "string"
+        ? { profileId: args }
+        : args && typeof args === "object"
+          ? (args as { profileId?: string; controllerId?: string; testIds?: string[]; kind?: number })
+          : {};
+    const testIds = Array.isArray(options.testIds) ? options.testIds.map(String) : [];
+    const profiles: TestRunProfileImpl[] = [];
+    const explicitlyWanted = options.profileId !== undefined && options.profileId !== null;
+    if (explicitlyWanted) {
+      const profile = this.findProfile(String(options.profileId));
+      if (profile) profiles.push(profile);
+    } else {
+      const wanted = options.controllerId ? [this.controllers.get(options.controllerId)].filter((controller): controller is ControllerImpl => !!controller) : [...this.controllers.values()];
+      for (const controller of wanted) {
+        const supporting = controller.profiles.filter((profile) => profile.supportsContinuousRun && (options.kind === undefined || profile.kind === options.kind));
+        const defaults = supporting.filter((profile) => profile.isDefault);
+        profiles.push(...(defaults.length ? defaults : supporting.slice(0, 1)));
+      }
+    }
+    if (!profiles.length) return { started: 0, keys: [], error: "No test profile supports continuous runs." };
+    const keys: string[] = [];
+    let error: string | undefined;
+    let started = 0;
+    for (const profile of profiles) {
+      const result = this.startContinuous(profile, testIds);
+      if (result.key) keys.push(result.key);
+      if (result.error) error = result.error;
+      started += result.started;
+    }
+    return { started, keys, error };
+  }
+
+  /** Stop continuous runs by key, profile or controller; no filter stops all of them. */
+  stopContinuous(filter?: string | { key?: string; profileId?: string; controllerId?: string; testIds?: string[] }): number {
+    const matches = (session: ContinuousSession): boolean => {
+      if (typeof filter === "string") return session.key === filter || session.profile.id === filter;
+      const wanted = filter ?? {};
+      if (wanted.key && session.key !== wanted.key) return false;
+      if (wanted.profileId && session.profile.id !== wanted.profileId) return false;
+      if (wanted.controllerId && session.profile.controller.id !== wanted.controllerId) return false;
+      if (wanted.testIds && wanted.testIds.some((id) => !session.testIds.includes(id))) return false;
+      return true;
+    };
+    let stopped = 0;
+    for (const session of [...this.#continuous.values()]) {
+      if (!matches(session)) continue;
+      stopped++;
+      // The run disappears from the window at once; the handler may still be
+      // cleaning up until its token callback runs.
+      this.#continuous.delete(session.key);
+      this.#continuousRequests.delete(session.request);
+      for (const runId of session.runIds) this.#runs.get(runId)?.end();
+      session.source.cancel();
+    }
+    if (stopped) this.postContinuous();
+    return stopped;
+  }
+
+  /** Stop continuous runs from a command argument: a key/profile id or `{ key, profileId, controllerId, testIds }`. */
+  stopContinuousByArgs(args?: unknown): number {
+    if (typeof args === "string") return this.stopContinuous(args);
+    if (args && typeof args === "object") {
+      const options = args as { key?: string; profileId?: string; controllerId?: string; testIds?: string[] };
+      return this.stopContinuous({ key: options.key, profileId: options.profileId, controllerId: options.controllerId, testIds: options.testIds });
+    }
+    return this.stopContinuous();
   }
 
   /** Start the runs the window asked for; returns once the handlers were started (not finished). */

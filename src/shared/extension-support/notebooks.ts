@@ -18,7 +18,7 @@ export const notebooksSupport: AreaSupport = {
     "workspace.applyEdit": ["supported", "applied in order; notebook edits and cell text edits apply to the notebook (opened when needed)"],
     "window.activeNotebookEditor": "supported",
     "window.visibleNotebookEditors": "supported",
-    "window.showNotebookDocument": ["partial", "opens the notebook editor; not for untitled notebooks; only Beside is honoured as a view column"],
+    "window.showNotebookDocument": ["partial", "opens the notebook editor in the given view column (or Beside) with preserveFocus; not for untitled notebooks"],
     "window.onDidChangeActiveNotebookEditor": "supported",
     "window.onDidChangeVisibleNotebookEditors": "supported",
     "window.onDidChangeNotebookEditorSelection": "supported",
@@ -26,7 +26,7 @@ export const notebooksSupport: AreaSupport = {
   },
   types: ["NotebookCellKind", "NotebookControllerAffinity", "NotebookRange", "NotebookCellData", "NotebookData", "NotebookCellOutputItem", "NotebookCellOutput", "NotebookEdit", "TabInputNotebook", "NotebookEditorRevealType", "NotebookCellStatusBarAlignment", "NotebookCellStatusBarItem", "TabInputNotebookDiff", "TabInputInteractiveWindow", "NotebookVariablesRequestKind"],
   contributions: {
-    notebooks: ["partial", "type and filenamePattern selector choose the serializer and open the notebook editor; priority is ignored"],
+    notebooks: ["supported", "type and filenamePattern selector choose the serializer; priority \"option\" files open as text (Open in Notebook Editor switches)"],
     notebookRenderer: ["partial", "ignored; renderer scripts never run, outputs are rendered natively (text, HTML, Markdown, images, JSON, errors)"],
   },
 };

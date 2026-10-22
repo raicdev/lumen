@@ -174,7 +174,7 @@ export class TerminalManager {
     const given = typeof spec?.nonce === "string" && spec.nonce ? spec.nonce : undefined;
     if (given) env.VSCODE_NONCE = given;
     let nonce = given;
-    // Shell integration (OSC 633 from bash / zsh / PowerShell) feeds Terminal.shellIntegration.
+    // Shell integration (OSC 633 from bash / zsh / fish / PowerShell) feeds Terminal.shellIntegration.
     if (Array.isArray(args) && spec?.shellIntegration !== false && !process.env.LUMEN_NO_SHELL_INTEGRATION) {
       // Per-terminal secret the integration scripts echo in their E / P sequences.
       const secret = given ?? randomUUID();

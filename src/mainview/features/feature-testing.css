@@ -15,6 +15,15 @@
 .tst-summary { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 12px 6px; font-size: 12px; }
 .tst-total { color: var(--text-dim); }
 
+/* Active continuous runs under the summary, and the toggle buttons that start / stop them. */
+.tst-continuous { display: flex; flex-direction: column; gap: 1px; padding: 0 8px 6px 12px; font-size: 12px; }
+.tst-continuous-row { display: flex; align-items: center; gap: 6px; height: 22px; }
+.tst-continuous-row .tst-desc { flex: 1 1 0; }
+.tst-continuous-row .tst-row-btn { display: grid; }
+.tst-continuous-icon { flex: none; color: var(--vscode-testing-iconQueued, var(--info)); }
+.icon-btn.tst-continuous-on { color: var(--vscode-testing-iconQueued, var(--info)); }
+.tst-row-actions:has(.tst-continuous-on) { display: flex; }
+
 .tst-tree { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
 .tst-empty { padding: 12px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
 .tst-empty-small { padding: 2px 12px 6px 28px; }

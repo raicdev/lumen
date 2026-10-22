@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ExtensionHost } from "../../src/main/exthost/host.ts";
 import type { HostToView } from "../../src/shared/extensions.ts";
 import { MatcherRunner, createMatcherRegistry, resolveMatchedFile, resolveProblemMatcher } from "../../src/main/tasks/problem-matchers.ts";
-import { expandVariables, parseTasksJson } from "../../src/main/tasks/tasks-json.ts";
+import { expandVariables, parseTasksJson, taskDefinitionIssues } from "../../src/main/tasks/tasks-json.ts";
 import { shellInvocation } from "../../src/main/tasks/process.ts";
 import { ShellExecution, ShellQuoting, Task, TaskGroup, TaskScope } from "../../src/main/tasks/task-types.ts";
 
@@ -101,6 +101,16 @@ test("tasks.json: platform overrides, global command and dependencies", () => {
   assert.equal(global.tasks[0]!.label, "lint");
   assert.equal(global.tasks[0]!.command, "gulp");
   assert.deepEqual(global.tasks[0]!.args, ["--x"]);
+});
+
+test("taskDefinitions required properties are errors and type mismatches are warnings", () => {
+  const definition = { type: "demo", required: ["script"], properties: { script: { type: "string" }, port: { type: ["number", "null"] }, watch: { type: "boolean" } } };
+  assert.deepEqual(taskDefinitionIssues({ label: "x", type: "demo", port: "80", watch: false }, definition), [
+    { severity: "error", message: "Required property 'script' is missing." },
+    { severity: "warning", message: "Property 'port' should be of type 'number' or 'null' but is of type 'string'." },
+  ]);
+  assert.deepEqual(taskDefinitionIssues({ label: "x", type: "demo", script: "build", port: null, watch: true }, definition), []);
+  assert.deepEqual(taskDefinitionIssues({ label: "x", type: "demo" }, undefined), []);
 });
 
 test("variables are substituted, unknown ones stay", async () => {
@@ -213,6 +223,93 @@ test("executeTask runs API tasks, custom executions and dependsOn chains", async
   const { readFileSync } = await import("node:fs");
   assert.equal(readFileSync(log, "utf8"), "onetwo");
   assert.deepEqual(ended.slice(1), ["one", "two", "both"]);
+});
+
+test("problemMatcher applyTo only reports problems of open / closed documents", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "lumen-tasks-ws-"));
+  mkdirSync(join(workspace, ".vscode"));
+  const script = `console.log("open.ts(1,1): error TS1000: open"); console.log("closed.ts(1,1): error TS1001: closed")`;
+  const matcher = (owner: string, applyTo: string) => ({ owner, applyTo, base: "$tsc" });
+  writeFileSync(
+    join(workspace, ".vscode", "tasks.json"),
+    JSON.stringify({
+      version: "2.0.0",
+      tasks: [
+        { label: "open", type: "process", command: process.execPath, args: ["-e", script], options: { cwd: "${workspaceFolder}" }, problemMatcher: matcher("openOnly", "openDocuments") },
+        { label: "closed", type: "process", command: process.execPath, args: ["-e", script], options: { cwd: "${workspaceFolder}" }, problemMatcher: matcher("closedOnly", "closedDocuments") },
+      ],
+    }),
+  );
+  const { host, posted } = startedHost(workspace);
+  host.handleView({ type: "documentOpen", doc: { path: join(workspace, "open.ts"), languageId: "typescript", version: 1, text: "", eol: "LF", dirty: false } });
+  const endCount = () => posted.filter((m) => m.type === "feature" && (m.payload as { kind: string }).kind === "end").length;
+
+  await host.executeCommand("workbench.action.tasks.runTask", ["open"]);
+  await waitFor(() => endCount() === 1);
+  await host.executeCommand("workbench.action.tasks.runTask", ["closed"]);
+  await waitFor(() => endCount() === 2);
+
+  const reported = (owner: string): string[] => {
+    const files = new Set<string>();
+    for (const message of posted) {
+      if (message.type !== "diagnostics" || message.owner !== owner) continue;
+      for (const [path, list] of message.entries) if (list.length) files.add(path.replace(/\\/g, "/").split("/").pop()!);
+    }
+    return [...files];
+  };
+  assert.deepEqual(reported("task.openOnly"), ["open.ts"]);
+  assert.deepEqual(reported("task.closedOnly"), ["closed.ts"]);
+});
+
+test("tasks.json tasks missing a required taskDefinitions property are reported and not run", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "lumen-tasks-ws-"));
+  mkdirSync(join(workspace, ".vscode"));
+  const marker = join(workspace, "ran.txt");
+  const script = `require("fs").writeFileSync(${JSON.stringify(marker)}, "ran")`;
+  writeFileSync(
+    join(workspace, ".vscode", "tasks.json"),
+    JSON.stringify({
+      version: "2.0.0",
+      tasks: [
+        { label: "bad", type: "demo" },
+        { label: "good", type: "demo", script: "ok" },
+      ],
+    }),
+  );
+  const { host, posted } = startedHost(workspace);
+  host.runtimes.set("demo.tasks", {
+    id: "demo.tasks",
+    description: {
+      id: "demo.tasks",
+      location: workspace,
+      enabled: true,
+      kind: "lumen",
+      development: false,
+      manifest: { contributes: { taskDefinitions: [{ type: "demo", required: ["script"], properties: { script: { type: "string" } } }] } },
+    },
+    api: null,
+    activated: true,
+    activating: null,
+    exports: undefined,
+    module: null,
+    context: null,
+    activationEvents: [],
+  } as never);
+  const vscode = host.apiFor(null) as Record<string, any>;
+  vscode.tasks.registerTaskProvider("demo", {
+    provideTasks: () => [],
+    resolveTask: (task: { definition: unknown; scope: unknown; name: string }) =>
+      new vscode.Task(task.definition, task.scope, task.name, "demo", new vscode.ProcessExecution(process.execPath, ["-e", script])),
+  });
+
+  await host.executeCommand("workbench.action.tasks.runTask", ["bad"]);
+  await waitFor(() => posted.some((m) => m.type === "feature" && (m.payload as { kind: string }).kind === "end"));
+  const output = posted.filter((m) => m.type === "feature").map((m) => m.payload as { kind: string; text?: string }).filter((m) => m.kind === "output").map((m) => m.text ?? "").join("");
+  assert.ok(output.includes("Required property 'script' is missing."));
+  assert.equal(existsSync(marker), false);
+
+  await host.executeCommand("workbench.action.tasks.runTask", ["good"]);
+  await waitFor(() => existsSync(marker));
 });
 
 test("terminate stops a running task", async () => {

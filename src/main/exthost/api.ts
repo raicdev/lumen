@@ -6,10 +6,12 @@ import { cssVariable } from "../../shared/color-theme.ts";
 import type { HostDecoration, HostDecorationType, HostQuickInputButton, HostQuickPick, HostQuickPickItem, HostStatusBarItem, ProviderKind } from "../../shared/extensions.ts";
 import { wireLanguageConfiguration } from "../../shared/extensions.ts";
 import { matchGlob, matchesSelector } from "../../shared/glob.ts";
+import { isCaseInsensitiveFileSystem } from "../../shared/file-systems.ts";
 import { keyOfUri, normalizeKey } from "./documents.ts";
 import type { ExtHostDocument } from "./documents.ts";
 import type { ExtensionHost, ExtensionRuntime } from "./host.ts";
 import { logTimestamp, toWire, wireEdit, wireRange } from "./wire.ts";
+import { decorationRenderOptions, decorationTypeOptions, type DecorationConverters } from "./decoration-options.ts";
 import * as T from "./types.ts";
 import { compatTypes } from "./compat-types.ts";
 import { Tab, TabGroup } from "./tabs.ts";
@@ -90,6 +92,34 @@ function buttonImageUrl(path: string): string | null {
   buttonImages.set(path, url);
   return url;
 }
+
+/** Decoration options: theme colors and local image files (gutter icons, content icon paths) for the view. */
+const decorationConverters: DecorationConverters = {
+  color: colorOf,
+  image: (value) => {
+    const url = (icon: any): string | undefined => {
+      if (!icon) return undefined;
+      const path =
+        typeof icon === "string"
+          ? icon.startsWith("file:")
+            ? T.Uri.parse(icon)?.fsPath
+            : icon
+          : T.Uri.isUri(icon)
+            ? icon.fsPath
+            : (icon?.fsPath ?? icon?.path);
+      return typeof path === "string" && path ? (buttonImageUrl(path) ?? undefined) : undefined;
+    };
+    if (!value) return undefined;
+    const themed = typeof value === "object" ? (value as { light?: unknown; dark?: unknown }) : undefined;
+    if (themed && !T.Uri.isUri(value) && (themed.light || themed.dark)) {
+      const light = url(themed.light);
+      const dark = url(themed.dark);
+      return light || dark ? { light: light ?? dark, dark: dark ?? light } : undefined;
+    }
+    const single = url(value);
+    return single ? { light: single, dark: single } : undefined;
+  },
+};
 
 /** A QuickInputButton as the view's `{ icon, image, tooltip, index }` (iconPath like a tree item's). */
 function quickInputButton(button: unknown, index: number): HostQuickInputButton | null {
@@ -203,7 +233,8 @@ export function createEditorFacade(host: ExtensionHost, state: EditorState): Rec
       if (next.insertSpaces !== undefined) void host.requestView("updateConfiguration", "editor.insertSpaces", insertSpaces);
     },
     get viewColumn() {
-      return T.ViewColumn.One;
+      // The column of the editor group showing this document (undefined when it is not in a group).
+      return host.tabGroups.viewColumnOf(state.key);
     },
     edit: async (callback: (builder: ReturnType<typeof editBuilder>) => void, options: { undoStopBefore?: boolean; undoStopAfter?: boolean } = {}) => {
       const collector: EditCollector = { edits: [] };
@@ -222,8 +253,7 @@ export function createEditorFacade(host: ExtensionHost, state: EditorState): Rec
         return {
           ...wireRange(item.range),
           hover: hover || undefined,
-          before: item.renderOptions?.before?.contentText,
-          after: item.renderOptions?.after?.contentText,
+          renderOptions: decorationRenderOptions(item.renderOptions, decorationConverters),
         };
       });
       host.post({ type: "decorations", path: state.key, typeId: type.key, ranges });
@@ -799,38 +829,7 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
   let decorationSeq = 0;
   function createTextEditorDecorationType(options: any) {
     const key = `${extensionId}-decoration-${++decorationSeq}`;
-    const merged = { ...options, ...(options?.dark ?? {}) };
-    const part = (value: any) =>
-      value
-        ? {
-            contentText: value.contentText,
-            color: colorOf(value.color),
-            backgroundColor: colorOf(value.backgroundColor),
-            margin: value.margin,
-            fontStyle: value.fontStyle,
-            fontWeight: value.fontWeight,
-          }
-        : undefined;
-    const border =
-      merged.border ??
-      (merged.borderWidth || merged.borderStyle || merged.borderColor
-        ? `${merged.borderWidth ?? "1px"} ${merged.borderStyle ?? "solid"} ${colorOf(merged.borderColor) ?? "currentColor"}`
-        : undefined);
-    const style: HostDecorationType = {
-      backgroundColor: colorOf(merged.backgroundColor),
-      color: colorOf(merged.color),
-      border,
-      borderRadius: merged.borderRadius,
-      outline: merged.outline ?? (merged.outlineColor ? `${merged.outlineWidth ?? "1px"} ${merged.outlineStyle ?? "solid"} ${colorOf(merged.outlineColor)}` : undefined),
-      fontWeight: merged.fontWeight,
-      fontStyle: merged.fontStyle,
-      textDecoration: merged.textDecoration,
-      opacity: merged.opacity,
-      cursor: merged.cursor,
-      before: part(merged.before),
-      after: part(merged.after),
-      isWholeLine: !!merged.isWholeLine,
-    };
+    const style: HostDecorationType = decorationTypeOptions(options, decorationConverters);
     host.post({ type: "decorationType", id: key, options: style });
     return {
       key,
@@ -929,9 +928,19 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
 
   const folder = () => (host.workspace ? { uri: T.Uri.file(host.workspace), name: host.workspace.split(/[/\\]/).filter(Boolean).pop() ?? host.workspace, index: 0 } : undefined);
 
+  /** Every setting as one tree (what `getConfiguration()` without a section shows as properties, like VS Code). */
+  function configurationRoot(): Record<string, unknown> {
+    const roots = new Set<string>();
+    for (const source of [host.configDefaults, host.configDefaultOverrides, host.config.lumen, host.config.user]) {
+      // Language sections ("[python]") are top-level keys of their own.
+      for (const key of Object.keys(source)) roots.add(key.startsWith("[") ? key : key.split(".")[0]!);
+    }
+    return Object.fromEntries([...roots].map((root) => [root, host.configValue(root)]));
+  }
+
   function getConfiguration(section?: string, _scope?: unknown) {
     const full = (key: string) => (section ? `${section}.${key}` : key);
-    const value = (section ? host.configValue(section) : undefined) as Record<string, unknown> | undefined;
+    const value = (section ? host.configValue(section) : configurationRoot()) as Record<string, unknown> | undefined;
     const config: Record<string, unknown> = {
       ...(value && typeof value === "object" ? structuredClone(value) : {}),
       get: (key: string, defaultValue?: unknown) => {
@@ -1032,13 +1041,35 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
 
   function createFileSystemWatcher(pattern: string | T.RelativePattern, ignoreCreate = false, ignoreChange = false, ignoreDelete = false) {
     const glob = pattern instanceof T.RelativePattern || (typeof pattern === "object" && pattern) ? (pattern as T.RelativePattern) : null;
+    const baseUri = glob?.baseUri;
     const watcher = {
       matches: (path: string) => {
         const base = glob ? glob.baseUri.fsPath : host.workspace;
         if (!base) return false;
         const rel = relative(base, path).replace(/\\/g, "/");
         if (rel.startsWith("..")) return false;
-        return matchGlob(glob ? glob.pattern : (pattern as string), glob ? rel : rel) || matchGlob(glob ? glob.pattern : (pattern as string), path);
+        return matchGlob(glob ? glob.pattern : (pattern as string), rel) || matchGlob(glob ? glob.pattern : (pattern as string), path);
+      },
+      /** A provider scheme: a RelativePattern based on its Uri, or a plain pattern (any provided file). */
+      matchesUri: (uri: T.Uri) => {
+        const expression = glob ? glob.pattern : (pattern as string);
+        if (baseUri && baseUri.scheme !== "file") {
+          if (uri.scheme !== baseUri.scheme || uri.authority !== baseUri.authority) return false;
+          // A case-insensitive provider's root may be spelled differently from the changed path.
+          const insensitive = isCaseInsensitiveFileSystem(baseUri.scheme);
+          const compare = (value: string) => (insensitive ? value.toLowerCase() : value);
+          const base = baseUri.path.replace(/\/+$/, "");
+          const path = uri.path.replace(/\/+$/, "");
+          const baseKey = compare(base);
+          const pathKey = compare(path);
+          if (baseKey && pathKey !== baseKey && !pathKey.startsWith(`${baseKey}/`)) return false;
+          const rel = baseKey && pathKey.startsWith(`${baseKey}/`) ? path.slice(base.length + 1) : path.replace(/^\/+/, "");
+          return matchGlob(expression, rel) || matchGlob(expression, keyOfUri(uri));
+        }
+        // A file RelativePattern (or the local workspace) never sees another scheme.
+        if (baseUri || uri.scheme === "file") return false;
+        const path = uri.path.replace(/^\/+/, "");
+        return matchGlob(expression, path) || matchGlob(expression, keyOfUri(uri));
       },
       create: ignoreCreate ? null : new T.EventEmitter<T.Uri>(),
       change: ignoreChange ? null : new T.EventEmitter<T.Uri>(),
@@ -1128,7 +1159,7 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     onWillRenameFiles: host.onWillRenameFiles.event,
     registerTextDocumentContentProvider: (scheme: string, provider: Parameters<ExtensionHost["contentProviders"]["register"]>[2]) =>
       host.contentProviders.register(runtime, scheme, provider),
-    registerFileSystemProvider: (scheme: string, provider: FileSystemProvider, options?: { isCaseSensitive?: boolean; isReadonly?: boolean }) =>
+    registerFileSystemProvider: (scheme: string, provider: FileSystemProvider, options?: { isCaseSensitive?: boolean; isReadonly?: boolean | { value: string } }) =>
       host.fileSystems.register(runtime, scheme, provider, options),
     notebookDocuments: [],
   });

@@ -2,9 +2,11 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./lib/rpc"; // initialize the Lumen Shell bridge
 import { reloadConfiguredColorTheme } from "./lib/theme";
+import { startUpdates } from "./lib/updates";
 
 // Lumen Dark is in place already; a configured theme from an extension follows once it is read.
 void reloadConfiguredColorTheme();
+startUpdates();
 
 // The browser's own menu (Back, Refresh, Save as, Print...) never shows; text fields keep it for cut/copy/paste.
 window.addEventListener("contextmenu", (event) => {

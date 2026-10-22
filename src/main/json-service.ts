@@ -96,7 +96,7 @@ export function setJsonSchemas(next: JsonSchemaAssociation[]): void {
 }
 
 function parse(path: string, content: string): { document: JsonTextDocument; json: JSONDocument } {
-  const uri = /^[a-zA-Z][\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? path : pathToFileURL(path).toString();
+  const uri = /^\w[\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? path : pathToFileURL(path).toString();
   const document = TextDocument.create(uri, isJsonc(path) ? "jsonc" : "json", 1, content);
   return { document, json: service.parseJSONDocument(document) };
 }

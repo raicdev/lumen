@@ -17,10 +17,12 @@ export type ProcessInfo = {
   memory: number;
   /** CPU use since the previous call, as a share of all cores (0–100); null on the first sample. */
   cpu: number | null;
+  /** When the process started (ms since the epoch; 0 when unknown). */
+  startTime: number;
 };
 
 type RawProcess = { pid: number; parentPid: number; name: string };
-type Sample = { pid: number; parentPid: number; name: string; commandLine: string; memory: number; cpuTime: number };
+type Sample = { pid: number; parentPid: number; name: string; commandLine: string; memory: number; cpuTime: number; startTime: number };
 
 /** CPU time (ms) per process at the previous call, keyed by pid and name so a reused pid starts over. */
 let previous: { at: number; times: Map<string, number> } | null = null;
@@ -46,6 +48,7 @@ export async function processTree(rootPid: number = process.pid): Promise<Proces
       commandLine: sample.commandLine,
       memory: sample.memory,
       cpu,
+      startTime: sample.startTime,
     };
   });
   previous = { at: now, times };
@@ -79,6 +82,8 @@ const ENTRY_SIZE = 568;
 /** PROCESS_MEMORY_COUNTERS_EX2 (Windows 10 1809+), which adds PrivateWorkingSetSize. */
 const COUNTERS_EX2_SIZE = 96;
 const COUNTERS_EX_SIZE = 80;
+/** FILETIME counts 100 ns from 1601-01-01; this is 1970-01-01 in its milliseconds. */
+const FILETIME_UNIX_EPOCH_MS = 11_644_473_600_000;
 
 function loadWin32() {
   const kernel32 = koffi.load("kernel32.dll");
@@ -139,7 +144,7 @@ function sampleWin32(rootPid: number): Sample[] {
   const counters = Buffer.alloc(COUNTERS_EX2_SIZE);
   const times = Buffer.alloc(32);
   return descendants(listWin32(api), rootPid).map((entry) => {
-    const sample: Sample = { ...entry, commandLine: "", memory: 0, cpuTime: 0 };
+    const sample: Sample = { ...entry, commandLine: "", memory: 0, cpuTime: 0, startTime: 0 };
     const handle = api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.pid);
     if (!handle) return sample;
     try {
@@ -154,6 +159,7 @@ function sampleWin32(rootPid: number): Sample[] {
       // FILETIMEs: creation, exit, kernel, user (100 ns units).
       if (api.GetProcessTimes(handle, times.subarray(0, 8), times.subarray(8, 16), times.subarray(16, 24), times.subarray(24, 32))) {
         sample.cpuTime = Number(times.readBigUInt64LE(16) + times.readBigUInt64LE(24)) / 10_000;
+        sample.startTime = Number(times.readBigUInt64LE(0)) / 10_000 - FILETIME_UNIX_EPOCH_MS;
       }
       sample.commandLine = commandLineWin32(api, handle);
     } finally {
@@ -175,13 +181,14 @@ function parseCpuTime(value: string): number {
 }
 
 async function samplePosix(rootPid: number): Promise<Sample[]> {
-  const { code, stdout } = await capture("ps", ["-A", "-o", "pid=,ppid=,rss=,time=,args="]);
+  const { code, stdout } = await capture("ps", ["-A", "-o", "pid=,ppid=,rss=,time=,etime=,args="]);
   if (code !== 0) return [];
+  const now = Date.now();
   const all: Sample[] = [];
   for (const line of stdout.split("\n")) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/.exec(line);
     if (!match) continue;
-    const commandLine = match[5]!;
+    const commandLine = match[6]!;
     const executable = commandLine.split(" ")[0] ?? "";
     all.push({
       pid: Number(match[1]),
@@ -190,6 +197,8 @@ async function samplePosix(rootPid: number): Promise<Sample[]> {
       commandLine,
       memory: Number(match[3]) * 1024,
       cpuTime: parseCpuTime(match[4]!),
+      // etime (elapsed) has the same [[dd-]hh:]mm:ss form as the CPU time.
+      startTime: now - parseCpuTime(match[5]!),
     });
   }
   return descendants(all, rootPid);

@@ -42,6 +42,11 @@ const KIND_COMMANDS: Record<string, number> = {
   "testing.coverageAll": TestRunProfileKind.Coverage,
 };
 
+/** Window messages of continuous runs (the rest is in shared/testing.ts). */
+type ContinuousViewMessage =
+  | { kind: "startContinuous"; profileId: string; ids?: string[] }
+  | { kind: "stopContinuous"; key?: string; profileId?: string; controllerId?: string };
+
 export const testingFeature: HostFeature = {
   area: "testing",
 
@@ -64,7 +69,7 @@ export const testingFeature: HostFeature = {
     DeclarationCoverage,
   },
 
-  commands: ["testing.runAll", "testing.debugAll", "testing.coverageAll", "testing.cancelRun", "testing.refreshTests"],
+  commands: ["testing.runAll", "testing.debugAll", "testing.coverageAll", "testing.cancelRun", "testing.refreshTests", "testing.startContinuousRun", "testing.stopContinuousRun"],
 
   /**
    * testing/* menus: `{ item }` is the `TestItem`, `{ item, run, message }` VS Code's
@@ -81,7 +86,7 @@ export const testingFeature: HostFeature = {
 
   onViewMessage(host, payload) {
     const model = testingModel(host);
-    const message = payload as TestingViewMessage;
+    const message = payload as TestingViewMessage | ContinuousViewMessage;
     switch (message.kind) {
       case "resolve": {
         const item = model.findItem(message.id);
@@ -97,14 +102,31 @@ export const testingFeature: HostFeature = {
       case "setDefaults":
         model.setDefaults(message.profileIds);
         break;
+      case "startContinuous": {
+        const profile = model.findProfile(message.profileId);
+        if (!profile) {
+          host.log("warning", `Unknown test profile: ${message.profileId}`);
+          break;
+        }
+        const result = model.startContinuous(profile, message.ids ?? []);
+        if (result.error) host.log("warning", result.error);
+        break;
+      }
+      case "stopContinuous":
+        model.stopContinuous({ key: message.key, profileId: message.profileId, controllerId: message.controllerId });
+        break;
     }
   },
 
   onViewRequest(host, method, args) {
     const model = testingModel(host);
     switch (method) {
-      case "snapshot":
-        return model.snapshot();
+      case "snapshot": {
+        const snapshot = model.snapshot();
+        // The window may have restarted: tell it about the continuous runs that are still active.
+        model.postContinuous();
+        return snapshot;
+      }
       case "run":
         return model.startRun(args[0] as TestRunArgs);
       case "detailedCoverage":
@@ -114,11 +136,20 @@ export const testingFeature: HostFeature = {
     }
   },
 
-  async executeCommand(host, command) {
+  async executeCommand(host, command, args) {
     const model = testingModel(host);
     if (command in KIND_COMMANDS) {
       const result = model.startRun({ kind: KIND_COMMANDS[command]!, include: [] });
       if (result.error) host.log("warning", result.error);
+      return undefined;
+    }
+    if (command === "testing.startContinuousRun") {
+      const result = model.startContinuousByArgs(args[0]);
+      if (result.error) host.log("warning", result.error);
+      return result.keys;
+    }
+    if (command === "testing.stopContinuousRun") {
+      model.stopContinuousByArgs(args[0]);
       return undefined;
     }
     if (command === "testing.cancelRun") {

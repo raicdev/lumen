@@ -1,4 +1,6 @@
+import { readFileSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { extname, isAbsolute, resolve } from "node:path";
 import type { ExtensionHost } from "../host.ts";
 import type { HostFeature } from "./contract.ts";
 import { Disposable, Uri } from "../types.ts";
@@ -12,10 +14,64 @@ import type { ScmCommandData, ScmControlData, ScmGroupData, ScmResourceData, Scm
  * Control view next to the built-in git UI, and window.withScmProgress.
  */
 
-type ResourceDecorations = { strikeThrough?: boolean; faded?: boolean; tooltip?: string };
+type ResourceDecorations = { strikeThrough?: boolean; faded?: boolean; tooltip?: string; iconPath?: unknown; color?: unknown };
 type ResourceState = { resourceUri: Uri; command?: Command; decorations?: ResourceDecorations; contextValue?: string };
 type Validation = { message: string; type: number } | undefined | null;
 type QuickDiffProvider = { provideOriginalResource?(uri: Uri, token: unknown): Uri | undefined | null | Promise<Uri | undefined | null> };
+
+/** The icon of a resource (`decorations.iconPath`, as a data or http URL per theme kind). Part of the resource data. */
+export type ScmResourceIcon = { light?: string; dark?: string; codicon?: string };
+
+const ICON_TYPES: Record<string, string> = { ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+const iconCache = new Map<string, string | undefined>();
+
+/** An icon file as a data URL (cached; small images only, like tree item icons). */
+function imageUrl(path: string): string | undefined {
+  if (iconCache.has(path)) return iconCache.get(path);
+  let url: string | undefined;
+  const type = ICON_TYPES[extname(path).toLowerCase()];
+  try {
+    if (type && statSync(path).size <= 512 * 1024) url = `data:${type};base64,${readFileSync(path).toString("base64")}`;
+  } catch {
+    /* missing icon */
+  }
+  iconCache.set(path, url);
+  return url;
+}
+
+/** One `iconPath` value: a path (absolute, relative to the extension), a file/data/http URI, or a theme icon. */
+function iconUrl(value: unknown, base: string | undefined): string | undefined {
+  if (typeof value === "string") {
+    if (/^(data|https?):/i.test(value)) return value;
+    if (/^\w[\w+.-]+:/.test(value) && !/^[a-zA-Z]:[\\/]/.test(value)) {
+      const uri = Uri.parse(value);
+      if (uri.scheme === "file") return imageUrl(uri.fsPath);
+      return /^(data|https?)$/.test(uri.scheme) ? value : undefined;
+    }
+    return imageUrl(base && !isAbsolute(value) ? resolve(base, value) : value);
+  }
+  if (Uri.isUri(value)) {
+    if (value.scheme === "file") return imageUrl(value.fsPath);
+    return /^(data|https?)$/.test(value.scheme) ? value.toString(true) : undefined;
+  }
+  return undefined;
+}
+
+/** `SourceControlResourceDecorations.iconPath` in wire form: light/dark variants are both sent, the view picks one. */
+function iconOf(value: unknown, base: string | undefined): ScmResourceIcon | undefined {
+  if (!value) return undefined;
+  if (typeof (value as { id?: unknown }).id === "string") return { codicon: (value as { id: string }).id };
+  if (typeof value === "string" || Uri.isUri(value)) {
+    const url = iconUrl(value, base);
+    return url ? { light: url, dark: url } : undefined;
+  }
+  if (typeof value === "object") {
+    const light = iconUrl((value as { light?: unknown }).light, base);
+    const dark = iconUrl((value as { dark?: unknown }).dark, base);
+    if (light || dark) return { light, dark };
+  }
+  return undefined;
+}
 
 /** `SourceControlInputBox`: changes made by the extension are pushed to the view; typing in the view only updates `value`. */
 class InputBox {
@@ -119,6 +175,8 @@ class SourceControl {
   readonly extensionId: string;
   readonly id: string;
   readonly rootUri: Uri | undefined;
+  /** Folder of the extension (relative `iconPath` strings resolve against it). */
+  readonly location: string | undefined;
   readonly inputBox: InputBox;
   readonly groups: ResourceGroup[] = [];
   disposed = false;
@@ -130,13 +188,14 @@ class SourceControl {
   #statusBarCommands: Command[] | undefined;
   readonly #state: ScmState;
 
-  constructor(state: ScmState, extensionId: string, id: string, label: string, rootUri: Uri | undefined) {
+  constructor(state: ScmState, extensionId: string, id: string, label: string, rootUri: Uri | undefined, location?: string) {
     this.#state = state;
     this.handle = state.nextHandle++;
     this.extensionId = extensionId;
     this.id = id;
     this.#label = label;
     this.rootUri = rootUri ? Uri.revive(rootUri as never) : undefined;
+    this.location = location;
     this.inputBox = new InputBox(() => state.schedule());
   }
   get label(): string {
@@ -269,7 +328,7 @@ function relativeDir(root: Uri | undefined, key: string): string {
   return dir;
 }
 
-function resourceData(control: SourceControl, state: ResourceState, index: number): ScmResourceData | null {
+function resourceData(control: SourceControl, state: ResourceState, index: number): (ScmResourceData & { icon?: ScmResourceIcon }) | null {
   const uri = Uri.revive(state?.resourceUri as never);
   if (!uri) return null;
   const path = keyOfUri(uri);
@@ -285,6 +344,7 @@ function resourceData(control: SourceControl, state: ResourceState, index: numbe
     letter: tooltip ? tooltip.trim().charAt(0).toUpperCase() || undefined : undefined,
     hasCommand: !!state.command?.command,
     index,
+    icon: iconOf(state.decorations?.iconPath, control.location),
   };
 }
 
@@ -382,7 +442,7 @@ function sameOrInside(root: Uri | undefined, path: string): boolean {
 
 /** The base text of a file from the first source control whose quick diff provider knows it. */
 export async function scmQuickDiff(host: ExtensionHost, path: string): Promise<string | null> {
-  const uri = /^[a-zA-Z][\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? Uri.parse(path) : Uri.file(path);
+  const uri = /^\w[\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? Uri.parse(path) : Uri.file(path);
   const token = { isCancellationRequested: false, onCancellationRequested: () => new Disposable(() => {}) };
   for (const control of stateOf(host).controls.values()) {
     const provider = control.quickDiffProvider;
@@ -400,7 +460,7 @@ export async function scmQuickDiff(host: ExtensionHost, path: string): Promise<s
 
 export const scmFeature: HostFeature = {
   area: "scm",
-  api: ({ host, extensionId }) => {
+  api: ({ host, extensionId, runtime }) => {
     const state = stateOf(host);
     const own: SourceControl[] = [];
     // `scm.inputBox` (deprecated) before the extension created a source control.
@@ -408,7 +468,7 @@ export const scmFeature: HostFeature = {
     return {
       scm: {
         createSourceControl: (id: string, label: string, rootUri?: Uri) => {
-          const control = new SourceControl(state, extensionId, String(id), String(label), rootUri);
+          const control = new SourceControl(state, extensionId, String(id), String(label), rootUri, runtime?.description.location);
           state.controls.set(control.handle, control);
           own.push(control);
           state.schedule();

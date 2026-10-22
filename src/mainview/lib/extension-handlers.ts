@@ -14,6 +14,8 @@ import { dispatchHostRequest } from "../features/registry";
 
 export type ExtensionBridge = {
   openFile: (path: string, options: { line?: number; character?: number; end?: { line: number; character: number }; preview?: boolean; focus?: boolean; beside?: boolean }) => Promise<boolean>;
+  /** Open a side-by-side diff of two documents (`vscode.diff`). */
+  openDiff: (original: string, modified: string, options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange }) => Promise<boolean>;
   /** The editor showing a document (opening it in the active group when needed). */
   editorFor: (path: string, open: boolean) => Promise<EditorController | null>;
   saveDoc: (path: string) => Promise<boolean>;
@@ -79,6 +81,7 @@ export function createExtensionHandlers(bridge: ExtensionBridge): { [K in keyof 
         beside: options.beside,
       });
     },
+    openDiff: (original, modified, options) => bridge.openDiff(path(original), path(modified), options),
     async openUntitled(target, language, content) {
       await bridge.openUntitled(target, language, content);
       return true;

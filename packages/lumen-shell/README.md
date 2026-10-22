@@ -34,14 +34,15 @@ without a giant framework.
 | No startup flash | the window is DWM-cloaked until the page reports its first painted frame; `backgroundColor` also feeds WebView2's default background and the window class brush |
 | Bundling | esbuild for the view and the main process; in dev the main process runs from source (Node type stripping) |
 | Packaging | `lumen-shell package` bundles both sides, builds a Node [single executable](https://nodejs.org/api/single-executable-applications.html) launcher and copies the native libraries/addons next to it; on Windows the executable gets the `package.icon`, version info and the GUI subsystem (no console window) |
-| Installer | `lumen-shell installer` wraps the packaged app in a per-user NSIS setup (Start menu shortcut, uninstaller, installed apps entry) |
+| Installer | `lumen-shell installer` wraps the packaged app in a per-user NSIS setup (Start menu shortcut, uninstaller, installed apps entry); it waits for the running app to exit, and `/S /RELAUNCH` installs silently and starts the app again |
+| Updates | `autoUpdater` checks the latest GitHub release (tag `v<semver>`), downloads its `<App>-<version>-win32-<arch>-setup.exe`, verifies the SHA-256 digest GitHub publishes for the asset and runs it silently over the installation when the app exits |
 
 ## API
 
 Main process:
 
 ```ts
-import { app, BrowserWindow, Menu, dialog, shell, defineMainRPC } from "@lumen/shell/main";
+import { app, autoUpdater, BrowserWindow, Menu, dialog, shell, defineMainRPC } from "@lumen/shell/main";
 import type { AppRPC } from "./shared/types";
 
 const rpc = defineMainRPC<AppRPC>({
@@ -72,6 +73,13 @@ app.on("ready", () => {
   void dialog.showOpenDialog({ properties: ["openDirectory"] });
   shell.showItemInFolder("/tmp/file.ts");
 });
+
+autoUpdater.configure({ repository: "owner/repo", name: "Lumen", version: "0.1.0", identifier: "dev.lumen.editor" });
+const update = await autoUpdater.check();           // a newer release, or null
+if (update && autoUpdater.canInstall) {             // installed by the setup (not portable / dev)
+  const file = await autoUpdater.download(update, (received, total) => {});
+  if (await win.requestClose()) autoUpdater.install(file, { relaunch: true });
+}
 
 await app.run();
 ```

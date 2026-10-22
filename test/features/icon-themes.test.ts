@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ExtensionHost } from "../../src/main/exthost/host.ts";
-import { fontCharacterOf, iconIdFor, normalizeFileIconTheme, normalizeProductIconTheme } from "../../src/shared/icon-themes.ts";
+import { contributedIcons, fontCharacterOf, iconIdFor, normalizeFileIconTheme, normalizeProductIconTheme, resolveContributedIcon } from "../../src/shared/icon-themes.ts";
 
 /**
  * File / product icon themes: normalization and lookup (shared) and the host
@@ -107,4 +107,46 @@ test("the host loads theme files and serves their assets as data: URIs, only ins
   assert.equal(assets[join(extension, "nope.svg")], null);
   await assert.rejects(host.methods.feature("icon-themes", "load", ["file", "pub.ext", join(dir, "secret.svg")]), /outside/);
   assert.deepEqual(await host.methods.feature("icon-themes", "assets", ["unknown", [definitions.a!.path]]), {});
+});
+
+test("contributes.icons: font glyphs, aliases and the host serving the font", async () => {
+  const extensions = [
+    {
+      id: "pub.a",
+      location: "/ext/a",
+      manifest: {
+        contributes: {
+          icons: {
+            "a-logo": { description: "Logo", default: { fontPath: "./font/icons.woff", fontCharacter: "\\E001" } },
+            "a-alias": { description: "Alias", default: "a-logo" },
+            "a-check": { description: "Built-in", default: "check" },
+            "a-loop": { description: "Loop", default: "a-loop" },
+            "bad id!": { default: "check" },
+          },
+        },
+      },
+    },
+    { id: "pub.b", location: "/ext/b", manifest: { contributes: { icons: { "a-logo": { default: "x" } } } } },
+  ];
+  const icons = contributedIcons(extensions);
+  assert.deepEqual(icons.get("a-logo"), { extensionId: "pub.a", fontPath: "/ext/a/font/icons.woff", fontCharacter: "\\E001" });
+  assert.equal(icons.has("bad id!"), false);
+  assert.deepEqual(resolveContributedIcon("a-alias", icons), icons.get("a-logo"));
+  assert.deepEqual(resolveContributedIcon("a-check", icons), { codicon: "check" });
+  assert.equal(resolveContributedIcon("a-loop", icons), undefined);
+  assert.equal(resolveContributedIcon("check", icons), undefined);
+
+  const dir = mkdtempSync(join(tmpdir(), "lumen-icons-"));
+  const extension = join(dir, "ext");
+  mkdirSync(join(extension, "font"), { recursive: true });
+  writeFileSync(join(extension, "font", "icons.woff"), "font");
+  writeFileSync(join(dir, "secret.woff"), "font");
+  const host = new ExtensionHost();
+  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: dir, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.post = () => undefined;
+  host.runtimes.set("pub.ext", { description: { location: extension } } as never);
+  assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(extension, "font", "icons.woff")]), `data:font/woff;base64,${Buffer.from("font").toString("base64")}`);
+  assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(dir, "secret.woff")]), null);
+  assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(extension, "font", "icons.svg")]), null);
+  assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.other", join(extension, "font", "icons.woff")]), null);
 });

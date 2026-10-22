@@ -1,6 +1,7 @@
 import * as workerThreadsModule from "worker_threads";
 import { parentPort } from "worker_threads";
 import Module from "module";
+import { ChildProcess } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { readdir, stat } from "fs/promises";
@@ -52,7 +53,7 @@ import { NOT_HANDLED, featureByArea, featureCommandIds, hostFeatures } from "./f
 import { CustomEditorManager } from "./custom-editors.ts";
 import { DebugSessionManager } from "./debug.ts";
 import { ExtHostDocument, keyOfUri, normalizeKey, uriOfKey } from "./documents.ts";
-import { FileSystems } from "./filesystems.ts";
+import { FileSystems, messageOf } from "./filesystems.ts";
 import { ContentProviders } from "./content-providers.ts";
 import { FileDecorations } from "./file-decorations.ts";
 import { TabGroups } from "./tabs.ts";
@@ -106,6 +107,8 @@ type EditorState = {
 
 type FileWatcher = {
   matches: (path: string) => boolean;
+  /** A change of a provided file system (workspace.createFileSystemWatcher of a provider scheme). */
+  matchesUri: (uri: T.Uri) => boolean;
   create: T.EventEmitter<T.Uri> | null;
   change: T.EventEmitter<T.Uri> | null;
   delete: T.EventEmitter<T.Uri> | null;
@@ -353,6 +356,11 @@ export class ExtensionHost {
     // Implicit events (VS Code ≥ 1.74): contributed commands and languages.
     for (const command of [manifest.contributes?.commands ?? []].flat()) events.add(`onCommand:${command.command}`);
     for (const language of manifest.contributes?.languages ?? []) events.add(`onLanguage:${language.id}`);
+    // Walkthrough activation is `onWalkthrough:<walkthrough id>` in VS Code (the contribution point generates it).
+    for (const walkthrough of [manifest.contributes?.walkthroughs ?? []].flat()) {
+      const id = (walkthrough as { id?: unknown } | null)?.id;
+      if (typeof id === "string" && id) events.add(`onWalkthrough:${id}`);
+    }
     for (const views of Object.values((manifest.contributes?.views ?? {}) as Record<string, { id?: string }[]>)) {
       for (const view of views ?? []) if (view?.id) events.add(`onView:${view.id}`);
     }
@@ -1460,16 +1468,63 @@ export class ExtensionHost {
         const content = await this.contentProviders.provide(uri);
         if (content !== undefined) return { content, language, readOnly: true };
       }
-      const content = new TextDecoder().decode(await this.fileSystems.readFile(uri));
-      return { content, language, readOnly: !this.fileSystems.isWritable(uri.scheme) };
+      let content: string;
+      try {
+        content = new TextDecoder().decode(await this.fileSystems.readFile(uri));
+      } catch (error) {
+        // FileSystemError codes are readable in the window's "Cannot open" message.
+        throw new Error(messageOf(error));
+      }
+      let readOnly = !this.fileSystems.isWritable(uri.scheme);
+      let readOnlyMessage = readOnly ? this.fileSystems.readOnlyMessage(uri.scheme) : undefined;
+      // FilePermission.Readonly makes a single file read-only (workspace.fs.stat / FileStat).
+      if (!readOnly) {
+        try {
+          const stat = await this.fileSystems.stat(uri);
+          if (stat.permissions && stat.permissions & 1) {
+            readOnly = true;
+            readOnlyMessage = "This file is read-only.";
+          }
+        } catch {
+          /* a provider may not answer stat for every file */
+        }
+      }
+      return { content, language, readOnly, ...(readOnlyMessage ? { readOnlyMessage } : {}) };
     },
 
     writeVirtualFile: async (path, content) => {
-      await this.fileSystems.writeFile(uriOfKey(path), new TextEncoder().encode(content));
-      return true;
+      try {
+        await this.fileSystems.writeFile(uriOfKey(path), new TextEncoder().encode(content));
+        return true;
+      } catch (error) {
+        // FileSystemError codes are readable in the window's save error.
+        throw new Error(messageOf(error));
+      }
     },
 
     virtualSchemes: async () => [...this.fileSystems.providers.keys()],
+
+    providerReadDirectory: async (path) => await this.fileSystems.list(uriOfKey(path)),
+
+    providerCreateFile: async (path, content) => await this.fileSystems.createFile(uriOfKey(path), new TextEncoder().encode(content)),
+
+    providerCreateDirectory: async (path) => await this.fileSystems.createDirectory(uriOfKey(path)),
+
+    providerRename: async (oldPath, newPath) => await this.fileSystems.rename(uriOfKey(oldPath), uriOfKey(newPath)),
+
+    providerCopy: async (source, destination) => await this.fileSystems.copy(uriOfKey(source), uriOfKey(destination)),
+
+    providerDelete: async (path) => await this.fileSystems.delete(uriOfKey(path)),
+
+    providerWatch: async (path, recursive) => await this.fileSystems.watch(uriOfKey(path), recursive),
+
+    providerUnwatch: async (path) => this.fileSystems.unwatch(uriOfKey(path)),
+
+    providerListFiles: async (roots, limit) => await this.fileSystems.listFiles(roots, limit),
+
+    providerSearchFiles: async (roots, query, options) => await this.fileSystems.searchFiles(roots, query, options),
+
+    providerReplaceFiles: async (roots, query, replacement, options, paths) => await this.fileSystems.replaceFiles(roots, query, replacement, options, paths),
 
     provideFileDecorations: async (paths) => this.fileDecorations.provide(paths),
 
@@ -1661,6 +1716,20 @@ export class ExtensionHost {
         const columnOrOptions = args[2] as number | { viewColumn?: number; preserveFocus?: boolean } | undefined;
         return this.customEditors.open(keyOfUri(uri), viewType, columnOrOptions);
       }
+      case "vscode.diff": {
+        const original = T.Uri.revive(args[0] as T.Uri);
+        const modified = T.Uri.revive(args[1] as T.Uri);
+        if (!original || !modified) return undefined;
+        const title = typeof args[2] === "string" ? (args[2] as string) : undefined;
+        const options = (args[3] ?? {}) as { viewColumn?: number; preview?: boolean; preserveFocus?: boolean; selection?: T.Range };
+        return this.requestView("openDiff", keyOfUri(original), keyOfUri(modified), {
+          title,
+          preview: options.preview,
+          preserveFocus: options.preserveFocus,
+          viewColumn: options.viewColumn,
+          selection: options.selection ? wireRange(T.toRange(options.selection)) : undefined,
+        });
+      }
       case "workbench.action.openSettings":
       case "workbench.action.openGlobalSettings":
         return this.requestView("executeCommand", "workbench.action.openSettings", []);
@@ -1739,10 +1808,19 @@ export class ExtensionHost {
     }
   }
 
+  /** A file system provider reported changes (onDidChangeFile, or Lumen wrote through it). */
+  filesChangedUris(events: readonly { uri: T.Uri; type: number }[]): void {
+    if (!this.watchers.size) return;
+    for (const { uri, type } of events) {
+      const kind = type === T.FileChangeType.Created ? "create" : type === T.FileChangeType.Deleted ? "delete" : "change";
+      for (const watcher of this.watchers) if (watcher.matchesUri(uri)) watcher[kind]?.fire(uri);
+    }
+  }
+
   /** The files of a view file operation as the objects the onWill* / onDid* events hand out. */
   #fileOperationFiles(kind: "create" | "delete" | "rename", files: HostFileOperation[]) {
-    if (kind === "rename") return files.map((file) => ({ oldUri: T.Uri.file(file.oldPath!), newUri: T.Uri.file(file.newPath!) }));
-    return files.map((file) => T.Uri.file(file.path!));
+    if (kind === "rename") return files.map((file) => ({ oldUri: uriOfKey(file.oldPath!), newUri: uriOfKey(file.newPath!) }));
+    return files.map((file) => uriOfKey(file.path!));
   }
 
   /**
@@ -2282,6 +2360,37 @@ function installModuleHooks(host: ExtensionHost): void {
   });
 }
 
+/**
+ * Tell the main process which extension started each child process: spawn,
+ * exec, execFile and fork all go through ChildProcess#spawn, and the
+ * innermost extension file on the caller's stack names the extension.
+ */
+function trackChildProcesses(host: ExtensionHost): void {
+  const prototype = ChildProcess.prototype as unknown as { spawn: (this: ChildProcess, options: unknown) => unknown };
+  const spawn = prototype.spawn;
+  prototype.spawn = function (this: ChildProcess, options: unknown) {
+    const result = spawn.call(this, options);
+    if (this.pid) {
+      const extensionId = callingExtension(host);
+      if (extensionId) host.send({ type: "childProcess", pid: this.pid, extensionId });
+    }
+    return result;
+  };
+}
+
+function callingExtension(host: ExtensionHost): string | null {
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = 64;
+  const stack = new Error().stack ?? "";
+  Error.stackTraceLimit = limit;
+  // "    at name (C:\path\file.js:1:2)", "    at file:///path/file.mjs:1:2"
+  for (const match of stack.matchAll(/^\s*at (?:.*\()?((?:file:\/\/|[A-Za-z]:[\\/]|\/).+?):\d+:\d+\)?$/gm)) {
+    const runtime = host.runtimeForFile(match[1]);
+    if (runtime) return runtime.id;
+  }
+  return null;
+}
+
 /* ── worker entry ────────────────────────────────────────────────────────── */
 
 const consoleOriginal = { log: console.log, info: console.info, warn: console.warn, error: console.error, debug: console.debug };
@@ -2289,6 +2398,7 @@ const consoleOriginal = { log: console.log, info: console.info, warn: console.wa
 export async function runExtensionHost(): Promise<void> {
   if (!parentPort) return;
   const host = new ExtensionHost();
+  trackChildProcesses(host);
   const { format } = await import("util");
   // Extensions' console output also goes to the "Extension Host" output channel.
   for (const level of ["log", "info", "warn", "error", "debug"] as const) {

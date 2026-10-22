@@ -2,6 +2,13 @@ import { MarkdownString } from "../../types.ts";
 
 /** Classes and enums of the chat / language model API (`lumen.Chat*`, `lumen.LanguageModel*`, `lumen.Mcp*`). */
 
+/**
+ * A participant icon as the Chat panel draws it (from `chat.createChatParticipant`'s `iconPath`):
+ * an image URL (a data URL for local files, `dark` overriding it in a dark theme) or a codicon.
+ * Mirrored by the window side (mainview/features/chat-lm.tsx).
+ */
+export type ChatParticipantIcon = { url: string; dark?: string } | { codicon: string; color?: string };
+
 function frozen<T extends Record<string, number>>(values: T): Readonly<T> & Readonly<Record<number, string>> {
   const result: Record<string | number, string | number> = { ...values };
   for (const [key, value] of Object.entries(values)) result[value] = key;

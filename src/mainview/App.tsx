@@ -1,8 +1,10 @@
 import { Blocks, Bug, Ellipsis, LayoutPanelLeft, Maximize2, Minimize2, X, ChevronDown, ListCollapse, Eraser, FilePlus, Files, FolderPlus, GitBranch, ListTree, Plus, RefreshCw, Search, Settings, SquareSplitHorizontal, Trash2 } from "lucide-react";
-import { commandExecuted } from "./features/menus-walkthroughs/state";
+import { commandExecuted, evaluateCompletion, refreshContext, setContextLookup, setVisibleViews } from "./features/menus-walkthroughs/state";
 import { ModalEditorTitleActions } from "./features/menus-walkthroughs/MenuActions";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeSet } from "@codemirror/state";
 import { api, setCloseCheckHandler } from "./lib/rpc";
+import { diffTabPath, isDiffTab, parseDiffTab } from "./lib/diff-tab";
 import { isSmart, isTsFamily, isUntitled, isVirtualDocument, lspStatusLabel, type CursorInfo, type EditorController, type Location } from "./lib/editor";
 import { isWebviewTab, useWebviews, webviewIdOf, webviewService, webviewTabPath, type SavedWebview } from "./lib/webviews";
 import { ContainerIcon, ViewContainerView, WebviewSlot } from "./components/WebviewSlot";
@@ -62,11 +64,15 @@ import {
   type WorkspaceState,
 } from "./lib/session";
 import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
+import { DiffEditor, type DiffContent } from "./components/DiffEditor";
 import { EditorDropTarget, FILE_DRAG_TYPE, TAB_DRAG_TYPE, type EditorDropZone } from "./components/EditorDropTarget";
 import { evenSizes, layoutGrid, leafIds, removeLeaf, resizeSplit, splitLeaf, type DropSide, type GridNode } from "./lib/editor-grid";
 import { TERMINAL_DRAG_TYPE, TerminalHost, TerminalPanelView, useTerminals, type TerminalMenuAction } from "./components/TerminalView";
 import { DockOverlay, EDITOR_TERMINAL_DRAG_TYPE, type DockZone } from "./components/DockOverlay";
 import { FileTreeView, type TreeContextAction, type TreeDecorations } from "./components/FileTreeView";
+import { explorerRoots } from "./features/workspace-misc/roots";
+import { useStore } from "./features/store";
+import { renderMarkdown } from "./lib/markdown";
 import { SearchView } from "./components/SearchView";
 import { QuickInput, type PickItem, type QuickInputRequest } from "./components/QuickInput";
 import { TitleBar } from "./components/TitleBar";
@@ -84,11 +90,13 @@ import { ScmView, gitDecoration } from "./components/ScmView";
 import { SettingsEditor } from "./components/SettingsEditor";
 import { ShortcutsEditor } from "./components/ShortcutsEditor";
 import { ProcessExplorer } from "./components/ProcessExplorer";
+import { checkForUpdates, restartToUpdate, updateState } from "./lib/updates";
 import { Welcome } from "./components/Welcome";
 import { ExtensionsView, type ExtensionAction, type ExtensionTarget } from "./components/ExtensionsView";
 import { ExtensionDetails } from "./components/ExtensionDetails";
-import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus } from "../shared/types";
+import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus, TextRange } from "../shared/types";
 import type { ExtensionDescription, HostDebugConfiguration, HostFileOperation, HostInputBox, HostQuickPick, HostStatusBarItem, HostTabGroup, HostWorkspaceSymbol, MarketplaceExtension } from "../shared/extensions";
+import { normalizeFileSystemKey, sameDocumentKey } from "../shared/file-systems";
 
 /** What the app knows about an open document besides the editor state. */
 type DocState = {
@@ -100,22 +108,30 @@ type DocState = {
   savedEol: "LF" | "CRLF";
   /** A document an extension provides for reading only (text document content provider). */
   readOnly?: boolean;
+  /** The provider's message for a read-only file system (registerFileSystemProvider). */
+  readOnlyMessage?: string;
 };
 
 type SideView = Layout["sideView"];
 
 const lowerKey = (path: string) => path.toLowerCase();
 
+/** The key of the open document a path names: a provider's URI may arrive with another path case. */
+const openDocumentKey = (docs: Map<string, DocState>, path: string) => [...docs.keys()].find((candidate) => sameDocumentKey(candidate, path)) ?? path;
+
 const isInside = (path: string, folder: string) => {
-  const lower = lowerKey(path);
-  const base = lowerKey(folder);
+  // Provider paths follow their provider's isCaseSensitive; local files compare case-insensitively.
+  const normalize = (value: string) => (isVirtualDocument(value) ? normalizeFileSystemKey(value) : lowerKey(value));
+  const lower = normalize(path);
+  // A provider root ends in ":" or "/" ("memfs:/"); a drive root ends in a separator too.
+  const base = normalize(folder).replace(/[\\/]+$/, "");
   return lower === base || lower.startsWith(base + "\\") || lower.startsWith(base + "/");
 };
 
 type EditorGroupState = { id: string; tabs: TabInfo[]; activePath: string | null };
 
 /** Read a document: from disk, or from the file system an extension provides. */
-async function readDocument(path: string): Promise<{ content: string; language: string; readOnly?: boolean } | { error: string }> {
+async function readDocument(path: string): Promise<{ content: string; language: string; readOnly?: boolean; readOnlyMessage?: string } | { error: string }> {
   if (!isVirtualDocument(path)) return await api().request.readFile({ path });
   try {
     return await extensionService.call("readVirtualFile", path);
@@ -135,7 +151,7 @@ async function writeDocument(path: string, content: string): Promise<{ success: 
 }
 
 /** Tabs that are not text documents. */
-const isSpecialTab = (path: string | null | undefined): path is string => isTerminalTab(path) || isWebviewTab(path) || isFeatureEditorTab(path);
+const isSpecialTab = (path: string | null | undefined): path is string => isTerminalTab(path) || isWebviewTab(path) || isFeatureEditorTab(path) || isDiffTab(path);
 
 /** A custom editor tab (`webview:<id>` bound to a file): its file, provider kind and dirty state. */
 type CustomEditorTabInfo = { id: string; uri: string; viewType: string; kind: "text" | "readonly" | "editable"; dirty: boolean };
@@ -174,6 +190,9 @@ export function App() {
     [],
   );
   const docs = useRef(new Map<string, DocState>());
+  /** Where a diff tab should put the cursor in its modified side, and whether it takes the focus when it opens. */
+  const diffSelections = useRef(new Map<string, TextRange>());
+  const diffAutoFocus = useRef(new Set<string>());
   const mru = useRef<string[]>([]);
   const closedStack = useRef<string[]>([]);
   const navBack = useRef<Location[]>([]);
@@ -213,6 +232,8 @@ export function App() {
   const [panelMaximized, setPanelMaximized] = useState(false);
   const [zenMode, setZenMode] = useState(false);
   const [treeRefresh, setTreeRefresh] = useState(0);
+  /** Extra workspace folders (including provided file systems) the explorer shows. */
+  const explorerRootEntries = useStore(explorerRoots);
   const [treeReveal, setTreeReveal] = useState<{ path: string; token: number } | null>(null);
   const [treeCollapse, setTreeCollapse] = useState(0);
   const [outlineCollapse, setOutlineCollapse] = useState(0);
@@ -473,9 +494,11 @@ export function App() {
   const refreshTabDirty = useCallback(
     (path: string) => {
       const dirty = isDocDirty(path);
-      mapAllTabs((tab) =>
-        tab.path === path && (tab.dirty !== dirty || (dirty && tab.preview)) ? { ...tab, dirty, preview: tab.preview && !dirty } : tab,
-      );
+      mapAllTabs((tab) => {
+        // Diff tabs show the modified document: their dot follows that document.
+        const shows = tab.path === path || parseDiffTab(tab.path)?.modified === path;
+        return shows && (tab.dirty !== dirty || (dirty && tab.preview)) ? { ...tab, dirty, preview: tab.preview && !dirty } : tab;
+      });
     },
     [isDocDirty, mapAllTabs],
   );
@@ -536,8 +559,10 @@ export function App() {
         viewType?: string;
       } = {},
     ): Promise<boolean> => {
+      // The same provider resource with another path case is the open document's tab.
+      path = openDocumentKey(docs.current, path);
       // workbench.editor.useModal "all": files open in the modal editor part.
-      const toModal = !options.groupId && getSettings()["workbench.editor.useModal"] === "all" && !isTerminalTab(path) && !isWebviewTab(path);
+      const toModal = !options.groupId && getSettings()["workbench.editor.useModal"] === "all" && !isTerminalTab(path) && !isWebviewTab(path) && !isDiffTab(path);
       if (toModal) ensureModalGroup();
       const groupId = toModal ? MODAL_GROUP : options.groupId && groupsRef.current[options.groupId] ? options.groupId : activeGroupIdRef.current;
       focusGroup(groupId);
@@ -551,6 +576,12 @@ export function App() {
         return true;
       }
       if (isWebviewTab(path)) {
+        if (!groupsRef.current[groupId]?.tabs.some((tab) => tab.path === path)) return false;
+        touchMru(path);
+        setActivePath(path, groupId);
+        return true;
+      }
+      if (isDiffTab(path)) {
         if (!groupsRef.current[groupId]?.tabs.some((tab) => tab.path === path)) return false;
         touchMru(path);
         setActivePath(path, groupId);
@@ -609,7 +640,7 @@ export function App() {
                 if (!("error" in result)) {
                   const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
                   const content = result.content.replace(/\r\n/g, "\n");
-                  docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly });
+                  docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly, readOnlyMessage: result.readOnlyMessage });
                 }
               }
               extensionService.documentOpened(path);
@@ -629,7 +660,7 @@ export function App() {
         }
         const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
         const content = result.content.replace(/\r\n/g, "\n");
-        docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly });
+        docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly, readOnlyMessage: result.readOnlyMessage });
       }
       const doc = docs.current.get(path)!;
       const preview = !!options.preview && getSettings()["workbench.editor.enablePreview"];
@@ -681,10 +712,106 @@ export function App() {
       extensionService.documentOpened(path);
       if (options.line !== undefined) editor.revealPosition(options.line, options.character ?? 0, options.end);
       else if (options.focus !== false) editor.focus();
-      if (getSettings()["explorer.autoReveal"] && !isUntitled(path) && !isVirtualDocument(path)) setTreeReveal({ path, token: Date.now() });
+      if (getSettings()["explorer.autoReveal"] && !isUntitled(path)) setTreeReveal({ path, token: Date.now() });
       return true;
     },
     [docContent, isDocDirty, loadGitBase, focusGroup, waitForEditor, setTabs, setActivePath],
+  );
+
+  /** Read either side of a diff: an open document's editor state, or the file / virtual document on disk. */
+  const loadDiffContent = useCallback(
+    async (path: string): Promise<DiffContent> => {
+      const doc = docs.current.get(path);
+      if (doc) return { content: docContent(path) ?? doc.content, language: doc.language, readOnly: doc.readOnly };
+      if (isUntitled(path)) return { error: `Cannot open ${path}: the document is not open.` };
+      return await readDocument(path);
+    },
+    [docContent],
+  );
+
+  /** Open (or switch to) a side-by-side diff tab (`vscode.diff`). */
+  const openDiff = useCallback(
+    async (
+      original: string,
+      modified: string,
+      options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange } = {},
+    ): Promise<boolean> => {
+      original = openDocumentKey(docs.current, original);
+      modified = openDocumentKey(docs.current, modified);
+      let groupId = activeGroupIdRef.current;
+      if (options.viewColumn !== undefined && (options.viewColumn === -2 || options.viewColumn > 1)) {
+        const order = leafIds(gridRef.current);
+        groupId = order[order.indexOf(activeGroupIdRef.current) + 1] ?? splitGroup(activeGroupIdRef.current, "right");
+      }
+      focusGroup(groupId);
+      const editor = editors.current.get(groupId) ?? (await waitForEditor(groupId));
+
+      // The modified side is a real document: it is saved and synced like a text tab.
+      if (!docs.current.has(modified)) {
+        if (isUntitled(modified)) return false;
+        const result = await readDocument(modified);
+        if ("error" in result) {
+          toast(result.error, "error");
+          return false;
+        }
+        const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
+        const content = result.content.replace(/\r\n/g, "\n");
+        docs.current.set(modified, {
+          content,
+          savedContent: content,
+          language: result.language,
+          eol,
+          savedEol: eol,
+          readOnly: !!result.readOnly,
+          readOnlyMessage: result.readOnlyMessage,
+        });
+      }
+
+      const tabPath = diffTabPath(original, modified);
+      // A content provider URI may carry a query (`git:/a.txt?ref=HEAD`): show just the name.
+      const nameOf = (path: string) => basename(path.replace(/[?#].*$/, "")) || basename(path);
+      const name = options.title ?? `${nameOf(original)} ↔ ${nameOf(modified)}`;
+      if (options.selection) diffSelections.current.set(tabPath, options.selection);
+      if (!options.preserveFocus) diffAutoFocus.current.add(tabPath);
+      const preview = !!options.preview && getSettings()["workbench.editor.enablePreview"];
+      setTabs((prev) => {
+        if (prev.some((tab) => tab.path === tabPath)) return prev;
+        const tab: TabInfo = { path: tabPath, name, dirty: isDocDirty(modified), preview };
+        const previewIndex = preview ? prev.findIndex((candidate) => candidate.preview && !candidate.dirty) : -1;
+        if (previewIndex >= 0) {
+          const next = [...prev];
+          next[previewIndex] = tab;
+          return next;
+        }
+        const activeIndex = prev.findIndex((candidate) => candidate.path === editor.getCurrent()?.path);
+        const next = [...prev];
+        next.splice(activeIndex >= 0 ? activeIndex + 1 : next.length, 0, tab);
+        return next;
+      }, groupId);
+
+      touchMru(tabPath);
+      setActivePath(tabPath, groupId);
+      extensionService.documentOpened(modified);
+      return true;
+    },
+    [focusGroup, isDocDirty, setActivePath, setTabs, waitForEditor],
+  );
+
+  /** Keep the modified side of a diff tab in the document model (dirty dot, extensions, saving). */
+  const editDiffDocument = useCallback(
+    (path: string, content: string, changes: ChangeSet) => {
+      const doc = docs.current.get(path);
+      if (!doc) return;
+      doc.content = content;
+      for (const editor of editors.current.values()) if (editor.hasDocument(path)) editor.applyRemoteChanges(path, changes);
+      const dirty = content !== doc.savedContent || doc.eol !== doc.savedEol;
+      editorDirty.current.set(path, dirty);
+      refreshTabDirty(path);
+      syncDirtyState();
+      extensionService.documentChanged(path);
+      extensionService.documentDirty(path, dirty);
+    },
+    [refreshTabDirty, syncDirtyState],
   );
 
   const newUntitled = useCallback(
@@ -702,6 +829,9 @@ export function App() {
   /** Save a document; returns false when cancelled or failed. */
   const saveDoc = useCallback(
     async (path: string, options: { saveAs?: boolean; destination?: string } = {}): Promise<boolean> => {
+      // A diff tab saves its modified side.
+      const diff = parseDiffTab(path);
+      if (diff) path = diff.modified;
       // A feature editor (notebooks) saves through its opener.
       if (isFeatureEditorTab(path)) return await saveFeatureEditor(path);
       // A custom editor tab saves through its provider; a text custom editor uses the normal path.
@@ -715,6 +845,11 @@ export function App() {
       const editor = editorRef.current;
       const doc = docs.current.get(path);
       if (!editor || !doc) return false;
+      // A read-only file system provider's message says why the file cannot be written.
+      if (doc.readOnly && !options.saveAs) {
+        toast(doc.readOnlyMessage ?? `${basename(path)} is read-only.`, "info");
+        return false;
+      }
 
       let target = path;
       if (isUntitled(path) || options.saveAs) {
@@ -769,6 +904,8 @@ export function App() {
       saved.savedContent = content;
       saved.content = content;
       saved.savedEol = saved.eol;
+      // A diff tab edits the document without an EditorController holding it.
+      editorDirty.current.set(target, content !== saved.savedContent);
       for (const other of editors.current.values()) other.markSaved(target, content);
       refreshTabDirty(target);
       syncDirtyState();
@@ -801,17 +938,24 @@ export function App() {
   const closeTabs = useCallback(
     async (paths: string[], groupId?: string): Promise<boolean> => {
       const targets = groupId ? [groupId] : Object.keys(groupsRef.current);
-      const lastEditor = (path: string) =>
-        !Object.values(groupsRef.current).some((group) => !targets.includes(group.id) && group.tabs.some((tab) => tab.path === path));
+      // A diff tab edits its modified document; closing either closes the document with its last tab.
+      const documentOf = (path: string) => parseDiffTab(path)?.modified ?? path;
+      const lastEditor = (path: string) => {
+        const document = documentOf(path);
+        return !Object.values(groupsRef.current).some(
+          (group) => !targets.includes(group.id) && group.tabs.some((tab) => tab.path !== path && documentOf(tab.path) === document),
+        );
+      };
 
       for (const path of paths) {
-        const dirty = isDocDirty(path) || !!customEditorTabInfo(path)?.dirty || (isFeatureEditorTab(path) && isFeatureEditorDirty(path));
+        const document = documentOf(path);
+        const dirty = isDocDirty(document) || !!customEditorTabInfo(path)?.dirty || (isFeatureEditorTab(path) && isFeatureEditorDirty(path));
         if (!lastEditor(path) || !dirty) continue;
         const holder = targets.find((id) => groupsRef.current[id]?.tabs.some((tab) => tab.path === path));
-        if (holder && docs.current.has(path)) await openFile(path, { recordNav: false, groupId: holder });
+        if (holder && !isDiffTab(path) && docs.current.has(document)) await openFile(document, { recordNav: false, groupId: holder });
         const choice = await showDialog({
           title: "Unsaved changes",
-          message: `Do you want to save the changes you made to ${basename(path)}?`,
+          message: `Do you want to save the changes you made to ${basename(document)}?`,
           detail: "Your changes will be lost if you don't save them.",
           buttons: [
             { label: "Save", role: "primary", value: "save" },
@@ -820,7 +964,7 @@ export function App() {
           ],
         });
         if (choice === "cancel" || choice === null) return false;
-        if (choice === "save" && !(await saveDoc(path))) return false;
+        if (choice === "save" && !(await saveDoc(document))) return false;
       }
 
       const closing = new Set(paths);
@@ -834,6 +978,20 @@ export function App() {
       }
       for (const path of finished) {
         mru.current = mru.current.filter((p) => p !== path);
+        const diff = parseDiffTab(path);
+        if (diff) {
+          diffSelections.current.delete(path);
+          diffAutoFocus.current.delete(path);
+          const stillOpen = Object.values(groupsRef.current).some((group) =>
+            group.tabs.some((tab) => tab.path !== path && !closing.has(tab.path) && documentOf(tab.path) === diff.modified),
+          );
+          if (!stillOpen) {
+            docs.current.delete(diff.modified);
+            editorDirty.current.delete(diff.modified);
+            extensionService.documentClosed(diff.modified);
+          }
+          continue;
+        }
         if (isTerminalTab(path)) {
           terminalService.kill(terminalIdOf(path));
           continue;
@@ -912,7 +1070,7 @@ export function App() {
   const applyWorkspaceEdits = useCallback(async (fileEdits: FileEdits[]) => {
     let changed = 0;
     for (const { path, edits: given, eol } of fileEdits) {
-      const openPath = [...docs.current.keys()].find((p) => lowerKey(p) === lowerKey(path));
+      const openPath = [...docs.current.keys()].find((p) => sameDocumentKey(p, path));
       if (openPath && eol) docs.current.get(openPath)!.eol = eol;
       const active = editorRef.current;
       if (openPath && given.length === 1 && given[0]!.snippet && active?.getCurrent()?.path === openPath) {
@@ -1177,7 +1335,7 @@ export function App() {
     const applyRenameEdits = async (edits: FileEdits[]) => {
       const changed = await applyWorkspaceEdits(edits);
       for (const { path } of edits) {
-        const open = [...docs.current.keys()].find((p) => lowerKey(p) === lowerKey(path));
+        const open = [...docs.current.keys()].find((p) => sameDocumentKey(p, path));
         if (open) refreshTabDirty(open);
       }
       syncDirtyState();
@@ -1460,7 +1618,14 @@ export function App() {
       // Extensions may adjust other files first (workspace.onWillCreateFiles).
       const willEdits = await extensionService.willFileOperation("create", [{ path: full }]);
       if (willEdits.length) await applyWorkspaceEdits(willEdits);
-      const result = kind === "file" ? await api().request.createFile({ path: full, content: "" }) : await api().request.createDir({ path: full });
+      const virtual = isVirtualDocument(full);
+      const result = !virtual
+        ? kind === "file"
+          ? await api().request.createFile({ path: full, content: "" })
+          : await api().request.createDir({ path: full })
+        : kind === "file"
+          ? await extensionService.call("providerCreateFile", full, "")
+          : await extensionService.call("providerCreateDirectory", full);
       if (!result.success) {
         toast(result.error ?? `Failed to create ${kind}`, "error");
         return;
@@ -1917,6 +2082,7 @@ export function App() {
   // the latest state without being rebuilt on every render.
   const actions = {
     openFile,
+    openDiff,
     newUntitled,
     saveDoc,
     saveAll,
@@ -2535,12 +2701,19 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.1.1", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.2.0", platform: navigator.platform }));
           await showAbout(info);
         },
       },
       { id: "workbench.action.openProcessExplorer", title: "Open Process Explorer", category: "Developer", run: () => setProcessExplorerOpen(true) },
+      { id: "update.checkForUpdate", title: "Check for Updates…", run: () => checkForUpdates() },
+      { id: "update.restartToUpdate", title: "Restart to Update", enabled: () => updateState().kind === "ready", run: () => restartToUpdate() },
       { id: "workbench.action.reloadWindow", title: "Reload Window", category: "Developer", run: () => location.reload() },
+      // The find bar of the active webview panel (enableFindWidget).
+      { id: "editor.action.webvieweditor.showFind", title: "Show Find", category: "Webview", run: () => void webviewService.find("open") },
+      { id: "editor.action.webvieweditor.findNext", title: "Find Next", category: "Webview", run: () => void webviewService.find("next") },
+      { id: "editor.action.webvieweditor.findPrevious", title: "Find Previous", category: "Webview", run: () => void webviewService.find("previous") },
+      { id: "editor.action.webvieweditor.hideFind", title: "Stop Find", category: "Webview", run: () => void webviewService.find("close") },
       {
         id: "workbench.action.closeWindow",
         title: "Close Window",
@@ -2617,6 +2790,9 @@ export function App() {
         return undefined;
     }
   }, []);
+
+  // Walkthrough `when` clauses and onContext events see the window's context keys too.
+  useEffect(() => setContextLookup(contextKey), [contextKey]);
 
   /** Commands contributed by extensions: in the palette, runnable from keys and menus. */
   const extensionCommands = useMemo(
@@ -2795,7 +2971,7 @@ export function App() {
       dirty: (path) => isDocDirty(path),
       eol: (path) => docs.current.get(path)?.eol ?? "LF",
     });
-    const resolveDoc = (path: string) => [...docs.current.keys()].find((candidate) => lowerKey(candidate) === lowerKey(path)) ?? path;
+    const resolveDoc = (path: string) => openDocumentKey(docs.current, path);
     extensionService.setHandlers(
       createExtensionHandlers({
         openFile: async (path, options) => {
@@ -2806,6 +2982,7 @@ export function App() {
           }
           return await act.current.openFile(resolveDoc(path), { ...options, groupId });
         },
+        openDiff: (original, modified, options) => act.current.openDiff(resolveDoc(original), resolveDoc(modified), options),
         editorFor: async (path, open) => {
           const target = resolveDoc(path);
           const holder = editorRef.current?.getCurrent()?.path === target ? editorRef.current : [...editors.current.values()].find((editor) => editor.getCurrent()?.path === target);
@@ -2820,7 +2997,7 @@ export function App() {
         applyWorkspaceEdits: async (edits) => {
           const changed = await act.current.applyWorkspaceEdits(edits);
           for (const { path } of edits) {
-            const open = [...docs.current.keys()].find((candidate) => lowerKey(candidate) === lowerKey(path));
+            const open = [...docs.current.keys()].find((candidate) => sameDocumentKey(candidate, path));
             if (open) refreshTabDirtyRef.current(open);
           }
           syncDirtyStateRef.current();
@@ -2831,6 +3008,7 @@ export function App() {
           if (!builtIn) return false;
           void Promise.resolve()
             .then(() => builtIn.run(args[0]))
+            .then(() => commandExecuted(command))
             .catch((error: unknown) => console.error(`[command] ${command} failed`, error));
           return true;
         },
@@ -2945,10 +3123,11 @@ export function App() {
   // The extension host learns which editors are visible and which one is active.
   useEffect(() => {
     const visible = Object.values(groups)
-      .map((group) => group.activePath)
+      .map((group) => parseDiffTab(group.activePath)?.modified ?? group.activePath)
       .filter((path): path is string => !!path && !isSpecialTab(path));
-    const path = activePath && !isTerminalTab(activePath) && !isFeatureEditorTab(activePath) ? activePath : null;
-    extensionService.setActiveEditor(path, path ? (editors.current.get(activeGroupId)?.getSelections() ?? []) : [], visible);
+    const diff = parseDiffTab(activePath);
+    const path = diff ? diff.modified : activePath && !isTerminalTab(activePath) && !isFeatureEditorTab(activePath) ? activePath : null;
+    extensionService.setActiveEditor(path, path && !diff ? (editors.current.get(activeGroupId)?.getSelections() ?? []) : [], visible);
   }, [groups, activePath, activeGroupId, ext.extensions]);
 
   // window.tabGroups: the editor layout, posted (debounced) whenever tabs change.
@@ -2962,16 +3141,30 @@ export function App() {
           isActive: id === activeGroupId,
           tabs: (group?.tabs ?? []).map((tab) => {
             const custom = customEditorTabInfo(tab.path);
+            const webview = isWebviewTab(tab.path) ? webviewService.info(webviewIdOf(tab.path)) : null;
+            const feature = parseFeatureEditorTab(tab.path);
+            const diff = parseDiffTab(tab.path);
             return {
               label: tab.name,
               path: tab.path,
-              kind: isTerminalTab(tab.path) ? "terminal" : custom ? "custom" : isWebviewTab(tab.path) ? "webview" : isFeatureEditorTab(tab.path) ? "feature" : "text",
+              kind: isTerminalTab(tab.path)
+                ? "terminal"
+                : diff
+                  ? "diff"
+                  : custom
+                    ? "custom"
+                    : isWebviewTab(tab.path)
+                      ? "webview"
+                      : feature
+                        ? "feature"
+                        : "text",
               isActive: group?.activePath === tab.path,
               isDirty: !!tab.dirty,
               isPinned: !tab.preview,
               isPreview: tab.preview,
-              ...(custom ? { uri: custom.uri, viewType: custom.viewType } : {}),
-              ...(parseFeatureEditorTab(tab.path) ? { uri: parseFeatureEditorTab(tab.path)!.path, viewType: parseFeatureEditorTab(tab.path)!.openerId } : {}),
+              ...(custom ? { uri: custom.uri, viewType: custom.viewType } : webview?.viewType ? { viewType: webview.viewType } : {}),
+              ...(feature ? { uri: feature.path, viewType: feature.openerId } : {}),
+              ...(diff ? { original: diff.original, modified: diff.modified } : {}),
             };
           }),
         };
@@ -3124,14 +3317,24 @@ export function App() {
   // Files of extension file systems changed: reload clean editors.
   useEffect(() => {
     const onChanged = (e: Event) => {
-      const { paths } = (e as CustomEvent<{ paths: string[] }>).detail;
-      for (const path of paths) {
+      const { paths, changes } = (e as CustomEvent<{ paths: string[]; changes?: { path: string; type: number }[] }>).detail;
+      // FileChangeType.Deleted (3): like a local file gone from disk, the tab keeps its
+      // content (and unsaved changes); there is nothing left to reload.
+      for (const changedPath of paths) {
+        // A case-insensitive provider may report the path with another case.
+        const path = openDocumentKey(docs.current, changedPath);
         const doc = docs.current.get(path);
         if (!doc) continue;
+        const deleted = (changes ?? []).some((change) => change.type === 3 && sameDocumentKey(change.path, changedPath));
+        if (deleted) {
+          toast(isDocDirty(path) ? `${basename(path)} was deleted. Your unsaved changes are kept.` : `${basename(path)} was deleted.`, "info");
+          continue;
+        }
         void readDocument(path).then((result) => {
           if ("error" in result) return;
           const content = result.content.replace(/\r\n/g, "\n");
-          if (content === doc.savedContent) return;
+          // Our own save just wrote exactly this (providers may fire a change event for it).
+          if (content === doc.savedContent || content === doc.content) return;
           if (isDocDirty(path)) {
             toast(`${basename(path)} changed. Your unsaved changes are kept.`, "info");
             return;
@@ -3231,7 +3434,8 @@ export function App() {
 
   // The language of the active group's document drives the status bar.
   useEffect(() => {
-    setActiveLanguage(activePath && !isTerminalTab(activePath) ? (docs.current.get(activePath)?.language ?? null) : null);
+    const document = parseDiffTab(activePath)?.modified ?? activePath;
+    setActiveLanguage(document && !isTerminalTab(document) ? (docs.current.get(document)?.language ?? null) : null);
   }, [activePath, activeGroupId]);
 
   /**
@@ -3265,18 +3469,25 @@ export function App() {
 
   /** Point every group's tabs at a renamed / re-saved file. */
   function renameEverywhere(from: string, to: string, options: { pin?: boolean } = {}) {
+    const renamePath = (path: string | null): string | null => {
+      if (path === from) return to;
+      const diff = parseDiffTab(path);
+      return diff && diff.modified === from ? diffTabPath(diff.original, to) : path;
+    };
+    const renameTab = (tab: TabInfo): TabInfo => {
+      if (tab.path === from) return { ...tab, path: to, name: basename(to), preview: options.pin ? false : tab.preview };
+      // A diff tab follows its modified document.
+      const diff = parseDiffTab(tab.path);
+      return diff && diff.modified === from ? { ...tab, path: diffTabPath(diff.original, to) } : tab;
+    };
     for (const editor of editors.current.values()) editor.renameDocument(from, to);
     editorDirty.current.set(to, editorDirty.current.get(from) ?? false);
     editorDirty.current.delete(from);
-    mru.current = mru.current.map((p) => (p === from ? to : p));
+    mru.current = mru.current.map((p) => renamePath(p)!);
     updateGroups((prev) => {
       const next: Record<string, EditorGroupState> = {};
       for (const [id, group] of Object.entries(prev)) {
-        next[id] = {
-          ...group,
-          tabs: group.tabs.map((tab) => (tab.path === from ? { ...tab, path: to, name: basename(to), preview: options.pin ? false : tab.preview } : tab)),
-          activePath: group.activePath === from ? to : group.activePath,
-        };
+        next[id] = { ...group, tabs: group.tabs.map(renameTab), activePath: renamePath(group.activePath) };
       }
       return next;
     });
@@ -3423,7 +3634,7 @@ export function App() {
     const webviewList: SavedWebview[] = [];
     const webviewIndex = new Map<string, number>();
     const saveTab = (path: string | null): string | null => {
-      if (!path || isUntitled(path) || isVirtualDocument(path)) return null;
+      if (!path || isUntitled(path) || isVirtualDocument(path) || isDiffTab(path)) return null;
       if (isWebviewTab(path)) {
         const id = webviewIdOf(path);
         if (!webviewIndex.has(id)) {
@@ -3732,6 +3943,63 @@ export function App() {
 
   /* ── explorer & tab actions ───────────────────────────────────────────── */
 
+  /** A row relative to its own root (a workspace folder, also a provided one). */
+  const relativeToRoot = useCallback(
+    (path: string) => {
+      const roots = [...(workspaceRoot ? [workspaceRoot] : []), ...explorerRootEntries.map((root) => root.path)];
+      const root = roots
+        .filter((candidate) => isInside(path, candidate))
+        .sort((a, b) => b.length - a.length)[0];
+      return root ? path.slice(root.length).replace(/^[\\/]+/, "").replace(/\\/g, "/") : path;
+    },
+    [workspaceRoot, explorerRootEntries],
+  );
+
+  /**
+   * Copy or move rows of a provided file system (context menu paste, drag and drop):
+   * provider.copy / provider.rename when the provider has them, else a read + write.
+   */
+  const transferProviderEntries = useCallback(
+    async (paths: string[], targetDir: string, copy: boolean) => {
+      if (!isVirtualDocument(targetDir)) {
+        toast("Copy and move are supported inside one provided file system.", "info");
+        return;
+      }
+      for (const source of paths) {
+        if (!isVirtualDocument(source)) continue;
+        const target = joinPath(targetDir, basename(source));
+        if (source === target) continue;
+        // A folder cannot be copied or moved into itself.
+        if (isInside(targetDir, source)) {
+          toast(`Cannot ${copy ? "copy" : "move"} ${basename(source)} into itself.`, "error");
+          continue;
+        }
+        if (copy) {
+          const willEdits = await extensionService.willFileOperation("create", [{ path: target }]);
+          if (willEdits.length) await applyWorkspaceEdits(willEdits);
+          const result = await extensionService.call("providerCopy", source, target);
+          if (!result.success) {
+            toast(result.error ?? "Copy failed", "error");
+            continue;
+          }
+          extensionService.didFileOperation("create", [{ path: target }]);
+        } else {
+          const willEdits = await extensionService.willFileOperation("rename", [{ oldPath: source, newPath: target }]);
+          if (willEdits.length) await applyWorkspaceEdits(willEdits);
+          const result = await extensionService.call("providerRename", source, target);
+          if (!result.success) {
+            toast(result.error ?? "Move failed", "error");
+            continue;
+          }
+          extensionService.didFileOperation("rename", [{ oldPath: source, newPath: target }]);
+          await followFileOperation("rename", [{ oldPath: source, newPath: target }]);
+        }
+      }
+      setTreeRefresh((n) => n + 1);
+    },
+    [applyWorkspaceEdits],
+  );
+
   const handleTreeContext = useCallback(
     async (evt: TreeContextAction) => {
       const dir = evt.isDirectory ? evt.path : dirname(evt.path);
@@ -3753,7 +4021,9 @@ export function App() {
           // Extensions may rewrite references before the move (workspace.onWillRenameFiles).
           const willEdits = await extensionService.willFileOperation("rename", [{ oldPath: evt.path, newPath }]);
           if (willEdits.length) await applyWorkspaceEdits(willEdits);
-          const result = await api().request.renamePath({ oldPath: evt.path, newPath });
+          const result = isVirtualDocument(evt.path)
+            ? await extensionService.call("providerRename", evt.path, newPath)
+            : await api().request.renamePath({ oldPath: evt.path, newPath });
           if (!result.success) {
             toast(result.error ?? "Rename failed", "error");
             return;
@@ -3776,7 +4046,9 @@ export function App() {
           // Extensions may react before the file goes (workspace.onWillDeleteFiles).
           const willEdits = await extensionService.willFileOperation("delete", [{ path: evt.path }]);
           if (willEdits.length) await applyWorkspaceEdits(willEdits);
-          const result = await api().request.deletePath({ path: evt.path });
+          const result = isVirtualDocument(evt.path)
+            ? await extensionService.call("providerDelete", evt.path)
+            : await api().request.deletePath({ path: evt.path });
           if (!result.success) {
             toast(result.error ?? "Delete failed", "error");
             return;
@@ -3790,8 +4062,7 @@ export function App() {
           break;
         case "copy-path":
         case "copy-relative-path": {
-          const text =
-            evt.action === "copy-relative-path" && workspaceRoot ? evt.path.slice(workspaceRoot.length + 1).replace(/\\/g, "/") : evt.path;
+          const text = evt.action === "copy-relative-path" ? relativeToRoot(evt.path) : evt.path;
           await navigator.clipboard.writeText(text).catch(() => {});
           toast("Copied to clipboard", "success");
           break;
@@ -3805,7 +4076,7 @@ export function App() {
           break;
       }
     },
-    [openFile, closeTabs, createEntry, applyWorkspaceEdits, focusSearch, showPanel, workspaceRoot],
+    [openFile, closeTabs, createEntry, applyWorkspaceEdits, focusSearch, showPanel, relativeToRoot],
   );
 
   const handleTabAction = useCallback(
@@ -3955,16 +4226,25 @@ export function App() {
   const withHints = (list: TabInfo[]) => {
     const counts = new Map<string, number>();
     for (const tab of list) counts.set(tab.name, (counts.get(tab.name) ?? 0) + 1);
-    return list.map((tab) => ((counts.get(tab.name) ?? 0) > 1 && !isUntitled(tab.path) && !isTerminalTab(tab.path) ? { ...tab, hint: basename(dirname(tab.path)) } : tab));
+    return list.map((tab) =>
+      (counts.get(tab.name) ?? 0) > 1 && !isUntitled(tab.path) && !isTerminalTab(tab.path) && !isDiffTab(tab.path) ? { ...tab, hint: basename(dirname(tab.path)) } : tab,
+    );
   };
 
   const errorCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "error").length, 0);
   const warningCount = [...allDiagnostics.values()].reduce((n, list) => n + list.filter((d) => d.severity === "warning").length, 0);
-  const activeDoc = activePath ? docs.current.get(activePath) : undefined;
+  const activeDoc = activePath ? docs.current.get(parseDiffTab(activePath)?.modified ?? activePath) : undefined;
   const activeTerminalTab = isTerminalTab(activePath) ? terminalIdOf(activePath) : null;
   const editorActive = !!activePath && !isSpecialTab(activePath);
   const paletteCommands = useMemo(() => [...allCommands.values()], [allCommands]);
   const visiblePaletteCommands = quick ? paletteCommands.filter((command) => command.enabled?.() !== false) : paletteCommands;
+  /** Where the sidebar's New File / New Folder buttons create: the local root, or the first provided root. */
+  const newEntryRoot = workspaceRoot ?? explorerRootEntries[0]?.path ?? null;
+  /** Workspace folders of provided file systems (Quick Open / Find in Files walk them). */
+  const providerRootPaths = useMemo(
+    () => explorerRootEntries.filter((root) => root.scheme !== "file").map((root) => root.path),
+    [explorerRootEntries],
+  );
   const showActivityBar = settings["workbench.activityBar.visible"] && !zenMode;
   const showSidebar = sidebarVisible && !zenMode;
   const showPanelArea = panelVisible && !zenMode;
@@ -4018,6 +4298,31 @@ export function App() {
   const activeAuxContainer = auxContainers.find((container) => container.id === auxBarView) ?? auxContainers[0];
   const featureViews = useMemo(() => featureSidebarViews(), []);
   const showAuxBarArea = auxBarVisible && !zenMode && auxContainers.length > 0;
+
+  // Walkthrough onView events: the visible side bar / panel surfaces and every view they contain
+  // (built-in ones, contributed tree/webview views and the features' own surfaces).
+  useEffect(() => {
+    const ids: string[] = [];
+    const addViews = (views: { id: string; when?: string }[] | undefined) => {
+      for (const view of views ?? []) if (extensionService.when(view.when, contextKey)) ids.push(view.id);
+    };
+    if (showSidebar) {
+      ids.push(sideView);
+      if (sideView === "explorer") addViews(viewLayout.explorerViews);
+      else if (sideView.startsWith(FEATURE_VIEW_PREFIX)) ids.push(sideView.slice(FEATURE_VIEW_PREFIX.length));
+      else if (sideView.startsWith("view:")) addViews(sideContainers.find((container) => `view:${container.id}` === sideView)?.views);
+    }
+    if (showAuxBarArea) addViews(activeAuxContainer?.views);
+    if (showPanelArea) {
+      ids.push(panelTab);
+      if (panelTab.startsWith(FEATURE_VIEW_PREFIX)) ids.push(panelTab.slice(FEATURE_VIEW_PREFIX.length));
+      else if (panelTab.startsWith("view:")) addViews(viewLayout.containers.find((container) => container.location === "panel" && `view:${container.id}` === panelTab)?.views);
+    }
+    setVisibleViews(ids);
+    refreshContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSidebar, showAuxBarArea, showPanelArea, sideView, panelTab, activePath, viewLayout, contextKey]);
+
   // The side bar shows a container that is not there (gone, or all its views hidden): back to the
   // Explorer — after a moment, so `when` context keys extensions set while starting have arrived.
   const sideViewMissing =
@@ -4164,7 +4469,9 @@ export function App() {
     const terminalId = isTerminalTab(path) ? terminalIdOf(path) : null;
     const webviewId = isWebviewTab(path) ? webviewIdOf(path) : null;
     const featureEditor = isFeatureEditorTab(path);
-    const showsEditor = !!path && !terminalId && !webviewId && !featureEditor;
+    const diff = parseDiffTab(path);
+    const diffDocument = diff ? docs.current.get(diff.modified) : undefined;
+    const showsEditor = !!path && !terminalId && !webviewId && !featureEditor && !diff;
     return (
       <div
         key={groupId}
@@ -4212,6 +4519,14 @@ export function App() {
             onShowSymbols={() => setQuick({ kind: "quick", value: "@" })}
           />
         )}
+        {showsEditor && docs.current.get(path!)?.readOnlyMessage && (
+          <div className="editor-readonly-banner" title={docs.current.get(path!)!.readOnlyMessage}>
+            <div
+              className="markdown-body"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(docs.current.get(path!)!.readOnlyMessage!) }}
+            />
+          </div>
+        )}
         <div className="editor-host">
           {!path && singleGroup && (
             <Welcome recent={recent} keys={keys} onRun={(id) => runCommand(id)} onOpenRecent={(folder) => void openWorkspace(folder)} />
@@ -4249,6 +4564,20 @@ export function App() {
             <div className="editor-webview">
               <WebviewSlot slotKey={webviewId} placeholder={webviews.find((webview) => webview.id === webviewId)?.restoring ? "Restoring…" : undefined} />
             </div>
+          )}
+          {diff && (
+            <DiffEditor
+              key={path}
+              original={diff.original}
+              modified={diff.modified}
+              language={diffDocument?.language ?? "plaintext"}
+              readOnly={!!diffDocument?.readOnly}
+              initialSelection={diffSelections.current.get(path ?? "")}
+              load={loadDiffContent}
+              onEdit={editDiffDocument}
+              onFocus={() => focusGroup(groupId)}
+              autoFocus={diffAutoFocus.current.has(path ?? "")}
+            />
           )}
           {(dragKind === "tab" || dragKind === "file" || dragKind === "terminal") && (
             <EditorDropTarget accepts={dragAccepts} onDrop={(zone, data, copy) => void dropIntoGroup(groupId, zone, data, copy)} />
@@ -4372,12 +4701,12 @@ export function App() {
               <div className="sidebar-header">
                 <span>{sidebarTitle}</span>
                 <div className="sidebar-actions">
-                  {sideView === "explorer" && workspaceRoot && (
+                  {sideView === "explorer" && newEntryRoot && (
                     <>
-                      <button className="icon-btn" type="button" title="New File…" onClick={() => void createEntry("file", workspaceRoot)}>
+                      <button className="icon-btn" type="button" title="New File…" onClick={() => void createEntry("file", newEntryRoot)}>
                         <FilePlus size={16} strokeWidth={1.75} />
                       </button>
-                      <button className="icon-btn" type="button" title="New Folder…" onClick={() => void createEntry("folder", workspaceRoot)}>
+                      <button className="icon-btn" type="button" title="New Folder…" onClick={() => void createEntry("folder", newEntryRoot)}>
                         <FolderPlus size={16} strokeWidth={1.75} />
                       </button>
                       <button className="icon-btn" type="button" title="Refresh Explorer" onClick={() => setTreeRefresh((n) => n + 1)}>
@@ -4435,6 +4764,7 @@ export function App() {
                   onOpenFile={(path, options) => void openFile(path, { preview: options.preview, focus: !options.preview })}
                   onOpenFolder={() => void pickFolder()}
                   onContextAction={(e) => void handleTreeContext(e)}
+                  onTransfer={(paths, targetDir, copy) => void transferProviderEntries(paths, targetDir, copy)}
                 />
                 {visibleViews(viewLayout.explorerViews).length > 0 && (
                   <>
@@ -4461,6 +4791,7 @@ export function App() {
               <div className="sidebar-panel" hidden={sideView !== "search"}>
                 <SearchView
                   workspaceRoot={workspaceRoot}
+                  providerRoots={providerRootPaths}
                   focusToken={searchFocus}
                   replaceToken={searchReplace}
                   initialQuery={searchSeed}
@@ -4731,7 +5062,14 @@ export function App() {
           });
         }}
         workspaceRoot={workspaceRoot}
-        listFiles={async () => (workspaceRoot ? (await api().request.listWorkspaceFiles({ root: workspaceRoot })).files : [])}
+        listFiles={async () => {
+          const local = workspaceRoot ? (await api().request.listWorkspaceFiles({ root: workspaceRoot })).files : [];
+          // VS Code searches provided schemes only through providers: walk their workspace folders instead.
+          const provided = providerRootPaths.length
+            ? await extensionService.call("providerListFiles", providerRootPaths, 20000).catch(() => [])
+            : [];
+          return [...local, ...provided];
+        }}
         recentEditors={mru.current.filter((path) => path !== activePath)}
         commands={visiblePaletteCommands}
         keys={keys}

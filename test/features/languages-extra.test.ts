@@ -183,6 +183,43 @@ test("drop edits: mime filter, kinds, snippets and additional edits", async () =
   assert.equal(edits[0].additional[0].newText, "// header\n");
 });
 
+test("dropped files: a known path also arrives as a text/uri-list and asFile().uri", async () => {
+  const { host, api } = startedHost();
+  const captured: { seen?: { list: string | null; file: any } } = {};
+  const record = async (_document: unknown, _at: unknown, transfer: any) => {
+    const list = transfer.get("text/uri-list");
+    captured.seen = { list: list ? await list.asString() : null, file: transfer.get("image/png").asFile() };
+    return [new api.DocumentDropEdit("x", "Insert", api.DocumentDropOrPasteEditKind.Text)];
+  };
+  api.languages.registerDocumentDropEditProvider("typescript", { provideDocumentDropEdits: record }, { dropMimeTypes: ["text/uri-list"] });
+  api.languages.registerDocumentDropEditProvider("typescript", { provideDocumentDropEdits: record });
+
+  const path = FILE + ".png";
+  const edits = await ask(host, "dropEdits", FILE, 0, 0, [{ mime: "image/png", file: { name: "a.png", path, base64: "AQ==" } }]);
+  assert.equal(edits.length, 2);
+  assert.ok(captured.seen);
+  assert.equal(captured.seen!.list, api.Uri.file(path).toString());
+  assert.equal(captured.seen!.file.name, "a.png");
+  assert.equal(captured.seen!.file.uri.toString(), api.Uri.file(path).toString());
+
+  // Without a known path the file has no URI and no URI list is invented.
+  captured.seen = undefined;
+  await ask(host, "dropEdits", FILE, 0, 0, [{ mime: "image/png", file: { name: "a.png", base64: "AQ==" } }]);
+  const withoutPath = captured.seen as { list: string | null; file: any } | undefined;
+  assert.ok(withoutPath);
+  assert.equal(withoutPath.list, null);
+  assert.equal(withoutPath.file.uri, undefined);
+
+  // A URI list the window sent itself is not overwritten by the file's path.
+  captured.seen = undefined;
+  await ask(host, "dropEdits", FILE, 0, 0, [
+    { mime: "text/uri-list", value: "file:///sent-by-window" },
+    { mime: "image/png", file: { name: "a.png", path, base64: "AQ==" } },
+  ]);
+  const explicit = captured.seen as { list: string | null } | undefined;
+  assert.equal(explicit?.list, "file:///sent-by-window");
+});
+
 test("paste edits: copy-time data, trigger kind, yieldTo and resolve", async () => {
   const { host, api } = startedHost();
   const Kind = api.DocumentDropOrPasteEditKind;

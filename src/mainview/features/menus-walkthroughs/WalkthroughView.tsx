@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CircleCheck, Circle } from "lucide-react";
-import { COMMAND_LINK_HOST, replaceCommandLinks, type Walkthrough, type WalkthroughMedia, type WalkthroughStep } from "../../../shared/menus-walkthroughs";
+import { ArrowLeft, CircleCheck, Circle, RotateCcw } from "lucide-react";
+import {
+  COMMAND_LINK_HOST,
+  mediaPathFor,
+  parseStepDescription,
+  replaceCommandLinks,
+  type MediaThemeKind,
+  type Walkthrough,
+  type WalkthroughMedia,
+  type WalkthroughStep,
+} from "../../../shared/menus-walkthroughs";
 import { renderMarkdown } from "../../lib/markdown";
 import { api as rpcApi } from "../../lib/rpc";
 import {
   getApi,
   isStepDone,
-  linkFollowed,
+  linkFollowedUrl,
   progressOf,
+  resetProgress,
   runCommandLink,
   selectStep,
   setStepDone,
@@ -19,15 +29,30 @@ import {
 
 /** A walkthrough: its steps with checkmarks on the left, the media of the selected step on the right. */
 
-type MediaData = { kind: "image"; dataUrl: string } | { kind: "text"; text: string } | { error: string };
+type MediaData = { kind: "image"; dataUrl: string } | { kind: "svg"; text: string } | { kind: "text"; text: string } | { error: string };
 
 const mediaCache = new Map<string, Promise<MediaData>>();
 
-function mediaPath(media: WalkthroughMedia): string | undefined {
-  if (typeof media.path === "string") return media.path;
-  const dark = getApi()?.theme.isDark() ?? true;
-  const { light, dark: darkPath, hc, hcLight } = media.path;
-  return (dark ? (darkPath ?? hc ?? light) : (light ?? hcLight ?? darkPath)) ?? hc ?? hcLight;
+/** The extension host restarted (extension update): read media files again. */
+export function clearMediaCache(): void {
+  mediaCache.clear();
+}
+
+/** The active theme kind (`document.documentElement.dataset.themeKind`), for light/dark/hc media variants. */
+function themeKind(): MediaThemeKind {
+  const kind = document.documentElement.dataset.themeKind;
+  if (kind === "light" || kind === "hcDark" || kind === "hcLight") return kind;
+  return document.body.classList.contains("vscode-light") ? "light" : "dark";
+}
+
+/** Re-renders when the color theme changes (media may have per-theme variants). */
+function useThemeKind(): MediaThemeKind {
+  const [kind, setKind] = useState(themeKind);
+  useEffect(() => {
+    setKind(themeKind());
+    return getApi()?.theme.onChange(() => setKind(themeKind()));
+  }, []);
+  return kind;
 }
 
 function loadMedia(extensionId: string, path: string): Promise<MediaData> {
@@ -44,8 +69,46 @@ function loadMedia(extensionId: string, path: string): Promise<MediaData> {
   return loading;
 }
 
+/** VS Code SVGs use the workbench's theme variables; render them inline, without scripts or event handlers. */
+export function sanitizeSvg(source: string): string {
+  return source
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<foreignObject\b[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(?:href|xlink:href)\s*=\s*(?:"|')?\s*javascript:/gi, "href=\"#");
+}
+
+/** A Markdown block with links that open externally, run commands, or complete `onLink`. */
+function MarkdownBlock({ markdown, onLink }: { markdown: string; onLink?: (url: string) => void }) {
+  const rendered = useMemo(() => {
+    const replaced = replaceCommandLinks(markdown);
+    return { html: renderMarkdown(replaced.markdown), links: replaced.links };
+  }, [markdown]);
+
+  return (
+    <div
+      className="markdown-body"
+      dangerouslySetInnerHTML={{ __html: rendered.html }}
+      onClick={(event) => {
+        const anchor = (event.target as HTMLElement).closest<HTMLElement>("a[data-href]");
+        if (!anchor) return;
+        event.preventDefault();
+        const href = anchor.dataset.href ?? "";
+        if (href.startsWith(COMMAND_LINK_HOST)) {
+          const command = rendered.links[Number(href.slice(COMMAND_LINK_HOST.length))];
+          if (command) runCommandLink(command);
+          return;
+        }
+        onLink?.(href);
+        void rpcApi().request.openExternal({ url: href });
+      }}
+    />
+  );
+}
+
 function StepMedia({ extensionId, media }: { extensionId: string; media: WalkthroughMedia | undefined }) {
-  const path = media ? mediaPath(media) : undefined;
+  const kind = useThemeKind();
+  const path = media ? mediaPathFor(media, kind) : undefined;
   const [data, setData] = useState<MediaData | null>(null);
   useEffect(() => {
     setData(null);
@@ -67,20 +130,50 @@ function StepMedia({ extensionId, media }: { extensionId: string; media: Walkthr
       </div>
     );
   }
-  return <div className="walkthrough-media markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(data.text) }} />;
+  if (data.kind === "svg") {
+    return (
+      <div className="walkthrough-media svg-body">
+        <div role="img" aria-label={media.alt ?? ""} dangerouslySetInnerHTML={{ __html: sanitizeSvg(data.text) }} />
+      </div>
+    );
+  }
+  return (
+    <div className="walkthrough-media markdown-body">
+      <MarkdownBlock markdown={data.text} onLink={(url) => linkFollowedUrl(url)} />
+    </div>
+  );
 }
 
-function StepDescription({ walkthrough, step }: { walkthrough: Walkthrough; step: WalkthroughStep }) {
+/** One line of a step description: Markdown with buttons for lone links (VS Code's buildMarkdownDescription). */
+function DescriptionLine({ text, button }: { text: string; button?: { label: string; href: string } }) {
   const rendered = useMemo(() => {
-    const { markdown, links } = replaceCommandLinks(step.description);
-    // A paragraph holding nothing but a command link is shown as a button (like VS Code).
-    const html = renderMarkdown(markdown).replace(/<p>(<a data-href="[^"]*">[^<]*<\/a>)<\/p>/g, (_m, link: string) => `<p class="walkthrough-button">${link}</p>`);
-    return { html, links };
-  }, [step.description]);
+    const replaced = replaceCommandLinks(text);
+    return { html: renderMarkdown(replaced.markdown), links: replaced.links };
+  }, [text]);
+  const label = useMemo(() => (button ? renderMarkdown(button.label).replace(/^<p>|<\/p>$/g, "") : ""), [button]);
+
+  if (button) {
+    return (
+      <p className="walkthrough-button">
+        <a
+          data-href={button.href}
+          onClick={(event) => {
+            event.preventDefault();
+            if (button.href.startsWith("command:")) runCommandLink(button.href);
+            else {
+              linkFollowedUrl(button.href);
+              void rpcApi().request.openExternal({ url: button.href });
+            }
+          }}
+          dangerouslySetInnerHTML={{ __html: label }}
+        />
+      </p>
+    );
+  }
 
   return (
     <div
-      className="walkthrough-description markdown-body"
+      className="walkthrough-line"
       dangerouslySetInnerHTML={{ __html: rendered.html }}
       onClick={(event) => {
         const anchor = (event.target as HTMLElement).closest<HTMLElement>("a[data-href]");
@@ -90,13 +183,44 @@ function StepDescription({ walkthrough, step }: { walkthrough: Walkthrough; step
         if (href.startsWith(COMMAND_LINK_HOST)) {
           const command = rendered.links[Number(href.slice(COMMAND_LINK_HOST.length))];
           if (command) runCommandLink(command);
-        } else {
-          linkFollowed(walkthrough, step, href);
-          void rpcApi().request.openExternal({ url: href });
+          return;
         }
+        linkFollowedUrl(href);
+        void rpcApi().request.openExternal({ url: href });
       }}
     />
   );
+}
+
+function StepDescription({ step }: { step: WalkthroughStep }) {
+  const lines = useMemo(() => parseStepDescription(step.description), [step.description]);
+  return (
+    <div className="walkthrough-description markdown-body">
+      {lines.map((line, index) => (
+        <DescriptionLine key={index} text={line.text} button={line.button} />
+      ))}
+    </div>
+  );
+}
+
+/** The icon of a walkthrough (or the extension's) at the left of the title. */
+export function WalkthroughIcon({ extensionId, path, size = 24 }: { extensionId: string; path: string; size?: number }) {
+  const [data, setData] = useState<{ src?: string; svg?: string }>({});
+  useEffect(() => {
+    let cancelled = false;
+    void loadMedia(extensionId, path).then((result) => {
+      if (cancelled) return;
+      if ("dataUrl" in result) setData({ src: result.dataUrl });
+      else if ("text" in result && result.kind === "svg") setData({ svg: sanitizeSvg(result.text) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [extensionId, path]);
+  if (data.src) return <img className="walkthrough-icon" src={data.src} alt="" width={size} height={size} />;
+  if (data.svg)
+    return <span className="walkthrough-icon" role="img" aria-hidden="true" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: data.svg }} />;
+  return null;
 }
 
 export function WalkthroughView({ walkthrough, onBack }: { walkthrough: Walkthrough; onBack?: () => void }) {
@@ -112,7 +236,7 @@ export function WalkthroughView({ walkthrough, onBack }: { walkthrough: Walkthro
     if (selectedId) setOpenId(selectedId);
   }, [selectedId]);
 
-  // Context / setting / view events have no push notification: look again while the page is shown.
+  // Context / setting / view events have no push notification for window keys: look again while the page is shown.
   useEffect(() => {
     startCompletionWatch();
     evaluateCompletion();
@@ -134,12 +258,25 @@ export function WalkthroughView({ walkthrough, onBack }: { walkthrough: Walkthro
             <ArrowLeft size={16} />
           </button>
         )}
+        {walkthrough.icon ? (
+          <WalkthroughIcon extensionId={walkthrough.extensionId} path={walkthrough.icon} />
+        ) : walkthrough.iconUrl ? (
+          <img className="walkthrough-icon" src={walkthrough.iconUrl} alt="" width={28} height={28} />
+        ) : null}
         <div>
-          <h1>{walkthrough.title}</h1>
+          <h1>
+            {walkthrough.title}
+            {walkthrough.featured && <span className="walkthrough-featured">Featured</span>}
+          </h1>
           {walkthrough.description && <p className="muted">{walkthrough.description}</p>}
         </div>
         <span className="walkthrough-progress muted">
           {done}/{total} steps
+          {done > 0 && (
+            <button type="button" className="icon-btn walkthrough-reset" title="Reset All Walkthrough Progress" onClick={() => resetProgress()}>
+              <RotateCcw size={13} />
+            </button>
+          )}
         </span>
       </header>
       <div className="walkthrough-body">
@@ -169,7 +306,7 @@ export function WalkthroughView({ walkthrough, onBack }: { walkthrough: Walkthro
                     {step.title}
                   </button>
                 </div>
-                {active && <StepDescription walkthrough={walkthrough} step={step} />}
+                {active && <StepDescription step={step} />}
               </li>
             );
           })}

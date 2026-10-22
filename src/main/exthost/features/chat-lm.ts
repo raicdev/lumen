@@ -19,7 +19,7 @@ export const chatLmFeature: HostFeature = {
         createChatParticipant: (id: string, handler: unknown) => state.registerParticipant(extensionId, id, handler),
       },
       lm: {
-        selectChatModels: (selector?: unknown) => state.selectChatModels(selector),
+        selectChatModels: (selector?: unknown) => state.selectChatModels(selector, extensionId),
         onDidChangeChatModels: state.modelsChanged.event,
         registerLanguageModelChatProvider: (vendor: string, provider: unknown) => state.registerProvider(extensionId, vendor, provider),
         registerTool: (name: string, tool: unknown) => state.registerTool(extensionId, name, tool),
@@ -57,6 +57,8 @@ export const chatLmFeature: HostFeature = {
         return state.wireState();
       case "refresh":
         return state.refresh();
+      case "models":
+        return { models: state.languageModels() };
       case "send":
         // Answers go back as `part` / `done` messages.
         void state.run(args[0] as ChatSendArgs);

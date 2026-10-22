@@ -5,6 +5,8 @@ import * as T from "../types.ts";
 import { normalizeKey } from "../documents.ts";
 import { CommandLineConfidence, ShellIntegrationModel, shellTypeOf } from "./terminal/shell.ts";
 import type { ShellExecution } from "./terminal/shell.ts";
+import { applyQuickFix, clearQuickFixes, registerQuickFixProvider, runQuickFixes, TerminalQuickFixOpener, TerminalQuickFixTerminalCommand } from "./terminal/quickfix.ts";
+export type { TerminalQuickFixContext } from "./terminal/quickfix.ts";
 import type {
   CreateTerminalRequest,
   CreateTerminalResponse,
@@ -228,6 +230,7 @@ function disposeRecord(host: ExtensionHost, record: Record_) {
 
 /** The window closed terminal `id` (or told us after the fact): the same as the host's `terminalClosed`. */
 function closeRecord(host: ExtensionHost, state: FeatureState, id: string) {
+  clearQuickFixes(host, id);
   const record = state.records.get(id);
   state.records.delete(id);
   const entry = host.terminals.get(id);
@@ -416,8 +419,14 @@ function modelOf(host: ExtensionHost, state: FeatureState, record: Record_): She
     send: (text) => void record.ready.then((id) => host.requestView("terminalSendText", id, text, false)).catch(() => {}),
     shell: () => record.state.shell,
     changed: () => state.onDidChangeShellIntegration.fire({ terminal, shellIntegration: model.api }),
-    started: (execution: ShellExecution) => state.onDidStartExecution.fire({ terminal, shellIntegration: model.api, execution }),
-    ended: (execution: ShellExecution, exitCode: number | undefined) => state.onDidEndExecution.fire({ terminal, shellIntegration: model.api, execution, exitCode }),
+    started: (execution: ShellExecution) => {
+      if (record.viewId) clearQuickFixes(host, record.viewId);
+      state.onDidStartExecution.fire({ terminal, shellIntegration: model.api, execution });
+    },
+    ended: (execution: ShellExecution, exitCode: number | undefined) => {
+      state.onDidEndExecution.fire({ terminal, shellIntegration: model.api, execution, exitCode });
+      if (record.viewId && !record.closed) void runQuickFixes(host, record.viewId, execution, exitCode);
+    },
   });
   record.model = model;
   return model;
@@ -577,6 +586,10 @@ export const terminalFeature: HostFeature = {
             if (state.profileProviders.get(String(id)) === entry) state.profileProviders.delete(String(id));
           });
         },
+        registerTerminalQuickFixProvider(id: string, provider: any) {
+          if (!provider || typeof provider.provideTerminalQuickFixes !== "function") throw new Error("registerTerminalQuickFixProvider: provideTerminalQuickFixes is required");
+          return registerQuickFixProvider(host, String(id), extensionId, provider);
+        },
       },
     };
   },
@@ -585,6 +598,8 @@ export const terminalFeature: HostFeature = {
     TerminalProfile,
     TerminalLink,
     TerminalShellExecutionCommandLineConfidence,
+    TerminalQuickFixTerminalCommand,
+    TerminalQuickFixOpener,
   },
 
   init(host) {
@@ -610,6 +625,8 @@ export const terminalFeature: HostFeature = {
         return host.requestView("terminalShow", String(args[0]), false);
       case "resolveProfile":
         return resolveProfile(host, state, String(args[0]), String(args[1]), (args[2] as { cols: number; rows: number } | null) ?? undefined);
+      case "quickFix":
+        return applyQuickFix(host, String(args[0]), String(args[1]));
       default:
         throw new Error(`terminal: unknown request '${method}'`);
     }

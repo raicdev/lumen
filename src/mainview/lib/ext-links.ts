@@ -143,7 +143,7 @@ function runCommandUri(uri: string): void {
 
 /** Open a resolved target: files through the editor, commands through the host, everything else externally. */
 function openTarget(uri: string, onOpen: (target: DocumentLinkTarget) => void): void {
-  const scheme = (/^([a-z][a-z0-9+.-]*):/i.exec(uri)?.[1] ?? "").toLowerCase();
+  const scheme = (/^(\w[\w+.-]*):/i.exec(uri)?.[1] ?? "").toLowerCase();
   if (scheme === "command") {
     runCommandUri(uri);
     return;

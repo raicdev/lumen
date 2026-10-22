@@ -7,7 +7,7 @@ import * as T from "../types.ts";
 import type { HostFeature } from "./contract.ts";
 import { NOT_HANDLED } from "./contract.ts";
 import { executeInteractive, inputUriOf, openInteractive } from "./notebooks/interactive.ts";
-import { NotebookService, notebookService } from "./notebooks/model.ts";
+import { NotebookService, globMatches, notebookService } from "./notebooks/model.ts";
 import type { Serializer } from "./notebooks/model.ts";
 import { NotebookVariablesRequestKind, notebookVariables, variableMenuArg } from "./notebooks/variables.ts";
 import { NotebookCellOutput, NotebookCellStatusBarAlignment, NotebookCellStatusBarItem, NotebookEdit, NotebookEditorRevealType, TabInputInteractiveWindow, TabInputNotebookDiff } from "./notebooks/types.ts";
@@ -28,7 +28,9 @@ async function showNotebook(service: NotebookService, host: ExtensionHost, docum
   const doc = service.find(keyOfUri(document.uri));
   if (!doc) throw new Error(`The notebook ${document.uri.toString()} is not open`);
   if (doc.untitled) throw new Error("Untitled notebooks live in memory only: save the notebook before showing it");
-  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preview: options.preview, preserveFocus: options.preserveFocus, beside: options.viewColumn === T.ViewColumn.Beside }]);
+  // Like window.showTextDocument: the view column and preserveFocus go to the window, which
+  // picks the editor group (Beside asks for a new one; One..Nine for a group by its position).
+  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preview: options.preview, preserveFocus: options.preserveFocus, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside }]);
   // The editor appears when the window has mounted the notebook.
   for (let waited = 0; waited < 5000; waited += 50) {
     const editor = service.editorOf(doc);
@@ -43,8 +45,35 @@ async function showNotebook(service: NotebookService, host: ExtensionHost, docum
 
 const emptyDoc = (path: string, error: string) => ({ path, notebookType: "", version: 0, dirty: false, metadata: {}, cells: [], controller: null, controllers: [], error });
 
+/** Does some `contributes.notebooks` selector claim the file (whatever its priority)? */
+function hasNotebookEditor(host: ExtensionHost, path: string): boolean {
+  if (path.toLowerCase().endsWith(".ipynb")) return true;
+  for (const runtime of host.runtimes.values()) {
+    const contributed = (runtime.description.manifest.contributes as { notebooks?: { selector?: { filenamePattern?: string }[] }[] } | undefined)?.notebooks;
+    if (contributed?.some((entry) => entry.selector?.some((selector) => !!selector.filenamePattern && globMatches(selector.filenamePattern, path)))) return true;
+  }
+  return false;
+}
+
+/**
+ * "Open in Notebook Editor": the active file gets the notebook editor even when its
+ * contribution has `"priority": "option"` (which leaves it to the text editor by default).
+ */
+async function openActiveAsNotebook(service: NotebookService, host: ExtensionHost): Promise<boolean> {
+  const tab = host.tabGroups.activeTabGroup.activeTab;
+  if (tab?.input instanceof TabInputNotebook || tab?.input instanceof TabInputInteractiveWindow) return true;
+  const path = tab?.viewPath();
+  if (!path || path.startsWith("feature-editor:")) throw new Error("There is no file in the active editor");
+  if (!hasNotebookEditor(host, path)) throw new Error("No notebook editor is contributed for this file");
+  const doc = service.find(path) ?? (await service.open(path, path));
+  doc.viewed = true;
+  await showNotebook(service, host, doc);
+  return true;
+}
+
 async function onRequest(host: ExtensionHost, method: string, args: unknown[]): Promise<unknown> {
   const service = notebookService(host);
+  if (method === "openWith") return await openActiveAsNotebook(service, host);
   const request = { method, args } as NbRequest;
   if (request.method === "open") {
     const path = request.args[0];

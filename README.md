@@ -47,6 +47,7 @@ frameless windows, native dialogs and a close guard.
 **Shell**
 
 - Native desktop window through **Lumen Shell** + the system WebView, close guard for unsaved changes
+- **Auto update** (Windows setup installs): checks [GitHub Releases](https://github.com/raicdev/lumen/releases) at startup and every 6 hours, downloads the new setup in the background, verifies its SHA-256 digest and installs it on *Restart to Update*; *Help → Check for Updates…* checks now; `update.mode` (`default` / `manual` / `none`) controls it. Portable copies are pointed to the release page
 - Integrated terminals (`node-pty` → ConPTY on Windows): multiple terminals, split groups (`Ctrl+Shift+5`), shell profiles (PowerShell 7 / Windows PowerShell / cmd / Git Bash / WSL …), rename, relaunch, terminals as editor tabs
 - Movable panel: dock it bottom / left / right by dragging its header (or *View: Move Panel …*), drag terminals into the editor area and back
 - Split editor groups: drag a tab, an explorer file or a terminal to an edge of any editor group to dock it there (center = move into that group, Ctrl = copy); `Ctrl+\` splits, `Ctrl+1…4` focuses groups, `Ctrl+Alt+←/→` moves editors between groups; the same file open twice stays in sync
@@ -70,7 +71,7 @@ pnpm start          # or: pnpm dev   (rebuild + reload on change)
 | `pnpm dev` | Dev with view watching (`src/`, `packages/`) and live reload |
 | `pnpm build` | Production bundles into `.lumen/build` |
 | `pnpm package` | Standalone app (`dist/Lumen/Lumen.exe`, a Node single executable) |
-| `pnpm installer` | Windows setup (`dist/Lumen-<version>-win32-x64-setup.exe`, per-user, needs [NSIS](https://nsis.sourceforge.io): `winget install NSIS.NSIS`) |
+| `pnpm installer` | Windows setup (`dist/Lumen-<version>-win32-x64-setup.exe`, per-user, needs [NSIS](https://nsis.sourceforge.io): `winget install NSIS.NSIS`). Publish it as an asset of a GitHub release tagged `v<version>` for auto update |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Extension tests (transpiler, VSIX reader, API surface, extension host end to end) |
 | `pnpm ext:transpile <file.vsix \| folder> [--out dir]` | Convert a VS Code extension to a Lumen extension and print its compatibility report |

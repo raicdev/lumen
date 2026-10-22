@@ -149,7 +149,7 @@ export function quickDiffExtension(path: string, api: ViewFeatureApi): Extension
         return path;
       case "resourceScheme":
       case "originalResourceScheme":
-        return /^[a-zA-Z][\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? path.slice(0, path.indexOf(":")) : "file";
+        return /^\w[\w+.-]+:/.test(path) && !/^[a-zA-Z]:[\\/]/.test(path) ? path.slice(0, path.indexOf(":")) : "file";
       case "scmProvider":
         return scmStore.get().controls.find((control) => control.hasQuickDiff)?.id;
       default:

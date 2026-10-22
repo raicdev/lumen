@@ -126,6 +126,72 @@ export function matchersOf(value: unknown): (string | Record<string, unknown>)[]
   return [value].flat().filter((item): item is string | Record<string, unknown> => typeof item === "string" || isObject(item));
 }
 
+/* ── taskDefinitions ─────────────────────────────────────────────────────── */
+
+export type TaskDefinitionProperty = { type?: string | string[]; description?: string };
+
+/** A `contributes.taskDefinitions` entry. */
+export type TaskDefinitionContribution = {
+  type?: string;
+  properties?: Record<string, TaskDefinitionProperty | undefined>;
+  required?: string[];
+};
+
+export type TaskDefinitionIssue = { severity: "error" | "warning"; message: string };
+
+function valueTypeOf(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+function matchesType(value: unknown, type: string): boolean {
+  switch (type) {
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number";
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "array":
+      return Array.isArray(value);
+    case "object":
+      return isObject(value);
+    case "null":
+      return value === null;
+    // An unknown type keyword constrains nothing.
+    default:
+      return true;
+  }
+}
+
+/**
+ * Validate a tasks.json entry of a contributed type against its taskDefinitions
+ * entry, like the tasks.json schema VS Code generates: missing `required`
+ * properties are errors, values that do not match a declared property type are
+ * warnings.
+ */
+export function taskDefinitionIssues(task: Record<string, unknown>, definition: TaskDefinitionContribution | undefined): TaskDefinitionIssue[] {
+  if (!definition) return [];
+  const issues: TaskDefinitionIssue[] = [];
+  for (const name of definition.required ?? []) {
+    if (typeof name === "string" && task[name] === undefined) issues.push({ severity: "error", message: `Required property '${name}' is missing.` });
+  }
+  for (const [name, property] of Object.entries(definition.properties ?? {})) {
+    const value = task[name];
+    if (value === undefined || !property) continue;
+    const types = [property.type ?? []].flat().filter((type): type is string => typeof type === "string");
+    if (!types.length || types.some((type) => matchesType(value, type))) continue;
+    issues.push({
+      severity: "warning",
+      message: `Property '${name}' should be of type ${types.map((type) => `'${type}'`).join(" or ")} but is of type '${valueTypeOf(value)}'.`,
+    });
+  }
+  return issues;
+}
+
 /* ── variables ───────────────────────────────────────────────────────────── */
 
 export type VariableContext = {

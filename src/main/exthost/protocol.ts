@@ -30,4 +30,6 @@ export type HostToMain =
   | { type: "view"; message: HostToView }
   | { type: "callResult"; id: number; result?: unknown; error?: string }
   | { type: "mainRequest"; id: number; method: keyof MainMethods; args: unknown[] }
+  /** An extension started a process (Process Explorer shows whose it is). */
+  | { type: "childProcess"; pid: number; extensionId: string }
   | { type: "shutdownDone" };

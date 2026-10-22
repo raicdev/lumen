@@ -34,7 +34,29 @@ kbd { background-color: var(--vscode-keybindingLabel-background); color: var(--v
 ::-webkit-scrollbar-corner { background-color: transparent; }
 ::-webkit-scrollbar-thumb { background-color: var(--vscode-scrollbarSlider-background); }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground); }
+::highlight(lumen-find) { background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)); }
+::highlight(lumen-find-active) { background-color: var(--vscode-editor-findMatchBackground, #515c6a); }
 `;
+
+/** Styles of the find bar (in its own shadow root, so the page's styles do not reach it). */
+const FIND_CSS = `
+:host { all: initial; position: fixed; top: 0; right: 14px; z-index: 2147483647; }
+.bar { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 0 0 4px 4px; background: var(--vscode-editorWidget-background, #252526); color: var(--vscode-editorWidget-foreground, #cccccc); box-shadow: 0 0 8px 2px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36)); font: 13px var(--vscode-font-family, system-ui, sans-serif); }
+input { width: 180px; padding: 3px 6px; border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; outline: none; background: var(--vscode-input-background, #3c3c3c); color: var(--vscode-input-foreground, #cccccc); font: inherit; }
+input:focus { border-color: var(--vscode-focusBorder, #007fd4); }
+.count { min-width: 72px; padding: 0 6px; font-size: 12px; opacity: 0.8; white-space: nowrap; }
+button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: none; color: inherit; font: inherit; cursor: pointer; }
+button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31)); }
+`;
+
+export type WebviewFindAction = "open" | "next" | "previous" | "close";
+
+/** The find action a key forwarded by a webview stands for (Ctrl/Cmd+F, F3, Shift+F3), as in VS Code's webview find widget. */
+export function webviewFindAction(event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }): WebviewFindAction | null {
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase() === "f") return "open";
+  if (event.key === "F3" && !event.ctrlKey && !event.metaKey && !event.altKey) return event.shiftKey ? "previous" : "next";
+  return null;
+}
 
 /**
  * Runs first in every webview: acquireVsCodeApi() (also acquireLumenApi),
@@ -95,11 +117,6 @@ const BOOTSTRAP = `(() => {
     theme = event.data.__lumenTheme;
     applyTheme();
   }, true);
-  try {
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(${JSON.stringify(DEFAULT_CSS)});
-    document.adoptedStyleSheets = [sheet, ...document.adoptedStyleSheets];
-  } catch {}
   if (!document.body) document.addEventListener("DOMContentLoaded", themeBody);
   document.addEventListener("click", (event) => {
     const link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
@@ -138,11 +155,105 @@ const BOOTSTRAP = `(() => {
     if (edit === "paste") document.execCommand("insertText", false, String(event.data.text || ""));
     else document.execCommand(edit);
   }, true);
+  // The find widget (enableFindWidget; the window decides when to open it): a bar in a closed
+  // shadow root. Matches are CSS highlights, so the page's DOM is never changed.
+  const find = (() => {
+    const highlights = typeof Highlight === "function" && window.CSS && CSS.highlights ? CSS.highlights : null;
+    let bar = null;
+    let input = null;
+    let count = null;
+    let ranges = [];
+    let index = -1;
+    const update = () => {
+      count.textContent = ranges.length ? (index + 1) + " of " + ranges.length : input.value ? "No results" : "";
+    };
+    const clear = () => {
+      if (highlights) { highlights.delete("lumen-find"); highlights.delete("lumen-find-active"); }
+      ranges = [];
+      index = -1;
+    };
+    const go = (step) => {
+      if (!ranges.length) { index = -1; update(); return; }
+      index = index < 0 ? 0 : (index + step + ranges.length) % ranges.length;
+      const range = ranges[index];
+      if (highlights) highlights.set("lumen-find-active", new Highlight(range));
+      const target = range.startContainer.parentElement;
+      if (target) target.scrollIntoView({ block: "center", inline: "nearest" });
+      update();
+    };
+    const search = () => {
+      clear();
+      const query = input.value.toLowerCase();
+      if (query && document.body) {
+        const skip = "script, style, noscript, template, textarea";
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+          acceptNode: (node) => (node.parentElement && !node.parentElement.closest(skip) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+        });
+        for (let node = walker.nextNode(); node && ranges.length < 1000; node = walker.nextNode()) {
+          const text = node.data.toLowerCase();
+          for (let at = text.indexOf(query); at >= 0 && ranges.length < 1000; at = text.indexOf(query, at + query.length)) {
+            const range = document.createRange();
+            range.setStart(node, at);
+            range.setEnd(node, at + query.length);
+            // Text that is not rendered (display: none, ...) is not a match.
+            if (range.getClientRects().length) ranges.push(range);
+          }
+        }
+      }
+      if (highlights && ranges.length) highlights.set("lumen-find", new Highlight(...ranges));
+      go(0);
+    };
+    const shown = () => !!bar && bar.isConnected;
+    const close = () => {
+      clear();
+      if (bar) bar.remove();
+    };
+    const open = () => {
+      if (!bar) {
+        bar = document.createElement("lumen-find-widget");
+        const shadow = bar.attachShadow({ mode: "closed" });
+        shadow.innerHTML = "<style>" + ${JSON.stringify(FIND_CSS)} + "</style>" +
+          "<div class='bar' role='search'><input type='text' placeholder='Find' aria-label='Find'><span class='count' aria-live='polite'></span>" +
+          "<button type='button' data-step='-1' title='Previous Match (Shift+Enter)' aria-label='Previous Match'>&#8593;</button>" +
+          "<button type='button' data-step='1' title='Next Match (Enter)' aria-label='Next Match'>&#8595;</button>" +
+          "<button type='button' data-close='' title='Close (Escape)' aria-label='Close'>&#215;</button></div>";
+        input = shadow.querySelector("input");
+        count = shadow.querySelector(".count");
+        input.addEventListener("input", search);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") { event.preventDefault(); go(event.shiftKey ? -1 : 1); }
+          else if (event.key === "Escape") { event.preventDefault(); close(); }
+          event.stopPropagation();
+        });
+        shadow.addEventListener("click", (event) => {
+          const button = event.target && event.target.closest ? event.target.closest("button") : null;
+          if (!button) return;
+          if (button.hasAttribute("data-close")) close();
+          else go(Number(button.dataset.step));
+        });
+      }
+      if (!bar.isConnected) document.documentElement.appendChild(bar);
+      input.focus();
+      input.select();
+      if (input.value) search();
+    };
+    return { open, close, next: () => (shown() ? go(1) : open()), previous: () => (shown() ? go(-1) : open()) };
+  })();
+  window.addEventListener("message", (event) => {
+    if (event.source !== host || !event.data || !event.data.__lumenFind) return;
+    event.stopImmediatePropagation();
+    const action = find[event.data.__lumenFind];
+    if (typeof action === "function") action();
+  }, true);
 })();`;
 
-/** The extension's page with Lumen's bootstrap in front of everything else. */
+/**
+ * The extension's page with Lumen's bootstrap in front of everything else.
+ * The default styles come first too, as in VS Code, so the page's own rules
+ * override them (adopted style sheets would come after the page's in the cascade).
+ */
 export function documentFor(html: string): string {
-  const head = `<script>${BOOTSTRAP}</script>`;
+  const head = `<style id="_defaultStyles">${DEFAULT_CSS}</style><script>${BOOTSTRAP}</script>`;
   const opening = /<head(\s[^>]*)?>/i.exec(html);
   if (opening) return html.slice(0, opening.index + opening[0].length) + head + html.slice(opening.index + opening[0].length);
   const doctype = /^\s*<!doctype[^>]*>/i.exec(html);

@@ -1,4 +1,4 @@
-import { CircleX, Pause, Play, X } from "lucide-react";
+import { CircleX, Pause, Play, Puzzle, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ProcessRow } from "../../shared/types";
 import { showDialog } from "../lib/dialog";
@@ -15,6 +15,7 @@ const REFRESH_MS = 1500;
 const CATEGORIES = [
   { id: "app", label: "Lumen" },
   { id: "webview", label: "WebView2" },
+  { id: "extension", label: "Extensions" },
   { id: "terminal", label: "Terminals" },
   { id: "process", label: "Other processes" },
 ] as const;
@@ -52,13 +53,25 @@ function treeOrder(rows: ProcessRow[]): { row: ProcessRow; depth: number }[] {
   return out;
 }
 
-/** A process counts toward its nearest WebView2 or terminal ancestor; the rest are "other". */
+/**
+ * A process counts toward its nearest ancestor (or itself) that works for an
+ * extension, is WebView2, or is a terminal; the rest are "other".
+ */
 function categoryOf(row: ProcessRow, byId: Map<string, ProcessRow>): Category {
   if (row.kind === "app") return "app";
   for (let current: ProcessRow | undefined = row; current; current = current.parent ? byId.get(current.parent) : undefined) {
+    if (current.extension) return "extension";
     if (current.kind === "webview" || current.kind === "terminal") return current.kind;
   }
   return "process";
+}
+
+/** The extension a row works for, its own or an ancestor's (children of an extension's process). */
+function extensionOf(row: ProcessRow, byId: Map<string, ProcessRow>): string | null {
+  for (let current: ProcessRow | undefined = row; current && current.kind !== "app"; current = current.parent ? byId.get(current.parent) : undefined) {
+    if (current.extension) return current.extension;
+  }
+  return null;
 }
 
 /** Process Explorer: what Lumen is running and how much memory / CPU each part uses. */
@@ -108,7 +121,10 @@ export function ProcessExplorer({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
-  const ordered = useMemo(() => treeOrder(rows), [rows]);
+  const ordered = useMemo(() => {
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return treeOrder(rows).map((entry) => ({ ...entry, category: categoryOf(entry.row, byId), extension: extensionOf(entry.row, byId) }));
+  }, [rows]);
 
   const summary = useMemo(() => {
     const byId = new Map(rows.map((row) => [row.id, row]));
@@ -193,12 +209,23 @@ export function ProcessExplorer({ open, onClose }: Props) {
               </tr>
             </thead>
             <tbody>
-              {ordered.map(({ row, depth }) => (
-                <tr key={row.id} className={`process-kind-${row.kind}`} title={row.commandLine || undefined}>
+              {ordered.map(({ row, depth, category, extension }) => (
+                <tr
+                  key={row.id}
+                  className={`process-kind-${row.kind === "thread" ? "thread" : category}`}
+                  title={row.commandLine || undefined}
+                >
                   <td>
                     <div className="process-name" style={{ paddingLeft: depth * 18 }}>
                       <span className="process-dot" />
                       {row.label}
+                      {row.extension && (
+                        <span className="process-extension" title={`Started for or rendered by the extension ${row.extension}`}>
+                          <Puzzle size={11} />
+                          {row.extension}
+                        </span>
+                      )}
+                      {!row.extension && extension && <span className="process-extension-inherited">via {extension}</span>}
                     </div>
                   </td>
                   <td className="num muted">{row.pid ?? ""}</td>

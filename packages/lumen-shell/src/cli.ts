@@ -38,6 +38,8 @@ export type LumenConfig = {
     icon?: string;
     /** Shown in the executable's details and in Windows' installed apps list. */
     publisher?: string;
+    /** URL schemes (`"myapp"` for myapp://...) the installer registers for the current user; the app gets the URL as an argument. */
+    protocols?: string[];
   };
 };
 
@@ -179,6 +181,10 @@ async function commandDev(config: LumenConfig, options: { watch: boolean }): Pro
   const outDir = join(ROOT, ".lumen", "dev", "assets");
   const started = Date.now();
   await buildView(config, outDir, false);
+  // esbuild keeps its service process alive after a build, holding on to that
+  // build's memory (~350 MB for the dev view with inline source maps). Builds
+  // here are far apart and start from scratch anyway: stop it until the next one.
+  await esbuild.stop();
   log(`view built in ${Date.now() - started}ms → ${outDir}`);
 
   process.env.LUMEN_DEV = "1";
@@ -196,18 +202,22 @@ async function commandDev(config: LumenConfig, options: { watch: boolean }): Pro
   await import(pathToFileURL(join(ROOT, config.main)).href);
 
   if (options.watch) {
+    // One rebuild at a time, so stopping the service never cuts one short.
+    let rebuilds = Promise.resolve();
     const watchers = watchTree(
       [join(ROOT, "src"), join(ROOT, "packages")],
       () => {
-        void (async () => {
+        rebuilds = rebuilds.then(async () => {
           try {
             await buildView(config, outDir, false);
             app.reloadAllWindows();
             log("view rebuilt — window reloaded");
           } catch (error) {
             console.error("[lumen] rebuild failed:", error);
+          } finally {
+            await esbuild.stop();
           }
-        })();
+        });
       },
     );
     log(`watching src/ and packages/ (${watchers.length} watcher(s))`);
@@ -460,12 +470,30 @@ async function commandInstaller(config: LumenConfig): Promise<void> {
     .map((line) => `  ${line}`)
     .join("\n");
   const sizeKb = Math.ceil((await treeSize(appDir)) / 1024);
+  // Per-user URL protocol handlers (HKCU\Software\Classes\<scheme>), removed again on uninstall.
+  const protocols = (config.package?.protocols ?? []).filter((scheme) => {
+    if (/^[a-z][a-z0-9+.-]*$/i.test(scheme)) return true;
+    log(`skipping invalid protocol scheme "${scheme}"`);
+    return false;
+  });
+  const protocolKey = (scheme: string, sub = "") => nsisString(`Software\\Classes\\${scheme}${sub}`);
+  const registerProtocols = protocols
+    .flatMap((scheme) => [
+      `WriteRegStr HKCU ${protocolKey(scheme)} "" ${nsisString(`URL:${name}`)}`,
+      `WriteRegStr HKCU ${protocolKey(scheme)} "URL Protocol" ""`,
+      `WriteRegStr HKCU ${protocolKey(scheme, "\\DefaultIcon")} "" ${nsisString(`$INSTDIR\\${exeName},0`)}`,
+      `WriteRegStr HKCU ${protocolKey(scheme, "\\shell\\open\\command")} "" ${nsisString(`"$INSTDIR\\${exeName}" "%1"`)}`,
+    ])
+    .map((line) => `  ${line}`)
+    .join("\n");
+  const unregisterProtocols = protocols.map((scheme) => `  DeleteRegKey HKCU ${protocolKey(scheme)}`).join("\n");
 
   const script = `Unicode true
 ManifestDPIAware true
 SetCompressor /SOLID lzma
 RequestExecutionLevel user
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
 
 Name ${nsisString(name)}
 OutFile ${nsisString(nsisText(outFile))}
@@ -499,13 +527,49 @@ ${icon ? `!define MUI_ICON ${nsisString(icon)}\n!define MUI_UNICON ${nsisString(
 !insertmacro MUI_LANGUAGE "Japanese"
 LangString DesktopShortcut \${LANG_ENGLISH} "Create a desktop shortcut"
 LangString DesktopShortcut \${LANG_JAPANESE} "デスクトップにショートカットを作成"
+LangString AppRunning \${LANG_ENGLISH} ${nsisString(`${name} is running. Close it, then click Retry.`)}
+LangString AppRunning \${LANG_JAPANESE} ${nsisString(`${name} が実行中です。終了してから [再試行] をクリックしてください。`)}
 
 Function CreateDesktopShortcut
   CreateShortcut ${nsisString(`$DESKTOP\\${name}.lnk`)} ${nsisString(`$INSTDIR\\${exeName}`)}
 FunctionEnd
 
+; Wait until no process runs the installed executable. The app's update
+; (/S) starts while the app is still exiting, so a silent install waits up to a
+; minute; an interactive one asks to close the app.
+Function WaitForApp
+  StrCpy $1 0
+  wait:
+    IfFileExists ${nsisString(`$INSTDIR\\${exeName}`)} 0 done
+    ClearErrors
+    FileOpen $0 ${nsisString(`$INSTDIR\\${exeName}`)} a
+    IfErrors 0 free
+    IfSilent 0 ask
+    IntOp $1 $1 + 1
+    IntCmp $1 120 fail 0 fail
+    Sleep 500
+    Goto wait
+  ask:
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(AppRunning)" IDRETRY wait
+  fail:
+    Abort
+  free:
+    FileClose $0
+  done:
+FunctionEnd
+
+; The app's update passes /RELAUNCH to be started again once installed.
+Function .onInstSuccess
+  \${GetParameters} $0
+  ClearErrors
+  \${GetOptions} $0 "/RELAUNCH" $1
+  IfErrors +2
+  Exec ${nsisString(`"$INSTDIR\\${exeName}"`)}
+FunctionEnd
+
 Section
   SetOutPath "$INSTDIR"
+  Call WaitForApp
   ; Drop the previous version's files so nothing stale is left behind.
 ${removeApp}
   File /r ${nsisString(`${nsisText(appDir)}\\*`)}
@@ -521,6 +585,7 @@ ${removeApp}
   WriteRegDWORD HKCU ${nsisString(uninstallKey)} "EstimatedSize" ${sizeKb}
   WriteRegDWORD HKCU ${nsisString(uninstallKey)} "NoModify" 1
   WriteRegDWORD HKCU ${nsisString(uninstallKey)} "NoRepair" 1
+${registerProtocols}
 SectionEnd
 
 Section "Uninstall"
@@ -530,6 +595,7 @@ ${removeApp}
   Delete ${nsisString(`$SMPROGRAMS\\${name}.lnk`)}
   Delete ${nsisString(`$DESKTOP\\${name}.lnk`)}
   DeleteRegKey HKCU ${nsisString(uninstallKey)}
+${unregisterProtocols}
 SectionEnd
 `;
 

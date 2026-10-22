@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, extname, resolve } from "node:path";
 import type { ExtensionHost, ExtensionRuntime } from "../../host.ts";
-import { CancellationError, CancellationTokenSource, Disposable, EventEmitter, Location, MarkdownString, Uri } from "../../types.ts";
+import { CancellationError, CancellationTokenSource, Disposable, EventEmitter, Location, MarkdownString, ThemeIcon, Uri } from "../../types.ts";
 import type { CancellationToken } from "../../types.ts";
 import { markdownOf } from "../../wire.ts";
 import type {
@@ -17,6 +17,7 @@ import type {
 } from "../../../../shared/chat-lm.ts";
 import { McpClient } from "./mcp.ts";
 import type { McpServerSpec, McpToolInfo, McpToolResult } from "./mcp.ts";
+import type { ChatParticipantIcon } from "./types.ts";
 import {
   ChatRequestTurn,
   ChatResponseAnchorPart,
@@ -123,6 +124,56 @@ function wireTree(nodes: Loose[]): ChatWireTreeNode[] {
   return (Array.isArray(nodes) ? nodes : []).map((node) => ({ name: String(node?.name ?? ""), children: node?.children ? wireTree(node.children) : undefined }));
 }
 
+const ICON_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+};
+
+/** Icon files as data URLs (cached; small images only, like the tree views' icons). */
+const iconUrls = new Map<string, string | undefined>();
+
+function imageUrl(path: string): string | undefined {
+  if (iconUrls.has(path)) return iconUrls.get(path);
+  let url: string | undefined;
+  const type = ICON_TYPES[extname(path).toLowerCase()];
+  try {
+    if (type && statSync(path).size <= 256 * 1024) url = `data:${type};base64,${readFileSync(path).toString("base64")}`;
+  } catch {
+    /* missing icon */
+  }
+  iconUrls.set(path, url);
+  return url;
+}
+
+/** A Uri (or a path) an extension gave as an icon, as a URL the panel can show. */
+function iconUrl(value: Loose): string | undefined {
+  const uri = typeof value === "string" ? Uri.file(value) : Uri.isUri(value) ? value : undefined;
+  if (!uri) return undefined;
+  if (uri.scheme === "http" || uri.scheme === "https" || uri.scheme === "data") return uri.toString(true);
+  return uri.scheme === "file" ? imageUrl(uri.fsPath) : undefined;
+}
+
+/** A participant's `iconPath` (Uri, ThemeIcon or `{ light, dark }`) as the panel draws it. */
+export function wireParticipantIcon(iconPath: Loose): ChatParticipantIcon | undefined {
+  if (!iconPath) return undefined;
+  if (iconPath instanceof ThemeIcon || (typeof iconPath === "object" && !Uri.isUri(iconPath) && typeof iconPath.id === "string")) {
+    const color = typeof iconPath.color?.id === "string" ? iconPath.color.id : undefined;
+    return color ? { codicon: String(iconPath.id), color } : { codicon: String(iconPath.id) };
+  }
+  if (typeof iconPath === "object" && !Uri.isUri(iconPath) && ("light" in iconPath || "dark" in iconPath)) {
+    const light = iconUrl(iconPath.light);
+    const dark = iconUrl(iconPath.dark) ?? light;
+    if (!light && !dark) return undefined;
+    return { url: (light ?? dark)!, dark };
+  }
+  const url = iconUrl(iconPath);
+  return url ? { url } : undefined;
+}
+
 /** An extension's contributions of one point (contributes.<point>), with the extension that made them. */
 function contributions(host: ExtensionHost, point: string): { runtime: ExtensionRuntime; item: Loose }[] {
   const out: { runtime: ExtensionRuntime; item: Loose }[] = [];
@@ -136,6 +187,8 @@ function contributions(host: ExtensionHost, point: string): { runtime: Extension
 /* ── registrations ─────────────────────────────────────────────────────── */
 
 type ParticipantReg = { id: string; extensionId: string; participant: Loose; feedback: EventEmitter<unknown> };
+/** `ChatWireParticipant` plus the icon the extension set on the participant. */
+type WireParticipant = ChatWireParticipant & { icon?: ChatParticipantIcon };
 type ModelInfo = Loose;
 type ProviderReg = { vendor: string; extensionId: string; provider: Loose; infos: ModelInfo[] | null; loading: Promise<void> | null; subscription: { dispose(): unknown } | null };
 type ToolReg = { name: string; extensionId: string; tool: Loose };
@@ -155,6 +208,20 @@ export type LanguageModelChatLike = {
   countTokens(text: string | LanguageModelChatMessage, token?: CancellationToken): Promise<number>;
 };
 
+/** A registered model as the "Manage Language Models" view lists it. Mirrored by the window side. */
+export type LanguageModelEntry = {
+  /** `vendor/id`, as in the Chat panel's model picker. */
+  id: string;
+  name: string;
+  vendor: string;
+  family: string;
+  version: string;
+  /** The extension that registered the provider. */
+  extensionId: string;
+  /** Its display name, when the extension is loaded. */
+  extensionName?: string;
+};
+
 /** Chat participants, language model providers, tools and MCP servers of one extension host. */
 export class ChatLmState {
   readonly host: ExtensionHost;
@@ -168,12 +235,18 @@ export class ChatLmState {
   #turns: (ChatRequestTurn | ChatResponseTurn)[] = [];
   /** Messages of the conversation with a model without a participant. */
   #direct: LanguageModelChatMessage[] = [];
+  /** The model the panel picked (`ChatSendArgs.modelId`); tool token counting uses it. */
+  #currentModelId: string | undefined;
   #lastParticipant: string | undefined;
   #stateScheduled = false;
   /** MCP servers the user allowed to start in this session. */
   readonly #trusted = new Set<string>();
+  /** Answers to "may this extension use that extension's models?" for this session, per (consumer, provider) pair. */
+  readonly #modelAccess = new Map<string, boolean>();
   /** Asks the user (replaced in tests). Resolves with the index of the chosen action, `null` when dismissed. */
   confirm: (title: string, message: string, actions: string[]) => Promise<number | null>;
+  /** Asks whether an extension may use another extension's models (replaced in tests). */
+  modelConsent: (extensionId: string, providerExtensionId: string, vendor: string, justification?: string) => Promise<boolean>;
 
   constructor(host: ExtensionHost) {
     this.host = host;
@@ -182,6 +255,13 @@ export class ChatLmState {
         return (await host.requestFeatureView(AREA, "confirm", [title, message, actions])) as number | null;
       } catch {
         return null;
+      }
+    };
+    this.modelConsent = async (extensionId, providerExtensionId, vendor, justification) => {
+      try {
+        return (await host.requestFeatureView(AREA, "modelConsent", [extensionId, providerExtensionId, vendor, justification])) === true;
+      } catch {
+        return false;
       }
     };
   }
@@ -225,8 +305,8 @@ export class ChatLmState {
     return participant;
   }
 
-  listParticipants(): ChatWireParticipant[] {
-    const out = new Map<string, ChatWireParticipant>();
+  listParticipants(): WireParticipant[] {
+    const out = new Map<string, WireParticipant>();
     for (const { runtime, item } of contributions(this.host, "chatParticipants")) {
       if (typeof item.id !== "string") continue;
       out.set(item.id, {
@@ -240,9 +320,15 @@ export class ChatLmState {
       });
     }
     for (const reg of this.participants.values()) {
-      if (out.has(reg.id)) continue;
+      const icon = wireParticipantIcon(reg.participant.iconPath);
+      const existing = out.get(reg.id);
+      if (existing) {
+        // `iconPath` can be set after createChatParticipant returned.
+        if (icon) existing.icon = icon;
+        continue;
+      }
       const name = reg.id.split(".").pop() ?? reg.id;
-      out.set(reg.id, { id: reg.id, name, fullName: name, description: "", extensionId: reg.extensionId, isDefault: false, commands: [] });
+      out.set(reg.id, { id: reg.id, name, fullName: name, description: "", extensionId: reg.extensionId, isDefault: false, commands: [], icon });
     }
     return [...out.values()];
   }
@@ -305,23 +391,25 @@ export class ChatLmState {
     );
   }
 
-  async selectChatModels(selector?: Loose): Promise<LanguageModelChatLike[]> {
+  async selectChatModels(selector?: Loose, consumer?: string): Promise<LanguageModelChatLike[]> {
     await this.activateProviders(selector?.vendor);
     const regs = [...this.providers.values()].filter((reg) => !selector?.vendor || reg.vendor === selector.vendor);
     await Promise.all(regs.map((reg) => this.#load(reg)));
+    // `justification` is not part of VS Code's selector; extensions sometimes pass it anyway and it is worth showing.
+    const justification = typeof selector?.justification === "string" ? selector.justification : undefined;
     const out: LanguageModelChatLike[] = [];
     for (const reg of regs) {
       for (const info of reg.infos ?? []) {
         if (selector?.id !== undefined && info.id !== selector.id) continue;
         if (selector?.family !== undefined && info.family !== selector.family) continue;
         if (selector?.version !== undefined && info.version !== selector.version) continue;
-        out.push(this.#modelObject(reg, info));
+        out.push(this.#modelObject(reg, info, consumer, justification));
       }
     }
     return out;
   }
 
-  #modelObject(reg: ProviderReg, info: ModelInfo): LanguageModelChatLike {
+  #modelObject(reg: ProviderReg, info: ModelInfo, consumer?: string, justification?: string): LanguageModelChatLike {
     const model: LanguageModelChatLike = {
       id: info.id,
       name: String(info.name ?? info.id),
@@ -330,14 +418,29 @@ export class ChatLmState {
       version: String(info.version ?? ""),
       maxInputTokens: Number(info.maxInputTokens ?? 0),
       capabilities: { imageInput: !!info.capabilities?.imageInput, toolCalling: info.capabilities?.toolCalling ?? false },
-      sendRequest: (messages, options, token) => this.#sendRequest(reg, info, messages, options, token),
+      sendRequest: (messages, options, token) => this.#sendRequest(reg, info, messages, options, token, consumer, justification),
       countTokens: (text, token) => this.#countTokens(reg, info, text, token),
     };
     return Object.freeze(model);
   }
 
-  async #sendRequest(reg: ProviderReg, info: ModelInfo, messages: unknown[], options: Loose = {}, token?: CancellationToken) {
+  /**
+   * Like VS Code, an extension needs the user's consent the first time it sends a request through a model
+   * another extension provides. The answer is remembered for the session (the window persists it).
+   */
+  async #requireModelConsent(reg: ProviderReg, consumer: string, justification?: string): Promise<void> {
+    const key = `${consumer}\u0000${reg.extensionId}`;
+    let allowed = this.#modelAccess.get(key);
+    if (allowed === undefined) {
+      allowed = await this.modelConsent(consumer, reg.extensionId, reg.vendor, justification);
+      this.#modelAccess.set(key, allowed);
+    }
+    if (!allowed) throw LanguageModelError.NoPermissions(`The user did not allow ${consumer} to use the language models provided by ${reg.extensionId}.`);
+  }
+
+  async #sendRequest(reg: ProviderReg, info: ModelInfo, messages: unknown[], options: Loose = {}, token?: CancellationToken, consumer?: string, justification?: string) {
     if (this.providers.get(reg.vendor) !== reg) throw LanguageModelError.NotFound(`Language model '${info.id}' is no longer available`);
+    if (consumer && consumer !== reg.extensionId) await this.#requireModelConsent(reg, consumer, typeof options?.justification === "string" ? options.justification : justification);
     const queue = new ReplayStream<unknown>();
     const cts = new CancellationTokenSource();
     token?.onCancellationRequested(() => cts.cancel());
@@ -375,6 +478,28 @@ export class ChatLmState {
     for (const reg of this.providers.values()) {
       for (const info of reg.infos ?? []) {
         out.push({ id: `${reg.vendor}/${info.id}`, name: String(info.name ?? info.id), vendor: reg.vendor, family: String(info.family ?? ""), version: String(info.version ?? ""), detail: typeof info.detail === "string" ? info.detail : undefined });
+      }
+    }
+    return out;
+  }
+
+  /** Every registered model with the extension providing it (the "Manage Language Models" view). */
+  languageModels(): LanguageModelEntry[] {
+    const out: LanguageModelEntry[] = [];
+    for (const reg of this.providers.values()) {
+      const runtime = this.host.runtimes.get(reg.extensionId) ?? [...this.host.runtimes.values()].find((candidate) => candidate.id.toLowerCase() === reg.extensionId.toLowerCase());
+      const manifest = runtime?.description.manifest;
+      const extensionName = manifest ? String(manifest.displayName ?? manifest.name ?? "") || undefined : undefined;
+      for (const info of reg.infos ?? []) {
+        out.push({
+          id: `${reg.vendor}/${info.id}`,
+          name: String(info.name ?? info.id),
+          vendor: reg.vendor,
+          family: String(info.family ?? ""),
+          version: String(info.version ?? ""),
+          extensionId: reg.extensionId,
+          extensionName,
+        });
       }
     }
     return out;
@@ -442,11 +567,33 @@ export class ChatLmState {
         if (answer !== 0) throw new CancellationError();
       }
     }
-    const result = await reg.tool.invoke({ input, toolInvocationToken: options.toolInvocationToken, tokenizationOptions: options.tokenizationOptions }, cancel);
+    const tokenizationOptions = options.tokenizationOptions ? await this.#tokenizationOptions(options.tokenizationOptions, cancel) : undefined;
+    const result = await reg.tool.invoke({ input, toolInvocationToken: options.toolInvocationToken, tokenizationOptions }, cancel);
     if (result instanceof LanguageModelToolResult) return result;
     if (Array.isArray(result?.content)) return new LanguageModelToolResult(result.content);
     if (Array.isArray(result)) return new LanguageModelToolResult(result);
     return new LanguageModelToolResult([]);
+  }
+
+  /** `LanguageModelToolTokenizationOptions` of a tool call (VS Code hands these to `invoke`). */
+  async #tokenizationOptions(given: Loose, token: CancellationToken): Promise<Loose> {
+    const model = await this.#resolveModel(this.#currentModelId).catch(() => undefined);
+    const countTokens =
+      typeof given?.countTokens === "function"
+        ? given.countTokens
+        : async (text: unknown): Promise<number> => {
+            const value = typeof text === "string" ? text : textOf((text as LanguageModelChatMessage)?.content ?? text);
+            if (model) {
+              try {
+                return await model.countTokens(value, token);
+              } catch {
+                /* the model went away: approximate below */
+              }
+            }
+            return Math.ceil(value.length / 4);
+          };
+    const budget = typeof given?.tokenBudget === "number" ? given.tokenBudget : (model?.maxInputTokens ?? 0);
+    return { tokenBudget: budget, countTokens };
   }
 
   /* ── MCP servers ──────────────────────────────────────────────────────── */
@@ -631,6 +778,7 @@ export class ChatLmState {
     this.#requests.set(args.id, record);
     let participantId: string | undefined;
     try {
+      this.#currentModelId = args.modelId;
       const parsed = this.#parse(args.text);
       participantId = parsed.participant?.id;
       record.participantId = participantId;
@@ -843,7 +991,7 @@ export class ChatLmState {
         const label = call.name;
         post({ type: "toolcall", callId: call.callId, name: call.name, label, status: "running" });
         try {
-          const result = await this.invokeTool(call.name, { input: call.input, toolInvocationToken: Object.freeze({ chatRequest: args.id }) }, token);
+          const result = await this.invokeTool(call.name, { input: call.input, toolInvocationToken: Object.freeze({ chatRequest: args.id }), tokenizationOptions: { tokenBudget: model.maxInputTokens } }, token);
           results.push(new LanguageModelToolResultPart(call.callId, result.content));
           post({ type: "toolcall", callId: call.callId, name: call.name, label, status: "done", detail: textOf(result.content).slice(0, 2000) });
         } catch (error) {

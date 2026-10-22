@@ -3,16 +3,22 @@ import type { ViewFeature, ViewFeatureApi } from "./types";
 import { installExplorerMenu, installTabMenu, menuEditorExtensions } from "./menus-walkthroughs/editor";
 import {
   WALKTHROUGH_PATH_PREFIX,
+  checkOpenOnInstall,
   commandExecuted,
   lookupWalkthrough,
+  markStepDone,
   openWalkthrough,
+  openWelcomePage,
   pickWalkthrough,
+  refreshFeatured,
+  resetProgress,
+  selectStepByKey,
   setApi,
   setRuntimeFormatters,
   startCompletionWatch,
   useWalkthroughs,
 } from "./menus-walkthroughs/state";
-import { WalkthroughView } from "./menus-walkthroughs/WalkthroughView";
+import { WalkthroughView, clearMediaCache } from "./menus-walkthroughs/WalkthroughView";
 import { resolveContributedMenu, runMenuCommand } from "./menus-walkthroughs/menus";
 import { flattenMenu } from "../../shared/menus-walkthroughs";
 
@@ -22,7 +28,8 @@ import { flattenMenu } from "../../shared/menus-walkthroughs";
  *    explorer/context in the explorer's context menu (editor.ts);
  *  - walkthroughs: the page in an editor tab (this file) and on the Welcome page (components/Welcome.tsx),
  *    progress and completion events (state.ts);
- *  - resourceLabelFormatters: labels of non-file resources in the editor's title strip (state.ts `resourceLabel`).
+ *  - resourceLabelFormatters: labels of non-file resources in the editor's title strip, the tabs and the
+ *    breadcrumbs (state.ts `resourceLabel` / `resourceTabLabel`, labels.ts `labelOf`).
  * Styles: feature-menus-walkthroughs.css.
  */
 
@@ -68,18 +75,33 @@ export const menusWalkthroughsView: ViewFeature = {
 
   onHostReady: (api) => {
     setApi(api);
+    clearMediaCache();
     setRuntimeFormatters([]);
     startCompletionWatch();
+    refreshFeatured(true);
+    checkOpenOnInstall();
   },
 
   onHostMessage: (payload) => {
-    const message = payload as { type: string; key?: string; step?: string; ids?: string[]; formatters?: ResourceLabelFormatter[] };
+    const message = payload as { type: string; key?: string; step?: string; toSide?: boolean; done?: boolean; ids?: string[]; formatters?: ResourceLabelFormatter[] };
     switch (message.type) {
       case "open":
-        if (message.key) void openWalkthrough(message.key, message.step);
+        if (message.key) void openWalkthrough(message.key, message.step, message.toSide === true);
+        break;
+      case "welcome":
+        void openWelcomePage();
         break;
       case "pick":
         void pickWalkthrough();
+        break;
+      case "mark":
+        if (message.key) markStepDone(message.key, message.done !== false);
+        break;
+      case "select":
+        if (message.key) selectStepByKey(message.key);
+        break;
+      case "reset":
+        resetProgress();
         break;
       case "commands":
         for (const id of message.ids ?? []) commandExecuted(id);
@@ -91,7 +113,8 @@ export const menusWalkthroughsView: ViewFeature = {
   },
 
   commands: [
-    { id: "lumen.walkthroughs.open", title: "Open Walkthrough…", category: "Welcome", run: () => pickWalkthrough() },
+    { id: "welcome.showAllWalkthroughs", title: "Open Walkthrough...", category: "Welcome", run: () => pickWalkthrough() },
+    { id: "resetGettingStartedProgress", title: "Reset Welcome Page Walkthrough Progress", category: "Developer", run: () => resetProgress() },
     // File > New File…: a text file, a file in the explorer, or what extensions add to file/newFile.
     { id: "welcome.showNewFileEntries", title: "New File…", category: "File", run: (api) => showNewFileEntries(api) },
   ],

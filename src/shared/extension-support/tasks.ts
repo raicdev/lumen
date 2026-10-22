@@ -18,8 +18,8 @@ export const tasksSupport: AreaSupport = {
   },
   types: ["Task", "TaskScope", "TaskRevealKind", "TaskPanelKind", "TaskGroup", "ShellExecution", "ProcessExecution", "CustomExecution", "ShellQuoting"],
   contributions: {
-    taskDefinitions: ["partial", "the type activates the contributing extension and routes tasks.json tasks of that type to its provider; properties and required are not validated"],
-    problemMatchers: ["partial", "patterns, base, fileLocation, severity and background patterns; applyTo is ignored (diagnostics are always reported)"],
+    taskDefinitions: ["partial", "the type activates the contributing extension and routes tasks.json tasks of that type to its provider; required and property types are checked before a task runs; no tasks.json completion from the definition"],
+    problemMatchers: ["partial", "patterns, base, fileLocation, severity, background patterns and applyTo; fileLocation \"search\" falls back to relative"],
     problemPatterns: "supported",
   },
 };

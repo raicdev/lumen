@@ -60,11 +60,15 @@ class OutputStream implements AsyncIterable<string> {
   }
 }
 
+/** Kept for output matchers (terminal quick fixes) and the API's read(): only the end matters. */
+const MAX_OUTPUT = 128 * 1024;
+
 export class ShellExecution {
   readonly commandLine: { readonly value: string; readonly isTrusted: boolean; readonly confidence: number };
   readonly cwd: Uri | undefined;
   #streams = new Set<OutputStream>();
   #ended = false;
+  #output = "";
 
   constructor(commandLine: { value: string; isTrusted: boolean; confidence: number }, cwd: Uri | undefined) {
     this.commandLine = commandLine;
@@ -80,7 +84,13 @@ export class ShellExecution {
   }
 
   push(data: string) {
+    if (data) this.#output = (this.#output + data).slice(-MAX_OUTPUT);
     for (const stream of this.#streams) stream.push(data);
+  }
+
+  /** The raw output written so far (escape sequences included), for output matchers. */
+  get output(): string {
+    return this.#output;
   }
 
   end() {
@@ -110,7 +120,7 @@ export class ShellIntegrationModel {
   detected = false;
   #cwd: Uri | undefined;
   #hooks: ShellHooks;
-  #pendingLine: string | undefined;
+  #pendingLine: { value: string; nonceVerified: boolean } | undefined;
   /** Commands an extension sent with executeCommand, waiting for their execution to start. */
   #queued: { value: string; execution?: ShellExecution }[] = [];
   #current: ShellExecution | undefined;
@@ -156,7 +166,7 @@ export class ShellIntegrationModel {
         }
         break;
       case "command-line":
-        this.#pendingLine = event.commandLine;
+        this.#pendingLine = { value: event.commandLine, nonceVerified: event.nonceVerified };
         break;
       case "executing":
         this.#start();
@@ -182,14 +192,16 @@ export class ShellIntegrationModel {
     if (this.#current) this.#finish(undefined);
     const reported = this.#pendingLine;
     this.#pendingLine = undefined;
-    const queuedIndex = this.#queued.findIndex((entry) => reported === undefined || entry.value === reported);
+    const queuedIndex = this.#queued.findIndex((entry) => reported === undefined || entry.value === reported.value);
     const queued = queuedIndex >= 0 ? this.#queued.splice(queuedIndex, 1)[0] : undefined;
     if (queued?.execution) {
       this.#current = queued.execution;
     } else {
-      // Typed by the user: the line comes from the shell's own report (not trusted, no nonce to prove it).
-      const confidence = reported === undefined ? CommandLineConfidence.Low : CommandLineConfidence.Medium;
-      this.#current = new ShellExecution({ value: reported ?? "", isTrusted: false, confidence }, this.#cwd);
+      // Typed by the user. A line carrying our per-terminal nonce is what VS Code calls
+      // trusted / High: only the shell integration script can produce it.
+      const verified = reported?.nonceVerified === true;
+      const confidence = reported === undefined ? CommandLineConfidence.Low : verified ? CommandLineConfidence.High : CommandLineConfidence.Medium;
+      this.#current = new ShellExecution({ value: reported?.value ?? "", isTrusted: verified, confidence }, this.#cwd);
     }
     this.#hooks.started(this.#current);
   }

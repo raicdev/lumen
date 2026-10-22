@@ -85,7 +85,15 @@ export function TerminalHost({ id, active, onFocus, editor }: { id: string; acti
       ref={ref}
       className={`terminal-host${active ? " active" : ""}`}
       onMouseDown={onFocus}
-      onContextMenu={editor ? (e) => showContributedMenu(e, "terminal/context", terminalLookup(id), [refArg("terminal", { id })]) : undefined}
+      onContextMenu={
+        editor
+          ? (e) =>
+              showContributedMenu(e, "terminal/context", terminalLookup(id), [refArg("terminal", { id })], [
+                { type: "item", label: "Copy", action: "copy", disabled: !terminalService.hasSelection(id), run: () => void terminalService.copySelection(id) },
+                { type: "item", label: "Paste", action: "paste", run: () => void terminalService.paste(id) },
+              ])
+          : undefined
+      }
     />
   );
 }
@@ -114,6 +122,13 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
     const inGroup = (snapshot.groups.find((g) => g.includes(id))?.length ?? 0) > 1;
     const contributed = terminalMenu(menuId, id);
     void showContextMenu(x, y, [
+      ...(menuId === "terminal/context"
+        ? [
+            { type: "item" as const, label: "Copy", action: "copy", disabled: !terminalService.hasSelection(id) },
+            { type: "item" as const, label: "Paste", action: "paste" },
+            { type: "separator" as const },
+          ]
+        : []),
       { type: "item", label: "Split Terminal", action: "split" },
       ...(inGroup ? [{ type: "item" as const, label: "Unsplit Terminal", action: "unsplit" }] : []),
       { type: "item", label: "Move Terminal into Editor Area", action: "move-to-editor" },
@@ -124,7 +139,9 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
       { type: "item", label: "Kill Terminal", action: "kill", danger: true },
       ...(contributed.length ? [{ type: "separator" as const }, ...contributed] : []),
     ]).then((action) => {
-      if (action) onAction(action as TerminalMenuAction, id);
+      if (action === "copy") terminalService.copySelection(id);
+      else if (action === "paste") void terminalService.paste(id);
+      else if (action) onAction(action as TerminalMenuAction, id);
     });
   };
 

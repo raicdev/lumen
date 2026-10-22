@@ -29,3 +29,24 @@
 .palette-input-wrap.sev-warning input:not([type="checkbox"]) {
   border-color: var(--warning, #cca700);
 }
+
+/* registerFileSystemProvider({ isReadonly: { value: "…" } }): the extension's message above a read-only editor. */
+.editor-readonly-banner {
+  flex: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-secondary, rgba(128, 128, 128, 0.08));
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+}
+
+/* The message is a MarkdownString ({ value }): the same renderer as hovers and walkthroughs. */
+.editor-readonly-banner .markdown-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.editor-readonly-banner .markdown-body p {
+  margin: 2px 0;
+}
