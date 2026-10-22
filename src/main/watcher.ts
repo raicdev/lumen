@@ -32,56 +32,72 @@ export type WorkspaceChange = {
   typesOverflow: boolean;
 };
 
-let watcher: FSWatcher | null = null;
-let timer: ReturnType<typeof setTimeout> | null = null;
-const pending = new Set<string>();
-const pendingTypes = new Set<string>();
-let typesOverflow = false;
-let gitTouched = false;
+/** Watches one window's workspace; `watch()` again switches to another root (or none). */
+export class WorkspaceWatcher {
+  #watcher: FSWatcher | null = null;
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  #pending = new Set<string>();
+  #pendingTypes = new Set<string>();
+  #typesOverflow = false;
+  #gitTouched = false;
 
-export function watchWorkspace(root: string | null, onChange: (change: WorkspaceChange) => void): void {
-  watcher?.close();
-  watcher = null;
-  if (timer) clearTimeout(timer);
-  pending.clear();
-  pendingTypes.clear();
-  typesOverflow = false;
-  gitTouched = false;
-  if (!root) return;
+  watch(root: string | null, onChange: (change: WorkspaceChange) => void): void {
+    this.dispose();
+    if (!root) return;
 
-  try {
-    watcher = watch(root, { recursive: true }, (_event, filename) => {
-      if (!filename) return;
-      const rel = String(filename).replace(/\\/g, "/");
-      const segments = rel.split("/");
-      if (segments[0] === ".git") {
-        // Only what changes `git status`: the index, HEAD and refs.
-        if (/^\.git\/(index|HEAD|refs\/)/.test(rel) && !rel.endsWith(".lock")) gitTouched = true;
-        else return;
-      } else if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) {
-        if (!TYPE_FILE.test(rel) || CACHE_SEGMENT.test(rel) || segments[0] === ".lumen") return;
-        if (pendingTypes.size < MAX_TYPE_PATHS) pendingTypes.add(normalize(join(root, rel)));
-        else typesOverflow = true;
-      } else {
-        pending.add(normalize(join(root, rel)));
-        gitTouched = true;
-      }
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        const change: WorkspaceChange = { paths: [...pending], git: gitTouched, typePaths: [...pendingTypes], typesOverflow };
-        pending.clear();
-        pendingTypes.clear();
-        typesOverflow = false;
-        gitTouched = false;
-        onChange(change);
-      }, 300);
-    });
-    watcher.on("error", () => {
-      watcher?.close();
-      watcher = null;
-    });
-  } catch (error) {
-    console.warn("[watcher] could not watch workspace:", error);
+    try {
+      const watcher = watch(root, { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        const rel = String(filename).replace(/\\/g, "/");
+        const segments = rel.split("/");
+        if (segments[0] === ".git") {
+          // Only what changes `git status`: the index, HEAD and refs.
+          if (/^\.git\/(index|HEAD|refs\/)/.test(rel) && !rel.endsWith(".lock")) this.#gitTouched = true;
+          else return;
+        } else if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) {
+          if (!TYPE_FILE.test(rel) || CACHE_SEGMENT.test(rel) || segments[0] === ".lumen") return;
+          if (this.#pendingTypes.size < MAX_TYPE_PATHS) this.#pendingTypes.add(normalize(join(root, rel)));
+          else this.#typesOverflow = true;
+        } else {
+          this.#pending.add(normalize(join(root, rel)));
+          this.#gitTouched = true;
+        }
+        if (this.#timer) clearTimeout(this.#timer);
+        this.#timer = setTimeout(() => {
+          this.#timer = null;
+          const change: WorkspaceChange = {
+            paths: [...this.#pending],
+            git: this.#gitTouched,
+            typePaths: [...this.#pendingTypes],
+            typesOverflow: this.#typesOverflow,
+          };
+          this.#reset();
+          onChange(change);
+        }, 300);
+      });
+      watcher.on("error", () => {
+        watcher.close();
+        if (this.#watcher === watcher) this.#watcher = null;
+      });
+      this.#watcher = watcher;
+    } catch (error) {
+      console.warn("[watcher] could not watch workspace:", error);
+    }
+  }
+
+  /** Stop watching (the window closed). */
+  dispose(): void {
+    this.#watcher?.close();
+    this.#watcher = null;
+    if (this.#timer) clearTimeout(this.#timer);
+    this.#timer = null;
+    this.#reset();
+  }
+
+  #reset(): void {
+    this.#pending.clear();
+    this.#pendingTypes.clear();
+    this.#typesOverflow = false;
+    this.#gitTouched = false;
   }
 }

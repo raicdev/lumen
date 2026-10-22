@@ -111,6 +111,7 @@ export function terminalProfiles(): TerminalProfile[] {
 /**
  * Full PTY terminal sessions via node-pty (ConPTY on Windows).
  * node-pty is loaded on first use so its native addon stays off the startup path.
+ * Each window has its own (its terminals end with it).
  */
 export class TerminalManager {
   private sessions = new Map<string, TerminalSession>();
@@ -284,5 +285,3 @@ export class TerminalManager {
     return [...this.sessions.values()].filter((s) => s.alive).map((s) => ({ pid: s.pty.pid, label: s.label }));
   }
 }
-
-export const terminals = new TerminalManager();

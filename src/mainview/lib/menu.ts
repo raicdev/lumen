@@ -27,6 +27,7 @@ export const APP_MENU: MenuGroup[] = [
     items: [
       cmd("workbench.action.files.newUntitledFile", "New Text File"),
       cmd("welcome.showNewFileEntries", "New File…"),
+      cmd("workbench.action.newWindow", "New Window"),
       cmd("explorer.newFile", "New File in Explorer…"),
       cmd("explorer.newFolder", "New Folder…"),
       sep,

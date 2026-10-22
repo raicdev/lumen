@@ -75,7 +75,7 @@ export function focusContext(): FocusContext {
 
 /* ── user overrides (Keyboard Shortcuts editor) ─────────────────────────── */
 
-const OVERRIDES_KEY = "lumen.keybindings";
+export const OVERRIDES_KEY = "lumen.keybindings";
 
 /** commandId → keybinding ("" removes the default binding). */
 export function loadKeybindingOverrides(): Record<string, string> {

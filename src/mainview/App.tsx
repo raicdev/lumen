@@ -69,7 +69,7 @@ import {
   TERMINAL_PASSTHROUGH,
   type Command,
 } from "./lib/commands";
-import { focusContext, keyFromEvent, loadKeybindingOverrides, saveKeybindingOverrides } from "./lib/keybindings";
+import { focusContext, keyFromEvent, loadKeybindingOverrides, OVERRIDES_KEY, saveKeybindingOverrides } from "./lib/keybindings";
 import { extractSymbols, flattenSymbols } from "./lib/symbols";
 import { applyTextEdits, saveParticipantEdits } from "./lib/text-edits";
 import { snippetToText } from "./lib/snippets";
@@ -81,6 +81,7 @@ import {
   loadEditorSession,
   loadLayout,
   recentFolders,
+  RECENT_KEY,
   saveLayout,
   type Layout,
   type SavedTerminal,
@@ -1263,6 +1264,13 @@ export function App() {
 
   const openWorkspace = useCallback(
     async (path: string) => {
+      // A folder is open in one window at a time: the window that shows it comes to the front.
+      if (lowerKey(path) !== lowerKey(workspaceRootRef.current ?? "")) {
+        const { focused } = await api()
+          .request.focusWorkspaceWindow({ path })
+          .catch(() => ({ focused: false }));
+        if (focused) return false;
+      }
       const { error } = await api().request.readDir({ path, depth: 1 });
       if (error) {
         toast(`Cannot open ${path}: ${error}`, "error");
@@ -2398,6 +2406,20 @@ export function App() {
         },
       },
       { id: "workbench.action.files.openFolder", title: "Open Folder…", category: "File", run: () => a().pickFolder() },
+      { id: "workbench.action.newWindow", title: "New Window", category: "File", run: () => api().request.newWindow({}) },
+      // vscode.openFolder / vscode.newWindow of extensions: a folder (or a pick) in this window or a new one.
+      {
+        id: "lumen.window.openFolder",
+        title: "Open Folder in Window",
+        category: "File",
+        enabled: () => false,
+        run: async (path?: unknown, newWindow?: unknown) => {
+          const folder = typeof path === "string" && path ? path : (await api().request.openFolder({})).path;
+          if (!folder) return;
+          if (newWindow === true) await api().request.newWindow({ path: folder });
+          else await a().openWorkspace(folder);
+        },
+      },
       // Used by workspace.updateWorkspaceFolders: the window follows the extension's first folder.
       {
         id: "lumen.workspace.openFolderPath",
@@ -2982,7 +3004,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.4", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.5", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -3957,16 +3979,38 @@ export function App() {
 
   /* ── workspace events ─────────────────────────────────────────────────── */
 
-  // Restore the last workspace (and its editors) on startup.
+  // Open the window's folder (and its editors) on startup: the one it showed in the last session, or the one it was opened for.
   const restored = useRef(false);
   const [startupDone, setStartupDone] = useState(false);
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    const last = localStorage.getItem("lumen.lastWorkspace");
-    if (last) void openWorkspace(last).finally(() => setStartupDone(true));
-    else setStartupDone(true);
+    void api()
+      .request.windowInit({})
+      // A version without saved windows remembered only the last folder.
+      .then((init) => init.workspace ?? (init.restoreLastWorkspace ? localStorage.getItem("lumen.lastWorkspace") : null))
+      .catch(() => null)
+      .then((folder) => (folder ? openWorkspace(folder) : undefined))
+      .finally(() => setStartupDone(true));
   }, [openWorkspace]);
+
+  // Launch URIs (lumen://) go to the window used last.
+  useEffect(() => {
+    const onFocus = () => api().send.windowFocused({});
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  // Another window changed keyboard shortcuts or opened a folder (every window shares this storage).
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key === null || event.key === OVERRIDES_KEY) setOverrides(loadKeybindingOverrides());
+      if (event.key === null || event.key === RECENT_KEY) setRecent(recentFolders());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   // Extensions start once the last workspace (and its editors) is back.
   useEffect(() => {

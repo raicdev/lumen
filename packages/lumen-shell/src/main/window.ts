@@ -442,7 +442,9 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
       return null;
     }
     if (channel === "__lumen:ipc") {
-      return this.#endpoint.receive(data);
+      // Handlers run outside the webview's message callback: one may open a window, and
+      // creating a webview inside that callback crashes the process. (Order is kept.)
+      return new Promise((resolve) => setImmediate(() => resolve(this.#endpoint.receive(data))));
     }
     return null;
   }

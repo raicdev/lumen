@@ -24,6 +24,8 @@ export type MainToHost =
   | { type: "call"; id: number; method: keyof HostMethods; args: unknown[] }
   | { type: "mainReply"; id: number; result?: unknown; error?: string }
   | { type: "filesChanged"; paths: string[] }
+  /** Another window's extension host wrote `key` of this memento file (globalState, secrets…). */
+  | { type: "stateChanged"; file: string; key: string }
   | { type: "shutdown" };
 
 export type HostToMain =
@@ -32,4 +34,6 @@ export type HostToMain =
   | { type: "mainRequest"; id: number; method: keyof MainMethods; args: unknown[] }
   /** An extension started a process (Process Explorer shows whose it is). */
   | { type: "childProcess"; pid: number; extensionId: string }
+  /** An extension wrote `key` of a memento file: the other windows' hosts reload it. */
+  | { type: "stateChanged"; file: string; key: string }
   | { type: "shutdownDone" };

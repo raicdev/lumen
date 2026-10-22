@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { LanguageServiceHub } from "../src/main/lsp.ts";
-import { watchWorkspace, type WorkspaceChange } from "../src/main/watcher.ts";
+import { WorkspaceWatcher, type WorkspaceChange } from "../src/main/watcher.ts";
 
 /**
  * A file that is not open changes on disk (git checkout, a formatter): the
@@ -117,7 +117,8 @@ test("the watcher reports type files in node_modules and build output, not tool 
     mkdirSync(join(dir, "node_modules", ".cache"), { recursive: true });
     mkdirSync(join(dir, "dist"), { recursive: true });
     const changes: WorkspaceChange[] = [];
-    watchWorkspace(dir, (change) => changes.push(change));
+    const watcher = new WorkspaceWatcher();
+    watcher.watch(dir, (change) => changes.push(change));
     await new Promise((resolve) => setTimeout(resolve, 100));
     writeFileSync(join(dir, "node_modules", "pkg", "index.d.ts"), "export {};\n");
     writeFileSync(join(dir, "node_modules", "pkg", "index.js"), "");
@@ -125,7 +126,7 @@ test("the watcher reports type files in node_modules and build output, not tool 
     writeFileSync(join(dir, "dist", "lib.d.ts"), "export {};\n");
     writeFileSync(join(dir, "main.ts"), "");
     for (let i = 0; i < 40 && !changes.length; i++) await new Promise((resolve) => setTimeout(resolve, 100));
-    watchWorkspace(null, () => undefined);
+    watcher.dispose();
     const relativeTo = (path: string) => relative(dir, path).split(sep).join("/");
     const typePaths = changes.flatMap((change) => change.typePaths).map(relativeTo);
     const paths = changes.flatMap((change) => change.paths).map(relativeTo);

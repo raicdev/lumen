@@ -3,7 +3,7 @@
  * editors that were open (restored on the next start, like VS Code).
  */
 
-const RECENT_KEY = "lumen.recentFolders";
+export const RECENT_KEY = "lumen.recentFolders";
 const LAYOUT_KEY = "lumen.layout";
 
 function read<T>(key: string, fallback: T): T {

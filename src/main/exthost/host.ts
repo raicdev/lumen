@@ -545,6 +545,14 @@ export class ExtensionHost {
   }
   #anonymousApi: Record<string, unknown> | null = null;
 
+  /** Memento files (globalState, workspaceState, secrets) → what reloads them when another window changed one. */
+  #stateFiles = new Map<string, ((key: string) => void)[]>();
+
+  /** Another window's extension host changed `key` in a memento file this host may have loaded. */
+  stateChanged(file: string, key: string): void {
+    for (const reload of this.#stateFiles.get(file) ?? []) reload(key);
+  }
+
   /* ── extension context ───────────────────────────────────────────────── */
 
   storagePaths(runtime: ExtensionRuntime) {
@@ -568,34 +576,36 @@ export class ExtensionHost {
   #createContext(runtime: ExtensionRuntime) {
     const paths = this.storagePaths(runtime);
     const id = runtime.id.toLowerCase();
-    const memento = (file: string | null) => {
-      let data: Record<string, unknown> = {};
-      if (file) {
-        try {
-          data = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-        } catch {
-          /* nothing stored yet */
-        }
+    const read = (file: string | null): Record<string, unknown> => {
+      if (!file) return {};
+      try {
+        return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+      } catch {
+        return {}; // nothing stored yet
       }
-      const persist = () => {
-        if (!file) return;
-        mkdirSync(dirname(file), { recursive: true });
-        writeFileSync(file, JSON.stringify(data), { encoding: "utf8", mode: 0o600 });
-      };
+    };
+    // Other windows' extension hosts keep the same files: an update writes over what is on
+    // disk now (not this host's copy), and their updates arrive through stateChanged().
+    const memento = (file: string | null, onChanged?: (key: string) => void) => {
+      let data = read(file);
+      if (file) this.#stateFiles.set(file, [...(this.#stateFiles.get(file) ?? []), (key) => ((data = read(file)), onChanged?.(key))]);
       return {
         keys: () => Object.keys(data),
         get: (key: string, defaultValue?: unknown) => (key in data ? structuredClone(data[key]) : defaultValue),
         update: async (key: string, value: unknown) => {
+          if (file) data = read(file);
           if (value === undefined) delete data[key];
           else data[key] = structuredClone(value);
-          persist();
+          if (!file) return;
+          mkdirSync(dirname(file), { recursive: true });
+          writeFileSync(file, JSON.stringify(data), { encoding: "utf8", mode: 0o600 });
+          this.send({ type: "stateChanged", file, key });
         },
         setKeysForSync: () => {},
       };
     };
-    const secretsFile = join(paths.state, "secrets", `${id}.json`);
-    const secrets = memento(secretsFile);
     const secretChanges = new T.EventEmitter<{ key: string }>();
+    const secrets = memento(join(paths.state, "secrets", `${id}.json`), (key) => secretChanges.fire({ key }));
     const description = runtime.description;
     const extensionUri = T.Uri.file(description.location);
     const environmentVariableCollection = {
@@ -1827,6 +1837,16 @@ export class ExtensionHost {
           selection: options.selection ? wireRange(T.toRange(options.selection)) : undefined,
         });
       }
+      case "vscode.openFolder": {
+        // (uri?, { forceNewWindow } | boolean): no uri asks for a folder.
+        const uri = args[0] ? T.Uri.revive(args[0] as T.Uri) : undefined;
+        if (uri && uri.scheme !== "file") throw new Error(`cannot open ${uri.toString()}: only folders on disk can be opened`);
+        const options = args[1] as boolean | { forceNewWindow?: boolean } | undefined;
+        const newWindow = typeof options === "boolean" ? options : !!options?.forceNewWindow;
+        return this.requestView("executeCommand", "lumen.window.openFolder", [uri?.fsPath ?? null, newWindow]);
+      }
+      case "vscode.newWindow":
+        return this.requestView("executeCommand", "workbench.action.newWindow", []);
       case "workbench.action.openSettings":
       case "workbench.action.openGlobalSettings":
         return this.requestView("executeCommand", "workbench.action.openSettings", []);
@@ -2546,6 +2566,9 @@ export async function runExtensionHost(): Promise<void> {
         break;
       case "filesChanged":
         host.filesChanged(message.paths);
+        break;
+      case "stateChanged":
+        host.stateChanged(message.file, message.key);
         break;
       case "shutdown":
         void host.deactivateAll().finally(() => host.send({ type: "shutdownDone" }));

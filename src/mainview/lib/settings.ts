@@ -479,8 +479,35 @@ export function onSettingsChange(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** `next`, keeping the arrays and objects of `previous` whose value did not change (listeners compare settings by identity). */
+function keepUnchanged<T extends Record<string, unknown>>(previous: T, next: T): T {
+  for (const [key, value] of Object.entries(next)) {
+    if (value && typeof value === "object" && JSON.stringify(value) === JSON.stringify(previous[key])) (next as Record<string, unknown>)[key] = previous[key];
+  }
+  return next;
+}
+
+/**
+ * Another window changed the settings: every window shares this storage (one origin),
+ * and the browser tells the others, so each reloads instead of writing over the
+ * change with its own copy later.
+ */
+function reloadFromStorage(key: string | null): void {
+  if (key !== null && key !== STORAGE_KEY && key !== LANGUAGE_STORAGE_KEY) return;
+  userSettings = keepUnchanged(userSettings as Record<string, unknown>, load() as Record<string, unknown>) as UserSettings;
+  const languages = loadLanguageSettings();
+  for (const [language, scope] of Object.entries(languages)) {
+    languages[language] = keepUnchanged((languageSettings[language] ?? {}) as Record<string, unknown>, scope as Record<string, unknown>) as Partial<Settings>;
+  }
+  languageSettings = languages;
+  notify();
+}
+
 if (typeof window !== "undefined") {
   window.addEventListener("lumen:ext-host", (event) => handleHostMessage((event as CustomEvent<HostMessage>).detail));
+  window.addEventListener("storage", (event) => {
+    if (event.storageArea === localStorage) reloadFromStorage(event.key);
+  });
 }
 
 export function useSettings(): Settings {

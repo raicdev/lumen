@@ -30,7 +30,10 @@ type Options = {
   manager: ExtensionManager;
   toView: (message: HostToView) => void;
   dialogs: Dialogs;
+  /** Shared by every window's host: each forgets only its own webviews. */
   webviews: WebviewResourceServer;
+  /** An extension wrote a memento file (globalState, secrets…): other windows' hosts reload it. */
+  onStateChanged?: (file: string, key: string) => void;
 };
 
 /** Open a web link in the default browser (no shell involved, so the URL cannot inject commands). */
@@ -65,6 +68,8 @@ export class ExtensionHostClient {
   #config: ConfigSnapshot = { lumen: {}, user: {} };
   #workspace: string | null = null;
   #generation = 0;
+  /** Webviews this host made (the webview server is shared with other windows). */
+  #webviewIds = new Set<string>();
 
   constructor(options: Options) {
     this.#options = options;
@@ -95,7 +100,7 @@ export class ExtensionHostClient {
     this.#workspace = workspace;
     await this.stop();
     const webviewPort = await this.#options.webviews.start();
-    this.#options.webviews.clear();
+    this.#forgetWebviews();
     const generation = ++this.#generation;
     const extensions = this.#options.manager.enabled();
     // The heap cap makes an extension that runs out of memory end this worker (and the
@@ -155,6 +160,13 @@ export class ExtensionHostClient {
     await worker.terminate().catch(() => 0);
     this.#rejectAll(new Error("extension host stopped"));
     this.#killChildProcesses();
+    this.#forgetWebviews();
+  }
+
+  /** This host's webviews are gone (it restarted or stopped). */
+  #forgetWebviews(): void {
+    for (const id of this.#webviewIds) this.#options.webviews.forget(id);
+    this.#webviewIds.clear();
   }
 
   /** Language servers and other helpers the extensions started do not outlive them. */
@@ -167,7 +179,7 @@ export class ExtensionHostClient {
   postFromView(message: ViewToHost): void {
     if (message.type === "configuration") this.#config = message.config;
     if (message.type === "workspace") this.#workspace = message.root;
-    if (message.type === "webviewClosed") this.#options.webviews.forget(message.id);
+    if (message.type === "webviewClosed") this.#forgetWebview(message.id);
     this.#post({ type: "view", message });
   }
 
@@ -183,6 +195,16 @@ export class ExtensionHostClient {
 
   filesChanged(paths: string[]): void {
     if (paths.length) this.#post({ type: "filesChanged", paths });
+  }
+
+  /** Another window's host wrote a memento file. */
+  stateChanged(file: string, key: string): void {
+    this.#post({ type: "stateChanged", file, key });
+  }
+
+  #forgetWebview(id: string): void {
+    this.#webviewIds.delete(id);
+    this.#options.webviews.forget(id);
   }
 
   #post(message: MainToHost): void {
@@ -204,9 +226,11 @@ export class ExtensionHostClient {
       case "view": {
         // Webview pages are served (from their extension's origin) rather than inlined.
         const inner = message.message;
-        if (inner.type === "webviewCreate") inner.webview.url = this.#options.webviews.pageUrl(inner.webview.id, inner.webview.extensionId);
-        else if (inner.type === "webviewHtml") this.#options.webviews.setHtml(inner.id, inner.html);
-        else if (inner.type === "webviewDispose") this.#options.webviews.forget(inner.id);
+        if (inner.type === "webviewCreate") {
+          this.#webviewIds.add(inner.webview.id);
+          inner.webview.url = this.#options.webviews.pageUrl(inner.webview.id, inner.webview.extensionId);
+        } else if (inner.type === "webviewHtml") this.#options.webviews.setHtml(inner.id, inner.html);
+        else if (inner.type === "webviewDispose") this.#forgetWebview(inner.id);
         this.#options.toView(inner);
         break;
       }
@@ -227,6 +251,9 @@ export class ExtensionHostClient {
       case "childProcess":
         this.#childProcesses.set(message.pid, message.extensionId);
         break;
+      case "stateChanged":
+        this.#options.onStateChanged?.(message.file, message.key);
+        break;
       case "shutdownDone":
         break;
     }
@@ -241,6 +268,7 @@ export class ExtensionHostClient {
       case "openExternal":
         return openExternal(String(args[0]));
       case "setWebviewRoots":
+        this.#webviewIds.add(String(args[0]));
         this.#options.webviews.setRoots(String(args[0]), (args[1] as string[]) ?? []);
         return true;
     }

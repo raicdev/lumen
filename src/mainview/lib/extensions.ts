@@ -293,6 +293,19 @@ class ExtensionService {
       if (changed.length) this.#postConfiguration(changed);
       if (changed.includes("editor.tabSize") || changed.includes("editor.insertSpaces")) this.#postEditorOptions();
     });
+    // Another window changed extension settings (all windows share this storage).
+    window.addEventListener("storage", (event) => {
+      if (event.storageArea !== localStorage || (event.key !== null && event.key !== EXTENSION_SETTINGS_KEY)) return;
+      const next = loadExtensionSettings();
+      const previous = this.#extensionSettings;
+      const changed = [...new Set([...Object.keys(previous), ...Object.keys(next)])].filter(
+        (key) => JSON.stringify(previous[key]) !== JSON.stringify(next[key]),
+      );
+      this.#extensionSettings = next;
+      if (!changed.length) return;
+      this.#update({ settingsVersion: this.#snapshot.settingsVersion + 1 });
+      this.#postConfiguration(changed);
+    });
     window.addEventListener("focus", () => this.post({ type: "focus", focused: true }));
     window.addEventListener("blur", () => this.post({ type: "focus", focused: false }));
   }

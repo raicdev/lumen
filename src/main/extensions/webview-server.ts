@@ -142,12 +142,6 @@ export class WebviewResourceServer {
     this.#pages.delete(webviewId);
   }
 
-  /** The extension host restarted: its webviews are gone. */
-  clear(): void {
-    this.#roots.clear();
-    this.#pages.clear();
-  }
-
   #handle(request: IncomingMessage, response: ServerResponse): void {
     const notFound = () => {
       response.writeHead(404, { "Content-Type": "text/plain" });

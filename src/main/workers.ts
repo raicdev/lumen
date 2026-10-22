@@ -23,7 +23,7 @@ export function workerEntry(): URL {
   return import.meta.url.endsWith(".ts") ? new URL("./index.ts", import.meta.url) : new URL("./main.mjs", import.meta.url);
 }
 
-class WorkerClient<S extends Service> {
+export class WorkerClient<S extends Service> {
   #kind: WorkerKind;
   #worker: Worker | null = null;
   #nextId = 1;
@@ -47,8 +47,8 @@ class WorkerClient<S extends Service> {
       else pending.resolve(message.result);
     });
     const fail = (error: Error) => {
+      if (this.#worker !== worker) return; // replaced or disposed
       console.error(`[worker:${this.#kind}]`, error);
-      if (this.#worker !== worker) return;
       this.#worker = null;
       for (const pending of this.#pending.values()) pending.reject(error);
       this.#pending.clear();
@@ -89,6 +89,15 @@ class WorkerClient<S extends Service> {
     this.#worker?.postMessage({ id: 0, method, args });
   }
 
+  /** End the worker (its window closed); a later call starts a new one. */
+  dispose(): void {
+    const worker = this.#worker;
+    this.#worker = null;
+    for (const pending of this.#pending.values()) pending.reject(new Error(`the ${this.#kind} worker was stopped`));
+    this.#pending.clear();
+    void worker?.terminate().catch(() => 0);
+  }
+
   /**
    * Settings the worker needs, replayed whenever it starts. They do not start
    * it: the worker (and the code it loads) waits for its first real call.
@@ -105,7 +114,14 @@ type LspService = {
 
 type FsService = Pick<typeof fsTasks, "searchInFiles" | "replaceInFiles" | "listWorkspaceFiles" | "searchFilesByName">;
 
-export const lspWorker = new WorkerClient<LspService & Service>("lsp");
+export type LspWorker = WorkerClient<LspService & Service>;
+
+/** A window's TypeScript language service (it follows that window's workspace root). */
+export function createLspWorker(): LspWorker {
+  return new WorkerClient<LspService & Service>("lsp");
+}
+
+/** Workspace-wide search: stateless, shared by every window. */
 export const fsWorker = new WorkerClient<FsService & Service>("fs");
 
 /** Worker side: serve calls for the requested service. */

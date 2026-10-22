@@ -581,7 +581,9 @@ class WebviewService {
         if (record.kind === "view") {
           this.#viewStates[record.viewType] = data.data;
           try {
-            localStorage.setItem("lumen.webviewViewState", JSON.stringify(this.#viewStates));
+            // Other windows write their views' states here too: keep theirs.
+            const stored = JSON.parse(localStorage.getItem("lumen.webviewViewState") ?? "{}") as Record<string, unknown>;
+            localStorage.setItem("lumen.webviewViewState", JSON.stringify({ ...stored, [record.viewType]: data.data }));
           } catch {
             /* too large or unavailable */
           }

@@ -222,7 +222,9 @@ export async function runMessageLoop(options: { shouldContinue: () => boolean })
     while (api.PeekMessageW(messageBuffer, null, 0, 0, PM_REMOVE)) {
       const message = messageBuffer.readUInt32LE(8);
       if (message === WM_QUIT) {
-        pumping = false;
+        // Every webview posts one when its window goes away (webview_terminate, or the
+        // last window it counts closing); the app decides whether the loop ends.
+        pumping = options.shouldContinue();
         break;
       }
       api.TranslateMessage(messageBuffer);

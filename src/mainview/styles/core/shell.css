@@ -18,7 +18,9 @@
   height: var(--toolbar-h);
   min-height: var(--toolbar-h);
   display: grid;
-  grid-template-columns: 1fr minmax(220px, 400px) 1fr;
+  /* The search box stays centred while the menu bar fits beside it; when it does not
+     (narrow windows), the box moves right and shrinks instead of covering the menus. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(120px, 400px) minmax(max-content, 1fr);
   align-items: center;
   padding-left: 8px;
   border-bottom: 1px solid var(--vscode-titleBar-border);
@@ -47,6 +49,7 @@
 .titlebar-center {
   display: flex;
   justify-content: center;
+  min-width: 0;
 }
 
 .titlebar-mark {
@@ -172,6 +175,7 @@
 
 .toolbar-search {
   width: 100%;
+  min-width: 0;
   max-width: 400px;
   height: 26px;
   display: flex;
@@ -195,6 +199,10 @@
 
 .toolbar-search span {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: left;
   font-size: 12px;
 }

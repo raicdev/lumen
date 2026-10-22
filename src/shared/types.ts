@@ -20,6 +20,14 @@ export type FileEntry = {
 };
 
 /** An unsaved editor kept on disk until it is saved or discarded (hot exit). */
+export type WindowInit = {
+  id: string;
+  /** The folder to open: the window's folder in the last session, or the one it was opened for. */
+  workspace: string | null;
+  /** The first launch after an update from a version without saved windows: reopen `lumen.lastWorkspace`. */
+  restoreLastWorkspace: boolean;
+};
+
 export type DocumentBackup = {
   /** The file path, or `untitled:Untitled-1`. */
   path: string;
@@ -365,6 +373,21 @@ export type LumenRPC = {
         params: { title: string };
         response: { ok: boolean };
       };
+      /** What this window opens with: its id (names its hot-exit backups) and its folder. */
+      windowInit: {
+        params: Record<string, never>;
+        response: WindowInit;
+      };
+      /** Open a new window, empty or showing `path` (a window that already shows it comes to the front instead). */
+      newWindow: {
+        params: { path?: string | null };
+        response: { ok: boolean };
+      };
+      /** Bring the window that shows `path` to the front, if another window shows it. */
+      focusWorkspaceWindow: {
+        params: { path: string };
+        response: { focused: boolean };
+      };
       showSaveDialog: {
         params: { defaultPath?: string };
         response: { path: string | null };
@@ -592,6 +615,8 @@ export type LumenRPC = {
     };
     messages: {
       log: { msg: string };
+      /** The window got the focus (launch URIs go to the window used last). */
+      windowFocused: Record<string, never>;
       /** Notifications for the extension host (in order). */
       extHostPost: { message: ViewToHost };
     };
