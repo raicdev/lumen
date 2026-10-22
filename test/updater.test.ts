@@ -51,6 +51,14 @@ test("same, older, pre-release, draft and malformed releases are no update", () 
   assert.equal(releaseUpdate(release({ tag_name: "v0.2.0-rc.1" }), "0.1.0", pattern), null);
 });
 
+test("a pre-release build gets the stable release of its version and newer ones, not older ones", () => {
+  const pattern = installerAssetPattern("win32", "x64");
+  assert.equal(releaseUpdate(release(), "0.2.0-beta.1", pattern)?.version, "0.2.0");
+  assert.equal(releaseUpdate(release(), "0.1.9-beta.2", pattern)?.version, "0.2.0");
+  assert.equal(releaseUpdate(release(), "0.2.1-beta.1", pattern), null);
+  assert.equal(releaseUpdate(release(), "0.2.0-", pattern), null);
+});
+
 test("no setup for other architectures or platforms; a missing digest is reported as null", () => {
   assert.equal(releaseUpdate(release(), "0.1.0", installerAssetPattern("win32", "arm64"))?.installer, null);
   assert.equal(releaseUpdate(release(), "0.1.0", installerAssetPattern("linux", "x64"))?.installer, null);

@@ -4,6 +4,7 @@ import "./lib/rpc"; // initialize the Lumen Shell bridge
 import { reloadConfiguredColorTheme } from "./lib/theme";
 import { startUpdates } from "./lib/updates";
 import "./lib/ui-style"; // modern / legacy look (workbench.style)
+import "./lib/tooltip"; // the workbench's own tooltips in place of the browser's
 
 // Lumen Dark is in place already; a configured theme from an extension follows once it is read.
 void reloadConfiguredColorTheme();

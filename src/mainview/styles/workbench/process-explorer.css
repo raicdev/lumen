@@ -49,6 +49,16 @@
   vertical-align: middle;
 }
 
+/* The own share of a row whose memory includes its nested processes (empty on the others, to keep the column aligned). */
+.process-own {
+  display: inline-block;
+  min-width: 6.5em;
+  margin-left: 8px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .process-name {
   display: flex;
   align-items: center;

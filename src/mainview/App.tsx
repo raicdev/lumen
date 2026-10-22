@@ -14,6 +14,7 @@ import { COMPAT_GRADES, compatGrade } from "./lib/compat";
 import { notify, toast } from "./lib/toast";
 import { extensionService, useExtensions } from "./lib/extensions";
 import { treeService, useTreeViews } from "./lib/trees";
+import { setTooltipCommandHandler } from "./lib/tooltip";
 import { createExtensionHandlers } from "./lib/extension-handlers";
 import { FeatureActivityBadge, FeatureEditorView, FeatureExplorerSections, FeatureIconView, FeatureSidebarPanels } from "./features/components";
 import {
@@ -2710,7 +2711,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.2.1", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.1", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -3243,13 +3244,14 @@ export function App() {
         if (!event.preserveFocus) focusGroup(holder.id);
       }
     });
-    // `command:` links in webviews that allow them, and the toolbars / welcome content of tree views.
+    // `command:` links in webviews that allow them, the toolbars / welcome content of tree views and Markdown tooltips.
     const runLinkCommand = (command: string, args: unknown[]) => {
       if (commands.has(command) || viewCommandsRef.current.has(command)) runCommandRef.current(command, false, args[0]);
       else extensionService.executeCommand(command, args);
     };
     webviewService.setCommandHandler(runLinkCommand);
     treeService.setCommandHandler(runLinkCommand);
+    setTooltipCommandHandler(runLinkCommand);
     // TreeView.reveal shows the view.
     const unsubscribeTreeReveal = treeService.onReveal((viewId) => act.current.revealView(viewId));
     let saveTimer: ReturnType<typeof setTimeout> | null = null;

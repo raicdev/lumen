@@ -1386,26 +1386,9 @@
 }
 
 /* A MarkdownString tooltip (TreeItem.tooltip / resolveTreeItem), near the hovered row. */
+/* The look is .lumen-tooltip-markdown (styles/core/tooltip.css). */
 .ext-tree-tooltip {
-  position: fixed;
-  z-index: 60;
-  max-width: 460px;
-  max-height: 320px;
-  overflow: auto;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-panel);
-  box-shadow: 0 2px 12px var(--vscode-widget-shadow);
   pointer-events: none;
-}
-
-.ext-tree-tooltip p {
-  margin: 0 0 6px;
-}
-
-.ext-tree-tooltip p:last-child {
-  margin-bottom: 0;
 }
 
 .ext-tree-welcome {

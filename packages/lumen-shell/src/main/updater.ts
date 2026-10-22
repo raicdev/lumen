@@ -52,6 +52,12 @@ export function parseVersion(value: string): [number, number, number] | null {
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
+/** The running version: plain semver, or a pre-release of one (`0.2.2-beta.1`) so beta builds still find updates. */
+export function parseRunningVersion(value: string): { core: [number, number, number]; prerelease: boolean } | null {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$/.exec(value.trim());
+  return match ? { core: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: !!match[4] } : null;
+}
+
 /** Negative, zero or positive as `a` is older than, the same as or newer than `b`. */
 export function compareVersions(a: [number, number, number], b: [number, number, number]): number {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
@@ -66,8 +72,11 @@ export function installerAssetPattern(platform: string, arch: string): RegExp | 
 export function releaseUpdate(release: GitHubRelease, current: string, assetPattern: RegExp | null): UpdateRelease | null {
   if (release.draft || release.prerelease || typeof release.tag_name !== "string") return null;
   const version = parseVersion(release.tag_name);
-  const running = parseVersion(current);
-  if (!version || !running || compareVersions(version, running) <= 0) return null;
+  const running = parseRunningVersion(current);
+  if (!version || !running) return null;
+  const order = compareVersions(version, running.core);
+  // A stable release is newer than the pre-releases of its own version (0.2.2 over 0.2.2-beta.1).
+  if (order < 0 || (order === 0 && !running.prerelease)) return null;
   const asset = assetPattern
     ? (release.assets ?? []).find((entry) => typeof entry.name === "string" && assetPattern.test(entry.name))
     : undefined;

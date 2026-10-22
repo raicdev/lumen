@@ -1,0 +1,68 @@
+/* ── Tooltips (lib/tooltip.ts) ── */
+
+.lumen-tooltip {
+  position: fixed;
+  z-index: 1100;
+  max-width: 360px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--border));
+  border-radius: var(--radius);
+  background: var(--vscode-editorHoverWidget-background, var(--bg-elevated));
+  box-shadow: var(--shadow);
+  color: var(--vscode-editorHoverWidget-foreground, var(--text));
+  font: 12px/1.45 var(--font-ui);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.1s ease-out, transform 0.1s ease-out;
+}
+
+.lumen-tooltip[data-side="above"] {
+  transform: translateY(2px);
+}
+
+.lumen-tooltip.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Markdown tooltips (status bar items of extensions) can be reached for their links. */
+.lumen-tooltip-markdown {
+  max-width: 460px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  white-space: normal;
+  pointer-events: auto;
+}
+
+.lumen-tooltip-markdown > :first-child {
+  margin-top: 0;
+}
+
+.lumen-tooltip-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.lumen-tooltip-markdown p {
+  margin: 0 0 6px;
+}
+
+.lumen-tooltip-markdown hr {
+  margin: 6px -10px;
+  border: 0;
+  border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--border));
+}
+
+.lumen-tooltip-markdown [data-href] {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumen-tooltip {
+    transition: none;
+  }
+}

@@ -138,7 +138,7 @@ function showLinkTooltip(event: MouseEvent, text: string | undefined) {
   hideLinkTooltip();
   if (!text) return;
   tooltip = document.createElement("div");
-  tooltip.className = "terminal-link-tooltip";
+  tooltip.className = "lumen-tooltip visible terminal-link-tooltip";
   tooltip.textContent = text;
   tooltip.style.left = `${event.clientX + 8}px`;
   tooltip.style.top = `${event.clientY + 14}px`;

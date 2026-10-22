@@ -71,12 +71,14 @@ function ExtensionItems({ items, side, onClick }: { items: HostStatusBarItem[]; 
         .sort((a, b) => b.priority - a.priority)
         .map((item) => {
           const style = { color: item.color, background: item.backgroundColor };
+          // A MarkdownString tooltip is the Markdown hover of lib/tooltip.ts.
+          const tooltip = typeof item.tooltip === "string" ? { title: item.tooltip } : { "data-tooltip-markdown": item.tooltip?.markdown };
           return item.command ? (
-            <button key={item.id} type="button" className="status-btn status-ext" title={item.tooltip} style={style} onClick={() => onClick(item)}>
+            <button key={item.id} type="button" className="status-btn status-ext" {...tooltip} style={style} onClick={() => onClick(item)}>
               <WithCodicons text={item.text} />
             </button>
           ) : (
-            <span key={item.id} className="status-item status-ext" title={item.tooltip} style={style}>
+            <span key={item.id} className="status-item status-ext" {...tooltip} style={style}>
               <WithCodicons text={item.text} />
             </span>
           );

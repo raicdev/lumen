@@ -16,6 +16,7 @@
 @import "./styles/core/statusbar.css";
 @import "./styles/core/command-palette.css";
 @import "./styles/core/toasts.css";
+@import "./styles/core/tooltip.css";
 @import "./styles/core/scrollbars.css";
 @import "./styles/core/tree.css";
 @import "./styles/core/search.css";

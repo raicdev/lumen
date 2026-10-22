@@ -32,11 +32,14 @@ function formatCpu(cpu: number | null): string {
   return cpu === null ? "—" : `${cpu.toFixed(1)}%`;
 }
 
-type TreeEntry = { row: ProcessRow; depth: number; descendants: number; collapsed: boolean };
+/** A row with the processes nested in it: thread rows are already part of their process, so they add nothing. */
+type Usage = { memory: number; cpu: number | null };
+
+type TreeEntry = { row: ProcessRow; depth: number; descendants: number; collapsed: boolean; total: Usage };
 
 /**
- * Rows in tree order (children by memory, largest first), with their depth.
- * The descendants of a collapsed row are left out.
+ * Rows in tree order (children by memory with what is nested in them, largest
+ * first), with their depth. The descendants of a collapsed row are left out.
  */
 function treeOrder(rows: ProcessRow[], isCollapsed: (row: ProcessRow) => boolean): TreeEntry[] {
   const children = new Map<string | null, ProcessRow[]>();
@@ -45,9 +48,23 @@ function treeOrder(rows: ProcessRow[], isCollapsed: (row: ProcessRow) => boolean
     list.push(row);
     children.set(row.parent, list);
   }
+  const totals = new Map<string, Usage>();
+  const totalOf = (row: ProcessRow): Usage => {
+    const known = totals.get(row.id);
+    if (known) return known;
+    const total: Usage = { memory: row.memory, cpu: row.cpu };
+    for (const child of children.get(row.id) ?? []) {
+      if (child.kind === "thread") continue;
+      const nested = totalOf(child);
+      total.memory += nested.memory;
+      if (nested.cpu !== null) total.cpu = (total.cpu ?? 0) + nested.cpu;
+    }
+    totals.set(row.id, total);
+    return total;
+  };
   for (const list of children.values()) {
     // Threads first: they are part of the parent process, not children of it.
-    list.sort((a, b) => Number(b.kind === "thread") - Number(a.kind === "thread") || b.memory - a.memory);
+    list.sort((a, b) => Number(b.kind === "thread") - Number(a.kind === "thread") || totalOf(b).memory - totalOf(a).memory);
   }
   const countDescendants = (row: ProcessRow): number =>
     (children.get(row.id) ?? []).reduce((sum, child) => sum + 1 + countDescendants(child), 0);
@@ -55,7 +72,7 @@ function treeOrder(rows: ProcessRow[], isCollapsed: (row: ProcessRow) => boolean
   const visit = (row: ProcessRow, depth: number) => {
     const descendants = countDescendants(row);
     const collapsed = descendants > 0 && isCollapsed(row);
-    out.push({ row, depth, descendants, collapsed });
+    out.push({ row, depth, descendants, collapsed, total: totalOf(row) });
     if (collapsed) return;
     for (const child of children.get(row.id) ?? []) visit(child, depth + 1);
   };
@@ -239,7 +256,9 @@ export function ProcessExplorer({ open, onClose }: Props) {
             </thead>
             <tbody>
               {ordered.map((entry) => {
-                const { row, depth, descendants, collapsed, category, extension } = entry;
+                const { row, depth, descendants, collapsed, total, category, extension } = entry;
+                // A parent shows itself with the processes nested in it; its own share is the muted value.
+                const nested = row.kind !== "thread" && total.memory !== row.memory;
                 return (
                   <tr
                     key={row.id}
@@ -278,8 +297,14 @@ export function ProcessExplorer({ open, onClose }: Props) {
                       </div>
                     </td>
                     <td className="num muted">{row.pid ?? ""}</td>
-                    <td className="num">{row.kind === "thread" ? "" : formatCpu(row.cpu)}</td>
-                    <td className="num">{formatBytes(row.memory)}</td>
+                    <td className="num" title={nested ? `Own: ${formatCpu(row.cpu)}` : undefined}>
+                      {row.kind === "thread" ? "" : formatCpu(total.cpu)}
+                    </td>
+                    <td className="num" title={nested ? `Own: ${formatBytes(row.memory)}
+Nested processes: ${formatBytes(total.memory - row.memory)}` : undefined}>
+                      {formatBytes(total.memory)}
+                      <span className="process-own">{nested ? formatBytes(row.memory) : ""}</span>
+                    </td>
                     <td className="shortcut-actions">
                       {row.pid !== null && row.kind !== "app" && (
                         <button type="button" className="icon-btn" title="End Process" onClick={() => void endProcess(row)}>
@@ -293,7 +318,8 @@ export function ProcessExplorer({ open, onClose }: Props) {
             </tbody>
           </table>
           <p className="process-note">
-            Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). JS heap rows
+            Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). A row with
+            processes nested in it shows them added in, with its own share after it. JS heap rows
             are parts of Lumen's own process (worker threads) and are not added to the total. Task Manager lists Lumen's WebView2
             processes as a separate "WebView2 Manager" group; they are shown here under Lumen.
           </p>

@@ -528,7 +528,7 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
         );
       })}
       {tooltip && (
-        <div className="ext-tree-tooltip markdown-body" style={{ left: tooltip.x, top: tooltip.y }} dangerouslySetInnerHTML={{ __html: tooltip.html }} />
+        <div className="lumen-tooltip lumen-tooltip-markdown visible ext-tree-tooltip markdown-body" style={{ left: tooltip.x, top: tooltip.y }} dangerouslySetInnerHTML={{ __html: tooltip.html }} />
       )}
     </div>
   );

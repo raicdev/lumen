@@ -378,7 +378,8 @@ export type HostStatusBarItem = {
   id: string;
   extensionId: string;
   text: string;
-  tooltip?: string;
+  /** A plain string, or a MarkdownString as `{ markdown }`. */
+  tooltip?: string | { markdown: string };
   command?: { command: string; arguments?: unknown[] };
   alignment: "left" | "right";
   priority: number;

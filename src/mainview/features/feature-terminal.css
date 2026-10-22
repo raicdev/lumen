@@ -1,17 +1,8 @@
 /* Styles of the "terminal" area. */
 
+/* The look is .lumen-tooltip (styles/core/tooltip.css). */
 .terminal-link-tooltip {
-  position: fixed;
-  z-index: 1000;
   max-width: 420px;
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-elevated);
-  color: var(--text);
-  font: 12px var(--font-ui);
-  pointer-events: none;
-  box-shadow: var(--shadow);
 }
 
 /* Terminal tab icons that extensions set (TerminalOptions.iconPath / color). */

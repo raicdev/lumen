@@ -31,7 +31,7 @@ import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.t
 import type { ExtensionDescription } from "../shared/extensions.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
 
-const APP_VERSION = "0.2.1";
+const APP_VERSION = "0.2.2-beta.1";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 

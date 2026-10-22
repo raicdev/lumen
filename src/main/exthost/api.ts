@@ -671,7 +671,7 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
           id,
           extensionId,
           text: state.text,
-          tooltip: typeof state.tooltip === "string" ? state.tooltip : state.tooltip?.value,
+          tooltip: typeof state.tooltip === "string" ? state.tooltip || undefined : state.tooltip?.value ? { markdown: state.tooltip.value } : undefined,
           command,
           alignment: alignment === T.StatusBarAlignment.Right ? "right" : "left",
           priority,
