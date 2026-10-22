@@ -1,8 +1,8 @@
 {
   "name": "lumen",
-  "version": "0.2.2-beta.1",
+  "version": "0.2.2-beta.2",
   "private": true,
-  "description": "Lumen — a fast, beautiful code editor. Zed alternative built with Lumen Shell, Node.js & TypeScript.",
+  "description": "Lumen — a lightweight VS Code alternative that runs VS Code extensions, built on the system WebView with Node.js & TypeScript.",
   "type": "module",
   "scripts": {
     "start": "lumen-shell dev",

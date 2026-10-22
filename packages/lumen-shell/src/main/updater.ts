@@ -7,11 +7,15 @@ import { basename, dirname, join } from "path";
 
 /**
  * Updates from GitHub Releases: the latest release whose tag (`v1.2.3`) is a
- * newer version than the running app. On Windows the release's per-user setup
+ * newer version than the running app. On the beta channel pre-releases
+ * (`v1.2.3-beta.1`) count too. On Windows the release's per-user setup
  * (`lumen-shell installer`, `<App>-<version>-win32-<arch>-setup.exe`) is
  * downloaded, checked against the SHA-256 digest GitHub publishes for it, and
  * run silently over the installed app once the app exits.
  */
+
+/** stable: releases only; beta: pre-releases as well, whichever is newest. */
+export type UpdateChannel = "stable" | "beta";
 
 export type UpdaterConfig = {
   /** `owner/name` of the GitHub repository whose releases are the updates. */
@@ -52,10 +56,19 @@ export function parseVersion(value: string): [number, number, number] | null {
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
-/** The running version: plain semver, or a pre-release of one (`0.2.2-beta.1`) so beta builds still find updates. */
-export function parseRunningVersion(value: string): { core: [number, number, number]; prerelease: boolean } | null {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$/.exec(value.trim());
-  return match ? { core: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: !!match[4] } : null;
+/** A version with its pre-release identifiers (`0.2.2-beta.1` → [0, 2, 2] and ["beta", 1]); build metadata is ignored. */
+export type Semver = { core: [number, number, number]; prerelease: (string | number)[] };
+
+/** `1.2.3` or `1.2.3-beta.1` (an optional leading `v`); null for anything else. */
+export function parseSemver(value: string): Semver | null {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value.trim());
+  if (!match) return null;
+  const prerelease = match[4] ? match[4].split(".").map((part) => (/^\d+$/.test(part) ? Number(part) : part)) : [];
+  return { core: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease };
+}
+
+export function formatSemver(version: Semver): string {
+  return version.core.join(".") + (version.prerelease.length ? `-${version.prerelease.join(".")}` : "");
 }
 
 /** Negative, zero or positive as `a` is older than, the same as or newer than `b`. */
@@ -63,24 +76,45 @@ export function compareVersions(a: [number, number, number], b: [number, number,
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 }
 
+/** Semver precedence: a pre-release comes before its release (`1.0.0-beta.2` < `1.0.0-beta.10` < `1.0.0`). */
+export function compareSemver(a: Semver, b: Semver): number {
+  const core = compareVersions(a.core, b.core);
+  if (core) return core;
+  if (!a.prerelease.length || !b.prerelease.length) return b.prerelease.length - a.prerelease.length;
+  for (let i = 0; i < Math.min(a.prerelease.length, b.prerelease.length); i++) {
+    const x = a.prerelease[i]!;
+    const y = b.prerelease[i]!;
+    if (x === y) continue;
+    // Numeric identifiers sort numerically and before alphanumeric ones.
+    if (typeof x === "number" && typeof y === "number") return x - y;
+    if (typeof x === "number") return -1;
+    if (typeof y === "number") return 1;
+    return x < y ? -1 : 1;
+  }
+  return a.prerelease.length - b.prerelease.length;
+}
+
 /** The setup asset for a platform/architecture (only Windows has one). */
 export function installerAssetPattern(platform: string, arch: string): RegExp | null {
   return platform === "win32" ? new RegExp(`-win32-${arch}-setup\\.exe$`, "i") : null;
 }
 
-/** A GitHub release as an update, or null when it is not newer than `current` (or not a stable release). */
-export function releaseUpdate(release: GitHubRelease, current: string, assetPattern: RegExp | null): UpdateRelease | null {
-  if (release.draft || release.prerelease || typeof release.tag_name !== "string") return null;
-  const version = parseVersion(release.tag_name);
-  const running = parseRunningVersion(current);
+/**
+ * A GitHub release as an update, or null when it is not newer than `current`
+ * or not on the channel (the stable channel takes no pre-releases). A running
+ * pre-release build updates to its own version's release (0.2.2 over 0.2.2-beta.1).
+ */
+export function releaseUpdate(release: GitHubRelease, current: string, assetPattern: RegExp | null, channel: UpdateChannel = "stable"): UpdateRelease | null {
+  if (release.draft || typeof release.tag_name !== "string") return null;
+  const version = parseSemver(release.tag_name);
+  const running = parseSemver(current);
   if (!version || !running) return null;
-  const order = compareVersions(version, running.core);
-  // A stable release is newer than the pre-releases of its own version (0.2.2 over 0.2.2-beta.1).
-  if (order < 0 || (order === 0 && !running.prerelease)) return null;
+  if (channel === "stable" && (release.prerelease || version.prerelease.length)) return null;
+  if (compareSemver(version, running) <= 0) return null;
   const asset = assetPattern ? (release.assets ?? []).find((entry) => typeof entry.name === "string" && assetPattern.test(entry.name)) : undefined;
   const digest = typeof asset?.digest === "string" ? /^sha256:([0-9a-f]{64})$/i.exec(asset.digest) : null;
   return {
-    version: version.join("."),
+    version: formatSemver(version),
     title: typeof release.name === "string" && release.name ? release.name : release.tag_name,
     notes: typeof release.body === "string" ? release.body : "",
     url: typeof release.html_url === "string" ? release.html_url : "",
@@ -94,6 +128,17 @@ export function releaseUpdate(release: GitHubRelease, current: string, assetPatt
           }
         : null,
   };
+}
+
+/** The newest of `releases` that is an update on the channel, or null. */
+export function newestUpdate(releases: GitHubRelease[], current: string, assetPattern: RegExp | null, channel: UpdateChannel): UpdateRelease | null {
+  let best: { update: UpdateRelease; version: Semver } | null = null;
+  for (const release of releases) {
+    const update = releaseUpdate(release, current, assetPattern, channel);
+    const version = update && parseSemver(update.version);
+    if (update && version && (!best || compareSemver(version, best.version) > 0)) best = { update, version };
+  }
+  return best?.update ?? null;
 }
 
 /** Asset names end up in a file path: nothing but a plain file name. */
@@ -112,6 +157,8 @@ async function sha256Of(path: string): Promise<string> {
 
 class AutoUpdater {
   #config: UpdaterConfig | null = null;
+  /** Which releases count as updates (the user's choice, so it can change while the app runs). */
+  channel: UpdateChannel = "stable";
 
   configure(config: UpdaterConfig): void {
     this.#config = config;
@@ -136,18 +183,24 @@ class AutoUpdater {
     return existsSync(join(dirname(process.execPath), `Uninstall ${this.#settings.name}.exe`));
   }
 
-  /** The latest release when it is newer than the running app, else null. */
+  /**
+   * The newest release on the channel when it is newer than the running app,
+   * else null. The stable channel reads GitHub's latest release; the beta
+   * channel the most recent releases, pre-releases included.
+   */
   async check(signal?: AbortSignal): Promise<UpdateRelease | null> {
     const { repository, name, version } = this.#settings;
-    const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
+    const beta = this.channel === "beta";
+    const response = await fetch(`https://api.github.com/repos/${repository}/releases${beta ? "?per_page=30" : "/latest"}`, {
       headers: { Accept: "application/vnd.github+json", "User-Agent": `${name}/${version}`, "X-GitHub-Api-Version": "2022-11-28" },
       signal,
     });
     // No published release yet.
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`GitHub answered ${response.status} ${response.statusText}`);
-    const release = (await response.json()) as GitHubRelease;
-    return releaseUpdate(release, version, installerAssetPattern(process.platform, process.arch));
+    const body = (await response.json()) as GitHubRelease | GitHubRelease[];
+    const releases = Array.isArray(body) ? body : [body];
+    return newestUpdate(releases, version, installerAssetPattern(process.platform, process.arch), this.channel);
   }
 
   /**

@@ -4,7 +4,7 @@ import { getSettings, onSettingsChange } from "./settings";
 import { notify, showProgress, toast } from "./toast";
 
 /**
- * Lumen's own updates in the view: hands `update.mode` to the main process
+ * Lumen's own updates in the view: hands `update.mode` and `update.channel` to the main process
  * (which checks GitHub Releases and downloads) and turns its update states
  * into notifications. Background checks stay quiet until an update is ready;
  * Help > Check for Updates reports every step.
@@ -87,13 +87,14 @@ async function show(next: UpdateState): Promise<void> {
   }
 }
 
-/** Start following the main process's update state and keep it told about `update.mode`. */
+/** Start following the main process's update state and keep it told about `update.mode` and `update.channel`. */
 export function startUpdates(): void {
   window.addEventListener("lumen:update-state", (event) => void show((event as CustomEvent<UpdateState>).detail));
   let mode = getSettings()["update.mode"];
+  let channel = getSettings()["update.channel"];
   const configure = () =>
     api()
-      .request.updateConfigure({ mode })
+      .request.updateConfigure({ mode, channel })
       .then(({ state: current }) => {
         // A reloaded view catches up with an update that is ready already.
         if (current.kind === "ready" || current.kind === "available") void show({ ...current, manual: false });
@@ -102,9 +103,10 @@ export function startUpdates(): void {
       .catch(() => undefined);
   void configure();
   onSettingsChange(() => {
-    const next = getSettings()["update.mode"];
-    if (next === mode) return;
-    mode = next;
+    const settings = getSettings();
+    if (settings["update.mode"] === mode && settings["update.channel"] === channel) return;
+    mode = settings["update.mode"];
+    channel = settings["update.channel"];
     void configure();
   });
 }

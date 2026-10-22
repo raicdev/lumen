@@ -63,6 +63,8 @@ export type Settings = {
   "terminal.integrated.defaultProfile": string;
   /** default: check at startup and every few hours, download in the background; manual: Help > Check for Updates only; none: never. */
   "update.mode": "default" | "manual" | "none";
+  /** stable: releases only; beta: pre-releases as well. */
+  "update.channel": "stable" | "beta";
 };
 
 export type SettingKey = keyof Settings;
@@ -108,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   "terminal.integrated.fontSize": 13,
   "terminal.integrated.defaultProfile": "",
   "update.mode": "default",
+  "update.channel": "stable",
 };
 
 type SchemaEntry = {
@@ -253,6 +256,13 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     description:
       "default: check for updates at startup and every few hours, download them in the background and ask to restart. manual: only Help > Check for Updates. none: never check.",
     options: ["default", "manual", "none"],
+  },
+  {
+    key: "update.channel",
+    category: "Application",
+    label: "Update: Channel",
+    description: "stable: update to releases only. beta: also update to beta pre-releases, which come before a release and may have bugs.",
+    options: ["stable", "beta"],
   },
 ];
 

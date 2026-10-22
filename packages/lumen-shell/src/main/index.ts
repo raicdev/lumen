@@ -10,7 +10,7 @@ export { shell } from "./shell.ts";
 export { processTree } from "./process-info.ts";
 export type { ProcessInfo } from "./process-info.ts";
 export { autoUpdater } from "./updater.ts";
-export type { UpdateRelease, UpdaterConfig } from "./updater.ts";
+export type { UpdateChannel, UpdateRelease, UpdaterConfig } from "./updater.ts";
 export { assetRoot, assetUrl, startAssetServer } from "./assets.ts";
 export { platform } from "./native/index.ts";
 export type { MenuEntry, MenuGroup } from "./native/platform.ts";

@@ -4,7 +4,15 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { autoUpdater, installerAssetPattern, parseVersion, releaseUpdate } from "../packages/lumen-shell/src/main/updater.ts";
+import {
+  autoUpdater,
+  compareSemver,
+  installerAssetPattern,
+  newestUpdate,
+  parseSemver,
+  parseVersion,
+  releaseUpdate,
+} from "../packages/lumen-shell/src/main/updater.ts";
 
 const SETUP = "Lumen-0.2.0-win32-x64-setup.exe";
 
@@ -57,6 +65,39 @@ test("a pre-release build gets the stable release of its version and newer ones,
   assert.equal(releaseUpdate(release(), "0.1.9-beta.2", pattern)?.version, "0.2.0");
   assert.equal(releaseUpdate(release(), "0.2.1-beta.1", pattern), null);
   assert.equal(releaseUpdate(release(), "0.2.0-", pattern), null);
+});
+
+test("semver precedence: pre-releases come before their release, numeric identifiers sort as numbers", () => {
+  const order = ["0.2.1", "0.2.2-alpha", "0.2.2-beta.1", "0.2.2-beta.2", "0.2.2-beta.10", "0.2.2-rc.1", "0.2.2", "v0.3.0-beta.1"];
+  const parsed = order.map((version) => parseSemver(version)!);
+  for (let i = 1; i < parsed.length; i++) assert.ok(compareSemver(parsed[i - 1]!, parsed[i]!) < 0, `${order[i - 1]} < ${order[i]}`);
+  assert.equal(compareSemver(parseSemver("1.0.0+build.5")!, parseSemver("v1.0.0")!), 0);
+  assert.equal(parseSemver("1.0.0-"), null);
+  assert.equal(parseSemver("1.0"), null);
+});
+
+test("the beta channel takes pre-releases; the stable channel never does", () => {
+  const pattern = installerAssetPattern("win32", "x64");
+  const beta = release({ tag_name: "v0.3.0-beta.1", prerelease: true });
+  assert.equal(releaseUpdate(beta, "0.2.0", pattern, "stable"), null);
+  assert.equal(releaseUpdate(beta, "0.2.0", pattern, "beta")?.version, "0.3.0-beta.1");
+  assert.equal(releaseUpdate(release({ tag_name: "v0.3.0-beta.2", prerelease: true }), "0.3.0-beta.1", pattern, "beta")?.version, "0.3.0-beta.2");
+  assert.equal(releaseUpdate(beta, "0.3.0-beta.1", pattern, "beta"), null);
+  assert.equal(releaseUpdate(beta, "0.3.0", pattern, "beta"), null);
+  assert.equal(releaseUpdate(release({ tag_name: "v0.3.0-beta.1", draft: true }), "0.2.0", pattern, "beta"), null);
+});
+
+test("the newest update of a release list wins, a release over the betas of its version", () => {
+  const list = [
+    release({ tag_name: "v0.3.0-beta.2", prerelease: true }),
+    release({ tag_name: "v0.3.0" }),
+    release({ tag_name: "v0.3.0-beta.1", prerelease: true }),
+    release({ tag_name: "v0.2.0" }),
+  ];
+  assert.equal(newestUpdate(list, "0.3.0-beta.1", null, "beta")?.version, "0.3.0");
+  assert.equal(newestUpdate(list.slice(2), "0.2.0", null, "beta")?.version, "0.3.0-beta.1");
+  assert.equal(newestUpdate([list[0]!, list[3]!], "0.1.0", null, "stable")?.version, "0.2.0");
+  assert.equal(newestUpdate(list, "0.3.0", null, "beta"), null);
 });
 
 test("no setup for other architectures or platforms; a missing digest is reported as null", () => {

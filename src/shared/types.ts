@@ -164,6 +164,9 @@ export type AppInfo = {
 /** `update.mode`: default checks at startup and every few hours and downloads in the background; manual only on Help > Check for Updates; none never. */
 export type UpdateMode = "default" | "manual" | "none";
 
+/** `update.channel`: stable releases only, or beta pre-releases as well. */
+export type UpdateChannel = "stable" | "beta";
+
 /** A newer Lumen release (GitHub Releases). */
 export type UpdateRelease = {
   version: string;
@@ -540,9 +543,9 @@ export type LumenRPC = {
         params: { url: string };
         response: { ok: boolean };
       };
-      /** `update.mode` changed (also sent once at startup): schedules the background checks. */
+      /** `update.mode` or `update.channel` changed (also sent once at startup): schedules the background checks. */
       updateConfigure: {
-        params: { mode: UpdateMode };
+        params: { mode: UpdateMode; channel: UpdateChannel };
         response: { state: UpdateState };
       };
       /** Help > Check for Updates: check now and download what is found. */

@@ -23,7 +23,7 @@ import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.t
 import type { ExtensionDescription } from "../shared/extensions.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
 
-const APP_VERSION = "0.2.2-beta.1";
+const APP_VERSION = "0.2.2-beta.2";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 
@@ -559,8 +559,8 @@ const rpc = defineMainRPC<LumenRPC>({
 
       openExternal: ({ url }) => ({ ok: openExternal(url) }),
 
-      updateConfigure: ({ mode }) => {
-        updates.configure(mode);
+      updateConfigure: ({ mode, channel }) => {
+        updates.configure(mode, channel);
         return { state: updates.state };
       },
 

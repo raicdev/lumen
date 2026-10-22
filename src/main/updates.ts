@@ -1,8 +1,10 @@
 import { app, autoUpdater, type UpdateRelease as ShellUpdateRelease } from "@lumen/shell/main";
-import type { UpdateMode, UpdateRelease, UpdateState } from "../shared/types.ts";
+import type { UpdateChannel, UpdateMode, UpdateRelease, UpdateState } from "../shared/types.ts";
 
 /** The first background check waits for startup to settle. */
 const FIRST_CHECK_DELAY = 30_000;
+/** After switching the channel, its releases are looked at soon. */
+const CHANNEL_CHECK_DELAY = 5_000;
 const CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 
 export type UpdateServiceOptions = {
@@ -17,15 +19,19 @@ function summary(release: ShellUpdateRelease): UpdateRelease {
 
 /**
  * Lumen's own updates (see autoUpdater in Lumen Shell): checks GitHub
- * Releases as `update.mode` says, downloads a newer setup in the background
+ * Releases as `update.mode` and `update.channel` say, downloads a newer setup in the background
  * and installs it when the user restarts to update. Every change of state goes
  * to the view, which shows the notifications.
  */
 export class UpdateService {
   #state: UpdateState = { kind: "idle" };
   #mode: UpdateMode | null = null;
+  #channel: UpdateChannel | null = null;
+  /** Bumped when the channel changes: what a check of the other channel finds is dropped. */
+  #generation = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #running: Promise<void> | null = null;
+  #runningGeneration = 0;
   /** Whether Help > Check for Updates asked during the current run. */
   #manual = false;
   #file: string | null = null;
@@ -39,13 +45,25 @@ export class UpdateService {
     return this.#state;
   }
 
-  /** Schedule the background checks of `update.mode` (dev runs never check on their own). */
-  configure(mode: UpdateMode): void {
-    if (mode === this.#mode) return;
+  /**
+   * Schedule the background checks of `update.mode` (dev runs never check on
+   * their own) on the releases of `update.channel`. Switching the channel drops
+   * what the other channel found or downloaded.
+   */
+  configure(mode: UpdateMode, channel: UpdateChannel): void {
+    const switched = this.#channel !== null && channel !== this.#channel;
+    if (mode === this.#mode && !switched) return;
     this.#mode = mode;
+    this.#channel = autoUpdater.channel = channel;
+    if (switched) {
+      this.#generation++;
+      this.#file = null;
+      this.#set({ kind: "idle" });
+      void autoUpdater.cleanup();
+    }
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
-    if (mode === "default" && app.packaged) this.#schedule(FIRST_CHECK_DELAY);
+    if (mode === "default" && app.packaged) this.#schedule(switched ? CHANNEL_CHECK_DELAY : FIRST_CHECK_DELAY);
   }
 
   #schedule(delay: number): void {
@@ -63,42 +81,51 @@ export class UpdateService {
       // Report what is going on (again) instead of starting over.
       if (this.#running || this.#state.kind === "ready") this.#set({ ...this.#state, manual: true } as UpdateState);
     }
-    if (this.#running) {
+    while (this.#running) {
+      // A check of the channel left behind does not answer for this one.
+      const stale = this.#runningGeneration !== this.#generation;
       await this.#running;
-      return this.#state;
+      if (!stale) return this.#state;
     }
     if (this.#state.kind === "ready") return this.#state;
     this.#manual = manual;
+    this.#runningGeneration = this.#generation;
     this.#running = this.#run().finally(() => (this.#running = null));
     await this.#running;
     return this.#state;
   }
 
   async #run(): Promise<void> {
-    this.#set({ kind: "checking", manual: this.#manual });
+    const generation = this.#generation;
+    const current = () => generation === this.#generation;
+    const set = (state: UpdateState) => current() && this.#set(state);
+    set({ kind: "checking", manual: this.#manual });
     try {
       const found = await autoUpdater.check();
+      if (!current()) return;
       if (!found) {
-        this.#set({ kind: "upToDate", manual: this.#manual });
+        set({ kind: "upToDate", manual: this.#manual });
         await autoUpdater.cleanup();
         return;
       }
       const release = summary(found);
       if (!autoUpdater.canInstall || !found.installer) {
-        this.#set({ kind: "available", release, manual: this.#manual });
+        set({ kind: "available", release, manual: this.#manual });
         return;
       }
-      this.#set({ kind: "downloading", release, percent: null, manual: this.#manual });
+      set({ kind: "downloading", release, percent: null, manual: this.#manual });
       let shown: number | null = null;
-      this.#file = await autoUpdater.download(found, (received, total) => {
+      const file = await autoUpdater.download(found, (received, total) => {
         const percent = total ? Math.min(100, Math.floor((received * 100) / total)) : null;
         if (percent === shown) return;
         shown = percent;
-        this.#set({ kind: "downloading", release, percent, manual: this.#manual });
+        set({ kind: "downloading", release, percent, manual: this.#manual });
       });
-      this.#set({ kind: "ready", release, manual: this.#manual });
+      if (!current()) return;
+      this.#file = file;
+      set({ kind: "ready", release, manual: this.#manual });
     } catch (error) {
-      this.#set({ kind: "error", message: error instanceof Error ? error.message : String(error), manual: this.#manual });
+      set({ kind: "error", message: error instanceof Error ? error.message : String(error), manual: this.#manual });
     }
   }
 

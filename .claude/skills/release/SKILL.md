@@ -5,16 +5,21 @@ description: Release a new version of Lumen. Bumps the version, builds the Windo
 
 # Release Lumen
 
-Lumen updates itself from the **latest GitHub release** of `raicdev/lumen`
-(`packages/lumen-shell/src/main/updater.ts`). A release only reaches users
-when all of these hold:
+Lumen updates itself from the GitHub releases of `raicdev/lumen`
+(`packages/lumen-shell/src/main/updater.ts`). Users pick a channel with the
+`update.channel` setting:
 
-- The tag is plain semver with a `v` prefix (`v0.3.0`). Tags such as
-  `v0.3.0-beta.1`, drafts and pre-releases are ignored by the updater.
-- It is marked **latest**.
-- It has an asset named `Lumen-<version>-win32-x64-setup.exe`. GitHub's
-  SHA-256 `digest` for that asset is required; GitHub adds it automatically
-  when the asset is uploaded.
+- **stable** (the default) reads the **latest** release. It only takes a tag
+  that is plain semver with a `v` prefix (`v0.3.0`) and is not a pre-release.
+- **beta** reads the 30 most recent releases and takes the newest by semver,
+  pre-releases included (`v0.3.0-beta.1` < `v0.3.0-beta.2` < `v0.3.0`).
+
+So a stable version is released with `--latest`. A beta version
+(`<x.y.z>-beta.<n>`) is released with `--prerelease --latest=false`, which
+keeps the stable release as latest and reaches only the beta channel. Drafts
+reach nobody. Either way the release needs an asset named
+`Lumen-<version>-win32-x64-setup.exe`. GitHub's SHA-256 `digest` for that
+asset is required; GitHub adds it automatically when the asset is uploaded.
 
 Releasing is outward-facing: it pushes to `main` and publishes a release.
 Only run this when the user asked for a release. Reply to the user in Japanese.
@@ -144,18 +149,24 @@ gh release create v<version> -R raicdev/lumen --title "Lumen v<version>" --lates
   dist/Lumen-<version>-win32-x64-setup.exe dist/Lumen-v<version>-win32-x64.zip
 ```
 
+For a beta version, replace `--latest` with `--prerelease --latest=false`,
+and start the notes with a line saying it is a beta that reaches users on the
+beta channel (`update.channel`: `beta`).
+
 ## 8. Check that auto update picks it up
 
-The previous version must see the new release as an update with a digest. The
-new version must see no update.
+On the channel the release is for, the previous version must see the new
+release as an update with a digest, and the new version must see no update. A
+beta must not show up on the stable channel.
 
 ```bash
 node -e "
 import('file:///D:/Software/zed-alternative/packages/lumen-shell/src/main/updater.ts').then(async ({ autoUpdater }) => {
-  for (const v of ['<previous>', '<version>']) {
+  for (const channel of ['stable', 'beta']) for (const v of ['<previous>', '<version>']) {
     autoUpdater.configure({ repository: 'raicdev/lumen', name: 'Lumen', version: v, identifier: 'lumen-release-check' });
+    autoUpdater.channel = channel;
     const r = await autoUpdater.check();
-    console.log(v, '->', r ? r.version + ' ' + r.installer?.name + ' ' + r.installer?.sha256 : null);
+    console.log(channel, v, '->', r ? r.version + ' ' + r.installer?.name + ' ' + r.installer?.sha256 : null);
   }
 });"
 ```
