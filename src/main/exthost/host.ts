@@ -2454,11 +2454,21 @@ function installModuleHooks(host: ExtensionHost): void {
  * Tell the main process which extension started each child process: spawn,
  * exec, execFile and fork all go through ChildProcess#spawn, and the
  * innermost extension file on the caller's stack names the extension.
+ *
+ * The packaged app has no console, so on Windows every console program an
+ * extension starts (language servers such as oxlint --lsp, and the cmd.exe
+ * behind `.cmd` shims and `shell: true`) would open its own console window.
+ * Hide them. Detached children get no console at all, and may be GUI apps
+ * meant to be seen, so leave them alone.
  */
 function trackChildProcesses(host: ExtensionHost): void {
   const prototype = ChildProcess.prototype as unknown as { spawn: (this: ChildProcess, options: unknown) => unknown };
   const spawn = prototype.spawn;
   prototype.spawn = function (this: ChildProcess, options: unknown) {
+    if (process.platform === "win32" && options && typeof options === "object") {
+      const spawnOptions = options as { detached?: boolean; windowsHide?: boolean };
+      if (!spawnOptions.detached) spawnOptions.windowsHide = true;
+    }
     const result = spawn.call(this, options);
     if (this.pid) {
       const extensionId = callingExtension(host);
