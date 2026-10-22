@@ -22,7 +22,14 @@ type QuickDiffProvider = { provideOriginalResource?(uri: Uri, token: unknown): U
 /** The icon of a resource (`decorations.iconPath`, as a data or http URL per theme kind). Part of the resource data. */
 export type ScmResourceIcon = { light?: string; dark?: string; codicon?: string };
 
-const ICON_TYPES: Record<string, string> = { ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+const ICON_TYPES: Record<string, string> = {
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
 const iconCache = new Map<string, string | undefined>();
 
 /** An icon file as a data URL (cached; small images only, like tree item icons). */
@@ -367,7 +374,14 @@ function controlData(control: SourceControl): ScmControlData {
     label: control.label,
     rootPath: control.rootUri ? keyOfUri(control.rootUri) : undefined,
     count: control.count ?? groups.reduce((sum, group) => sum + group.resources.length, 0),
-    inputBox: { value: input.value, valueRev: input.rev, placeholder: input.placeholder, visible: input.visible, enabled: input.enabled, validation: input.validation },
+    inputBox: {
+      value: input.value,
+      valueRev: input.rev,
+      placeholder: input.placeholder,
+      visible: input.visible,
+      enabled: input.enabled,
+      validation: input.validation,
+    },
     accept: commandData(control.acceptInputCommand),
     statusBarCommands: (control.statusBarCommands ?? []).map((command) => commandData(command)!),
     groups,
@@ -452,7 +466,11 @@ export async function scmQuickDiff(host: ExtensionHost, path: string): Promise<s
       const revived = original ? Uri.revive(original as never) : undefined;
       if (revived) return await originalText(host, revived);
     } catch (error) {
-      host.log("warning", `Quick diff provider of ${control.extensionId} failed: ${error instanceof Error ? error.message : String(error)}`, control.extensionId);
+      host.log(
+        "warning",
+        `Quick diff provider of ${control.extensionId} failed: ${error instanceof Error ? error.message : String(error)}`,
+        control.extensionId,
+      );
     }
   }
   return null;

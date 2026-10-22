@@ -16,7 +16,11 @@ import { resourceLookup } from "./editor";
 type CommandItem = Extract<ResolvedMenuItem, { type: "command" }>;
 
 export function MenuActionButton({ item, onRun, className }: { item: CommandItem; onRun: () => void; className?: string }) {
-  const icon = item.icon?.startsWith("$(") ? <WithCodicons text={item.icon} size={14} /> : item.icon ? <img src={item.icon} alt="" className="view-action-image" /> : null;
+  const icon = item.icon?.startsWith("$(") ? (
+    <WithCodicons text={item.icon} size={14} />
+  ) : item.icon ? (
+    <img src={item.icon} alt="" className="view-action-image" />
+  ) : null;
   return (
     <button
       type="button"
@@ -95,5 +99,12 @@ export function ModalEditorTitleActions({ path, activeEditor, maximized = false 
         return resource(key);
     }
   };
-  return <MenuActions menuId="modalEditor/editorTitle" lookup={lookup} args={path && !path.startsWith("terminal:") ? [uriArg(path)] : []} className="modal-editor-actions" />;
+  return (
+    <MenuActions
+      menuId="modalEditor/editorTitle"
+      lookup={lookup}
+      args={path && !path.startsWith("terminal:") ? [uriArg(path)] : []}
+      className="modal-editor-actions"
+    />
+  );
 }

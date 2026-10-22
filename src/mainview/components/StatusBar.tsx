@@ -22,7 +22,11 @@ function RemoteIndicator() {
       title="Open a Remote Window"
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        void showContextMenu(rect.left, rect.top, contributedMenuItems("statusBar/remoteIndicator", () => undefined, []));
+        void showContextMenu(
+          rect.left,
+          rect.top,
+          contributedMenuItems("statusBar/remoteIndicator", () => undefined, []),
+        );
       }}
     >
       <ArrowLeftRight size={13} />
@@ -150,8 +154,17 @@ export function StatusBar(props: Props) {
             <Braces size={13} />
           </span>
         )}
-        {props.autoSave && <span className="status-item muted" title="Auto Save is on">Auto Save</span>}
-        <button type="button" className={`status-btn${props.terminalActive ? " active" : ""}`} title="Toggle Terminal (Ctrl+`)" onClick={props.onToggleTerminal}>
+        {props.autoSave && (
+          <span className="status-item muted" title="Auto Save is on">
+            Auto Save
+          </span>
+        )}
+        <button
+          type="button"
+          className={`status-btn${props.terminalActive ? " active" : ""}`}
+          title="Toggle Terminal (Ctrl+`)"
+          onClick={props.onToggleTerminal}
+        >
           Terminal
         </button>
       </div>

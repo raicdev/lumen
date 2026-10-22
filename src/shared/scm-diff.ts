@@ -1,6 +1,10 @@
 /** Line diff for the quick diff gutter: which lines of `modified` are added / modified, and where lines were removed. */
 
-export type ScmLineChange = { kind: "added" | "modified" | "deleted"; /** 1-based line of `modified`; for "deleted" the line after which lines were removed (0 = top). */ line: number; /** Lines covered (modified / added). */ count: number };
+export type ScmLineChange = {
+  kind: "added" | "modified" | "deleted";
+  /** 1-based line of `modified`; for "deleted" the line after which lines were removed (0 = top). */ line: number;
+  /** Lines covered (modified / added). */ count: number;
+};
 
 function splitLines(text: string): string[] {
   return text === "" ? [] : text.replace(/\r\n/g, "\n").split("\n");

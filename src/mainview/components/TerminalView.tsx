@@ -88,10 +88,22 @@ export function TerminalHost({ id, active, onFocus, editor }: { id: string; acti
       onContextMenu={
         editor
           ? (e) =>
-              showContributedMenu(e, "terminal/context", terminalLookup(id), [refArg("terminal", { id })], [
-                { type: "item", label: "Copy", action: "copy", disabled: !terminalService.hasSelection(id), run: () => void terminalService.copySelection(id) },
-                { type: "item", label: "Paste", action: "paste", run: () => void terminalService.paste(id) },
-              ])
+              showContributedMenu(
+                e,
+                "terminal/context",
+                terminalLookup(id),
+                [refArg("terminal", { id })],
+                [
+                  {
+                    type: "item",
+                    label: "Copy",
+                    action: "copy",
+                    disabled: !terminalService.hasSelection(id),
+                    run: () => void terminalService.copySelection(id),
+                  },
+                  { type: "item", label: "Paste", action: "paste", run: () => void terminalService.paste(id) },
+                ],
+              )
           : undefined
       }
     />

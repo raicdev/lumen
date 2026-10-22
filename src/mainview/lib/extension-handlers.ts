@@ -13,9 +13,16 @@ import { dispatchHostRequest } from "../features/registry";
  */
 
 export type ExtensionBridge = {
-  openFile: (path: string, options: { line?: number; character?: number; end?: { line: number; character: number }; preview?: boolean; focus?: boolean; beside?: boolean }) => Promise<boolean>;
+  openFile: (
+    path: string,
+    options: { line?: number; character?: number; end?: { line: number; character: number }; preview?: boolean; focus?: boolean; beside?: boolean },
+  ) => Promise<boolean>;
   /** Open a side-by-side diff of two documents (`vscode.diff`). */
-  openDiff: (original: string, modified: string, options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange }) => Promise<boolean>;
+  openDiff: (
+    original: string,
+    modified: string,
+    options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange },
+  ) => Promise<boolean>;
   /** The editor showing a document (opening it in the active group when needed). */
   editorFor: (path: string, open: boolean) => Promise<EditorController | null>;
   saveDoc: (path: string) => Promise<boolean>;
@@ -55,14 +62,22 @@ const COMMAND_ALIASES: Record<string, string> = {
 
 const end = (range: TextRange) => ({ line: range.endLine, character: range.endCharacter });
 
-export function createExtensionHandlers(bridge: ExtensionBridge): { [K in keyof ViewMethods]: (...args: Parameters<ViewMethods[K]>) => Promise<ReturnType<ViewMethods[K]>> } {
+export function createExtensionHandlers(bridge: ExtensionBridge): {
+  [K in keyof ViewMethods]: (...args: Parameters<ViewMethods[K]>) => Promise<ReturnType<ViewMethods[K]>>;
+} {
   const path = (raw: string) => extensionService.viewPath(raw);
   return {
     async showMessage(kind, message, items, options) {
       if (options.modal) {
         const buttons = items.map((label, index) => ({ label, role: index === 0 ? ("primary" as const) : ("default" as const), value: String(index) }));
         buttons.push({ label: "Cancel", role: "default", value: "cancel" });
-        const choice = await showDialog({ title: options.source ?? (kind === "error" ? "Error" : kind === "warning" ? "Warning" : "Information"), message, detail: options.detail, buttons, kind });
+        const choice = await showDialog({
+          title: options.source ?? (kind === "error" ? "Error" : kind === "warning" ? "Warning" : "Information"),
+          message,
+          detail: options.detail,
+          buttons,
+          kind,
+        });
         return choice === null || choice === "cancel" ? null : Number(choice);
       }
       return await notify(kind, message, items, options.source);

@@ -52,7 +52,13 @@ button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94
 export type WebviewFindAction = "open" | "next" | "previous" | "close";
 
 /** The find action a key forwarded by a webview stands for (Ctrl/Cmd+F, F3, Shift+F3), as in VS Code's webview find widget. */
-export function webviewFindAction(event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }): WebviewFindAction | null {
+export function webviewFindAction(event: {
+  key?: string;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+}): WebviewFindAction | null {
   if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase() === "f") return "open";
   if (event.key === "F3" && !event.ctrlKey && !event.metaKey && !event.altKey) return event.shiftKey ? "previous" : "next";
   return null;
@@ -260,7 +266,6 @@ export function documentFor(html: string): string {
   if (doctype) return `${doctype[0]}<head>${head}</head>${html.slice(doctype[0].length)}`;
   return `<!DOCTYPE html><head>${head}</head>${html}`;
 }
-
 
 /**
  * Every extension's webviews get their own origin, `http://<label>.localhost:<port>`:

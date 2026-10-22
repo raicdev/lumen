@@ -159,7 +159,8 @@ export async function applyWorkspaceEdit(host: ExtensionHost, edit: T.WorkspaceE
     let run: TextEntry[] = [];
     // The edits of each notebook cell go to the notebook together (their positions refer to the text before the edit).
     const cellEdits = new Map<string, T.TextEdit[]>();
-    for (const entry of entries) if (entry.kind === "text" && isNotebookCellText(entry)) cellEdits.set(entry.uri.toString(), [...(cellEdits.get(entry.uri.toString()) ?? []), entry.edit]);
+    for (const entry of entries)
+      if (entry.kind === "text" && isNotebookCellText(entry)) cellEdits.set(entry.uri.toString(), [...(cellEdits.get(entry.uri.toString()) ?? []), entry.edit]);
     for (const entry of entries) {
       if ((entry.kind === "text" || entry.kind === "snippet") && !isNotebookCellText(entry)) {
         run.push(entry);
@@ -181,7 +182,11 @@ export async function applyWorkspaceEdit(host: ExtensionHost, edit: T.WorkspaceE
         continue;
       }
       if (!(await applyFileEntry(host, entry as Exclude<Entry, TextEntry | { kind: "notebook" }>))) {
-        host.log("warning", `workspace edit stopped: cannot ${entry.kind} ${entry.kind === "rename" ? entry.from.toString() : entry.uri.toString()}`, extensionId);
+        host.log(
+          "warning",
+          `workspace edit stopped: cannot ${entry.kind} ${entry.kind === "rename" ? entry.from.toString() : entry.uri.toString()}`,
+          extensionId,
+        );
         return false;
       }
     }

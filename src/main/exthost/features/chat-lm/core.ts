@@ -121,7 +121,10 @@ function wireLocation(value: Loose): { path?: string; external?: string; line?: 
 }
 
 function wireTree(nodes: Loose[]): ChatWireTreeNode[] {
-  return (Array.isArray(nodes) ? nodes : []).map((node) => ({ name: String(node?.name ?? ""), children: node?.children ? wireTree(node.children) : undefined }));
+  return (Array.isArray(nodes) ? nodes : []).map((node) => ({
+    name: String(node?.name ?? ""),
+    children: node?.children ? wireTree(node.children) : undefined,
+  }));
 }
 
 const ICON_TYPES: Record<string, string> = {
@@ -190,10 +193,33 @@ type ParticipantReg = { id: string; extensionId: string; participant: Loose; fee
 /** `ChatWireParticipant` plus the icon the extension set on the participant. */
 type WireParticipant = ChatWireParticipant & { icon?: ChatParticipantIcon };
 type ModelInfo = Loose;
-type ProviderReg = { vendor: string; extensionId: string; provider: Loose; infos: ModelInfo[] | null; loading: Promise<void> | null; subscription: { dispose(): unknown } | null };
+type ProviderReg = {
+  vendor: string;
+  extensionId: string;
+  provider: Loose;
+  infos: ModelInfo[] | null;
+  loading: Promise<void> | null;
+  subscription: { dispose(): unknown } | null;
+};
 type ToolReg = { name: string; extensionId: string; tool: Loose };
-type McpServer = { id: string; label: string; extensionId: string; status: ChatWireMcpServer["status"]; error?: string; client: McpClient | null; tools: McpToolInfo[]; names: Map<string, string> };
-type McpProviderReg = { id: string; extensionId: string; provider: Loose; servers: Map<string, McpServer>; subscription: { dispose(): unknown } | null; refreshing: Promise<void> | null };
+type McpServer = {
+  id: string;
+  label: string;
+  extensionId: string;
+  status: ChatWireMcpServer["status"];
+  error?: string;
+  client: McpClient | null;
+  tools: McpToolInfo[];
+  names: Map<string, string>;
+};
+type McpProviderReg = {
+  id: string;
+  extensionId: string;
+  provider: Loose;
+  servers: Map<string, McpServer>;
+  subscription: { dispose(): unknown } | null;
+  refreshing: Promise<void> | null;
+};
 type RequestRecord = { cts: CancellationTokenSource; participantId?: string; result?: unknown };
 
 export type LanguageModelChatLike = {
@@ -316,7 +342,9 @@ export class ChatLmState {
         description: String(item.description ?? ""),
         extensionId: runtime.id,
         isDefault: !!item.isDefault,
-        commands: (Array.isArray(item.commands) ? item.commands : []).filter((c: Loose) => c && typeof c.name === "string").map((c: Loose) => ({ name: c.name, description: String(c.description ?? "") })),
+        commands: (Array.isArray(item.commands) ? item.commands : [])
+          .filter((c: Loose) => c && typeof c.name === "string")
+          .map((c: Loose) => ({ name: c.name, description: String(c.description ?? "") })),
       });
     }
     for (const reg of this.participants.values()) {
@@ -352,7 +380,10 @@ export class ChatLmState {
     }
     const reg: ProviderReg = { vendor, extensionId, provider, infos: null, loading: null, subscription: null };
     this.providers.set(vendor, reg);
-    reg.subscription = typeof provider.onDidChangeLanguageModelChatInformation === "function" ? provider.onDidChangeLanguageModelChatInformation(() => void this.#reload(reg)) : null;
+    reg.subscription =
+      typeof provider.onDidChangeLanguageModelChatInformation === "function"
+        ? provider.onDidChangeLanguageModelChatInformation(() => void this.#reload(reg))
+        : null;
     void this.#load(reg);
     return new Disposable(() => {
       if (this.providers.get(vendor) === reg) this.providers.delete(vendor);
@@ -381,7 +412,9 @@ export class ChatLmState {
 
   /** Start the extensions that declare a model provider (contributes.languageModelChatProviders) for `vendor` (any when omitted). */
   async activateProviders(vendor?: string): Promise<void> {
-    const wanted = contributions(this.host, "languageModelChatProviders").filter(({ item }) => typeof item.vendor === "string" && (!vendor || item.vendor === vendor));
+    const wanted = contributions(this.host, "languageModelChatProviders").filter(
+      ({ item }) => typeof item.vendor === "string" && (!vendor || item.vendor === vendor),
+    );
     await Promise.all(
       wanted.map(async ({ runtime, item }) => {
         if (this.providers.has(item.vendor)) return;
@@ -438,9 +471,18 @@ export class ChatLmState {
     if (!allowed) throw LanguageModelError.NoPermissions(`The user did not allow ${consumer} to use the language models provided by ${reg.extensionId}.`);
   }
 
-  async #sendRequest(reg: ProviderReg, info: ModelInfo, messages: unknown[], options: Loose = {}, token?: CancellationToken, consumer?: string, justification?: string) {
+  async #sendRequest(
+    reg: ProviderReg,
+    info: ModelInfo,
+    messages: unknown[],
+    options: Loose = {},
+    token?: CancellationToken,
+    consumer?: string,
+    justification?: string,
+  ) {
     if (this.providers.get(reg.vendor) !== reg) throw LanguageModelError.NotFound(`Language model '${info.id}' is no longer available`);
-    if (consumer && consumer !== reg.extensionId) await this.#requireModelConsent(reg, consumer, typeof options?.justification === "string" ? options.justification : justification);
+    if (consumer && consumer !== reg.extensionId)
+      await this.#requireModelConsent(reg, consumer, typeof options?.justification === "string" ? options.justification : justification);
     const queue = new ReplayStream<unknown>();
     const cts = new CancellationTokenSource();
     token?.onCancellationRequested(() => cts.cancel());
@@ -468,7 +510,8 @@ export class ChatLmState {
 
   async #countTokens(reg: ProviderReg, info: ModelInfo, input: string | LanguageModelChatMessage, token?: CancellationToken): Promise<number> {
     const value = typeof input === "string" ? input : toMessage(input);
-    if (typeof reg.provider.provideTokenCount === "function") return Number(await reg.provider.provideTokenCount(info, value, token ?? new CancellationTokenSource().token));
+    if (typeof reg.provider.provideTokenCount === "function")
+      return Number(await reg.provider.provideTokenCount(info, value, token ?? new CancellationTokenSource().token));
     const text = typeof value === "string" ? value : textOf(value.content);
     return Math.ceil(text.length / 4);
   }
@@ -477,7 +520,14 @@ export class ChatLmState {
     const out: ChatWireModel[] = [];
     for (const reg of this.providers.values()) {
       for (const info of reg.infos ?? []) {
-        out.push({ id: `${reg.vendor}/${info.id}`, name: String(info.name ?? info.id), vendor: reg.vendor, family: String(info.family ?? ""), version: String(info.version ?? ""), detail: typeof info.detail === "string" ? info.detail : undefined });
+        out.push({
+          id: `${reg.vendor}/${info.id}`,
+          name: String(info.name ?? info.id),
+          vendor: reg.vendor,
+          family: String(info.family ?? ""),
+          version: String(info.version ?? ""),
+          detail: typeof info.detail === "string" ? info.detail : undefined,
+        });
       }
     }
     return out;
@@ -487,7 +537,9 @@ export class ChatLmState {
   languageModels(): LanguageModelEntry[] {
     const out: LanguageModelEntry[] = [];
     for (const reg of this.providers.values()) {
-      const runtime = this.host.runtimes.get(reg.extensionId) ?? [...this.host.runtimes.values()].find((candidate) => candidate.id.toLowerCase() === reg.extensionId.toLowerCase());
+      const runtime =
+        this.host.runtimes.get(reg.extensionId) ??
+        [...this.host.runtimes.values()].find((candidate) => candidate.id.toLowerCase() === reg.extensionId.toLowerCase());
       const manifest = runtime?.description.manifest;
       const extensionName = manifest ? String(manifest.displayName ?? manifest.name ?? "") || undefined : undefined;
       for (const info of reg.infos ?? []) {
@@ -532,10 +584,16 @@ export class ChatLmState {
     const out = new Map<string, Loose>();
     for (const { item } of contributions(this.host, "languageModelTools")) {
       if (typeof item.name !== "string") continue;
-      out.set(item.name, { name: item.name, description: String(item.modelDescription ?? item.userDescription ?? item.displayName ?? ""), inputSchema: item.inputSchema, tags: Array.isArray(item.tags) ? [...item.tags] : [] });
+      out.set(item.name, {
+        name: item.name,
+        description: String(item.modelDescription ?? item.userDescription ?? item.displayName ?? ""),
+        inputSchema: item.inputSchema,
+        tags: Array.isArray(item.tags) ? [...item.tags] : [],
+      });
     }
     for (const reg of this.tools.values()) {
-      if (!out.has(reg.name)) out.set(reg.name, { name: reg.name, description: String(reg.tool.description ?? ""), inputSchema: reg.tool.inputSchema, tags: [] });
+      if (!out.has(reg.name))
+        out.set(reg.name, { name: reg.name, description: String(reg.tool.description ?? ""), inputSchema: reg.tool.inputSchema, tags: [] });
     }
     for (const server of this.#mcpServers()) {
       for (const tool of server.tools) {
@@ -613,20 +671,24 @@ export class ChatLmState {
     if (!server.client) throw new Error(`MCP server '${server.label}' is not running`);
     const result: McpToolResult = await server.client.callTool(tool.name, input);
     const parts = result.content.map((item) => {
-      if (item.type === "image" && typeof item.data === "string") return LanguageModelDataPart.image(Uint8Array.from(Buffer.from(item.data, "base64")), item.mimeType ?? "image/png");
+      if (item.type === "image" && typeof item.data === "string")
+        return LanguageModelDataPart.image(Uint8Array.from(Buffer.from(item.data, "base64")), item.mimeType ?? "image/png");
       if (item.type === "text" && typeof item.text === "string") return new LanguageModelTextPart(item.text);
       return new LanguageModelTextPart(JSON.stringify(item));
     });
-    if (result.isError) throw new Error(parts.map((part) => (part instanceof LanguageModelTextPart ? part.value : "")).join("") || `MCP tool '${tool.name}' failed`);
+    if (result.isError)
+      throw new Error(parts.map((part) => (part instanceof LanguageModelTextPart ? part.value : "")).join("") || `MCP tool '${tool.name}' failed`);
     return new LanguageModelToolResult(parts);
   }
 
   registerMcpProvider(extensionId: string, id: string, provider: Loose): Disposable {
     if (this.mcpProviders.has(id)) throw new Error(`MCP server definition provider '${id}' is already registered`);
-    if (!provider || typeof provider.provideMcpServerDefinitions !== "function") throw new Error("an MCP server definition provider needs provideMcpServerDefinitions");
+    if (!provider || typeof provider.provideMcpServerDefinitions !== "function")
+      throw new Error("an MCP server definition provider needs provideMcpServerDefinitions");
     const reg: McpProviderReg = { id, extensionId, provider, servers: new Map(), subscription: null, refreshing: null };
     this.mcpProviders.set(id, reg);
-    reg.subscription = typeof provider.onDidChangeMcpServerDefinitions === "function" ? provider.onDidChangeMcpServerDefinitions(() => void this.refreshMcp(reg)) : null;
+    reg.subscription =
+      typeof provider.onDidChangeMcpServerDefinitions === "function" ? provider.onDidChangeMcpServerDefinitions(() => void this.refreshMcp(reg)) : null;
     void this.refreshMcp(reg);
     return new Disposable(() => {
       if (this.mcpProviders.get(id) === reg) this.mcpProviders.delete(id);
@@ -670,12 +732,16 @@ export class ChatLmState {
     this.changed();
     try {
       let resolved = definition;
-      if (typeof reg.provider.resolveMcpServerDefinition === "function") resolved = (await reg.provider.resolveMcpServerDefinition(definition, new CancellationTokenSource().token)) ?? definition;
+      if (typeof reg.provider.resolveMcpServerDefinition === "function")
+        resolved = (await reg.provider.resolveMcpServerDefinition(definition, new CancellationTokenSource().token)) ?? definition;
       const spec = this.#mcpSpec(resolved);
       const what = spec.type === "stdio" ? `${spec.command} ${spec.args.join(" ")}`.trim() : spec.url;
       const key = `${reg.extensionId}\u0000${label}\u0000${what}`;
       if (!this.#trusted.has(key)) {
-        const answer = await this.confirm(`Start MCP server "${label}"?`, `The extension ${reg.extensionId} wants to connect to an MCP server: ${what}`, ["Start server", "Don't start"]);
+        const answer = await this.confirm(`Start MCP server "${label}"?`, `The extension ${reg.extensionId} wants to connect to an MCP server: ${what}`, [
+          "Start server",
+          "Don't start",
+        ]);
         if (answer !== 0) throw new Error("not started (the user did not allow it)");
         this.#trusted.add(key);
       }
@@ -706,10 +772,11 @@ export class ChatLmState {
     if (typeof definition.command === "string") {
       const env: Record<string, string> = {};
       for (const [key, value] of Object.entries(definition.env ?? {})) if (value !== null && value !== undefined) env[key] = String(value);
-      const cwd = definition.cwd ? (Uri.isUri(definition.cwd) ? definition.cwd.fsPath : String(definition.cwd)) : this.host.workspace ?? undefined;
+      const cwd = definition.cwd ? (Uri.isUri(definition.cwd) ? definition.cwd.fsPath : String(definition.cwd)) : (this.host.workspace ?? undefined);
       return { type: "stdio", command: definition.command, args: (definition.args ?? []).map(String), env, cwd };
     }
-    if (definition.uri) return { type: "http", url: Uri.isUri(definition.uri) ? definition.uri.toString() : String(definition.uri), headers: { ...(definition.headers ?? {}) } };
+    if (definition.uri)
+      return { type: "http", url: Uri.isUri(definition.uri) ? definition.uri.toString() : String(definition.uri), headers: { ...(definition.headers ?? {}) } };
     throw new Error("an MCP server definition needs a command or a uri");
   }
 
@@ -726,7 +793,14 @@ export class ChatLmState {
   }
 
   wireMcpServers(): ChatWireMcpServer[] {
-    return this.#mcpServers().map((server) => ({ id: server.id, label: server.label, extensionId: server.extensionId, status: server.status, tools: server.tools.length, error: server.error }));
+    return this.#mcpServers().map((server) => ({
+      id: server.id,
+      label: server.label,
+      extensionId: server.extensionId,
+      status: server.status,
+      tools: server.tools.length,
+      error: server.error,
+    }));
   }
 
   stopAll(): void {
@@ -782,7 +856,9 @@ export class ChatLmState {
       const parsed = this.#parse(args.text);
       participantId = parsed.participant?.id;
       record.participantId = participantId;
-      const followups = parsed.participant ? await this.#runParticipant(args, record, parsed as Parsed & { participant: ChatWireParticipant }) : await this.#runDirect(args, record, parsed.prompt);
+      const followups = parsed.participant
+        ? await this.#runParticipant(args, record, parsed as Parsed & { participant: ChatWireParticipant })
+        : await this.#runDirect(args, record, parsed.prompt);
       this.send({ kind: "done", id: args.id, followups, participant: participantId });
     } catch (error) {
       const cancelled = record.cts.token.isCancellationRequested || error instanceof CancellationError;
@@ -801,7 +877,9 @@ export class ChatLmState {
     const mention = /^@(\S+)\s*/.exec(rest);
     if (mention) {
       const wanted = mention[1]!.toLowerCase();
-      participant = participants.find((p) => p.name.toLowerCase() === wanted || p.id.toLowerCase() === wanted || p.fullName.replace(/\s+/g, "").toLowerCase() === wanted);
+      participant = participants.find(
+        (p) => p.name.toLowerCase() === wanted || p.id.toLowerCase() === wanted || p.fullName.replace(/\s+/g, "").toLowerCase() === wanted,
+      );
       if (participant) rest = rest.slice(mention[0].length);
     }
     if (!participant && !mention) {
@@ -854,23 +932,44 @@ export class ChatLmState {
     const provider = reg.participant.followupProvider;
     if (provider && typeof provider.provideFollowups === "function") {
       try {
-        for (const followup of (await provider.provideFollowups(result, { history: this.#turns.filter((turn) => turn.participant === info.id) }, token)) ?? []) {
-          if (followup && typeof followup.prompt === "string") followups.push({ prompt: followup.prompt, label: String(followup.label ?? followup.prompt), participant: followup.participant, command: followup.command });
+        for (const followup of (await provider.provideFollowups(result, { history: this.#turns.filter((turn) => turn.participant === info.id) }, token)) ??
+          []) {
+          if (followup && typeof followup.prompt === "string")
+            followups.push({
+              prompt: followup.prompt,
+              label: String(followup.label ?? followup.prompt),
+              participant: followup.participant,
+              command: followup.command,
+            });
         }
       } catch (error) {
         this.host.log("warning", `chat followup provider failed: ${errorMessage(error)}`, reg.extensionId);
       }
     }
     const next = result.nextQuestion;
-    if (next && typeof next.prompt === "string") followups.push({ prompt: next.prompt, label: String(next.label ?? next.prompt), participant: next.participant, command: next.command });
-    return followups.map((followup) => ({ ...followup, participant: followup.participant ? this.listParticipants().find((p) => p.id === followup.participant)?.name ?? followup.participant : undefined }));
+    if (next && typeof next.prompt === "string")
+      followups.push({ prompt: next.prompt, label: String(next.label ?? next.prompt), participant: next.participant, command: next.command });
+    return followups.map((followup) => ({
+      ...followup,
+      participant: followup.participant ? (this.listParticipants().find((p) => p.id === followup.participant)?.name ?? followup.participant) : undefined,
+    }));
   }
 
   #missingModel(): LanguageModelChatLike {
     const fail = async () => {
       throw LanguageModelError.NotFound("No language model is available. Install an extension that provides one (contributes.languageModelChatProviders).");
     };
-    return Object.freeze({ id: "none", name: "No model", vendor: "none", family: "", version: "", maxInputTokens: 0, capabilities: { imageInput: false, toolCalling: false }, sendRequest: fail, countTokens: fail });
+    return Object.freeze({
+      id: "none",
+      name: "No model",
+      vendor: "none",
+      family: "",
+      version: "",
+      maxInputTokens: 0,
+      capabilities: { imageInput: false, toolCalling: false },
+      sendRequest: fail,
+      countTokens: fail,
+    });
   }
 
   /** The `ChatResponseStream` handed to a participant: posts each part to the panel and collects it for the history. */
@@ -885,7 +984,7 @@ export class ChatLmState {
       anchor: (value: unknown, title?: string) => {
         collected.push(new ChatResponseAnchorPart(value, title));
         const location = wireLocation(value);
-        post({ type: "anchor", ...location, title: title ?? (location.path ? basename(location.path) : location.external ?? "") });
+        post({ type: "anchor", ...location, title: title ?? (location.path ? basename(location.path) : (location.external ?? "")) });
         return stream;
       },
       button: (command: { command: string; title: string; arguments?: unknown[] }) => {
@@ -906,10 +1005,13 @@ export class ChatLmState {
             const text = typeof part === "string" ? part : markdownOf(part?.value ?? part);
             if (text) post({ type: "progress", value: text });
           };
-          Promise.resolve(task({ report })).then((final) => {
-            const text = markdownOf(final as Loose);
-            if (text) post({ type: "markdown", value: text });
-          }, () => {});
+          Promise.resolve(task({ report })).then(
+            (final) => {
+              const text = markdownOf(final as Loose);
+              if (text) post({ type: "markdown", value: text });
+            },
+            () => {},
+          );
         }
         return stream;
       },
@@ -917,7 +1019,12 @@ export class ChatLmState {
         collected.push(new ChatResponseReferencePart(value, iconPath));
         const target = (value as Loose)?.variableName ? { label: String((value as Loose).variableName) } : wireLocation(value);
         const path = (target as Loose).path ?? (target as Loose).external;
-        post({ type: "reference", path: (target as Loose).path, label: (target as Loose).label ?? (path ? basename(path) : "reference"), line: (target as Loose).line });
+        post({
+          type: "reference",
+          path: (target as Loose).path,
+          label: (target as Loose).label ?? (path ? basename(path) : "reference"),
+          line: (target as Loose).line,
+        });
         return stream;
       },
       warning: (value: string | MarkdownString) => {
@@ -991,7 +1098,11 @@ export class ChatLmState {
         const label = call.name;
         post({ type: "toolcall", callId: call.callId, name: call.name, label, status: "running" });
         try {
-          const result = await this.invokeTool(call.name, { input: call.input, toolInvocationToken: Object.freeze({ chatRequest: args.id }), tokenizationOptions: { tokenBudget: model.maxInputTokens } }, token);
+          const result = await this.invokeTool(
+            call.name,
+            { input: call.input, toolInvocationToken: Object.freeze({ chatRequest: args.id }), tokenizationOptions: { tokenBudget: model.maxInputTokens } },
+            token,
+          );
           results.push(new LanguageModelToolResultPart(call.callId, result.content));
           post({ type: "toolcall", callId: call.callId, name: call.name, label, status: "done", detail: textOf(result.content).slice(0, 2000) });
         } catch (error) {

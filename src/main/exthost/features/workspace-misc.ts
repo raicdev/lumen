@@ -107,7 +107,9 @@ export async function handleUri(host: ExtensionHost, raw: string, caller?: strin
   const allowed = stateOf(host).allowed;
   if (caller !== true && caller?.toLowerCase() !== id && !allowed.has(id)) {
     const name = runtime.description.manifest.displayName ?? runtime.id;
-    const choice = await host.requestView("showMessage", "info", `Allow the '${name}' extension to open this URI?`, ["Allow"], { modal: true, detail: uri.toString() }).catch(() => undefined);
+    const choice = await host
+      .requestView("showMessage", "info", `Allow the '${name}' extension to open this URI?`, ["Allow"], { modal: true, detail: uri.toString() })
+      .catch(() => undefined);
     if (choice !== 0) return false;
     allowed.add(id);
   }
@@ -236,7 +238,7 @@ export const workspaceMiscFeature: HostFeature = {
     let fileSystem: Record<string, any> | null = null;
 
     const relativePath = (pathOrUri: string | T.Uri | { uri: T.Uri }, includeWorkspaceFolder?: boolean) => {
-      const given = typeof pathOrUri === "string" ? pathOrUri : T.Uri.revive((pathOrUri as { uri?: T.Uri }).uri ?? (pathOrUri as T.Uri))?.fsPath ?? "";
+      const given = typeof pathOrUri === "string" ? pathOrUri : (T.Uri.revive((pathOrUri as { uri?: T.Uri }).uri ?? (pathOrUri as T.Uri))?.fsPath ?? "");
       const folder = state.folders.folderOf(T.Uri.file(given));
       if (!folder) return given;
       const rel = relative(folder.uri.fsPath, given).replace(/\\/g, "/");
@@ -306,7 +308,11 @@ export const workspaceMiscFeature: HostFeature = {
             // The window shows one root: ask it to follow (the "lumen.workspace.openFolderPath" window command, see followups).
             const command = result.wantedRoot === null ? "workbench.action.closeFolder" : "lumen.workspace.openFolderPath";
             void host.executeCommand(command, result.wantedRoot === null ? [] : [result.wantedRoot]).catch((error: unknown) => {
-              host.log("warning", `workspace folder change was not applied to the window: ${error instanceof Error ? error.message : String(error)}`, extensionId);
+              host.log(
+                "warning",
+                `workspace folder change was not applied to the window: ${error instanceof Error ? error.message : String(error)}`,
+                extensionId,
+              );
             });
           }
           return result.ok;
@@ -329,7 +335,10 @@ export const workspaceMiscFeature: HostFeature = {
               const stat = await wrapped.stat!(uri);
               const target = T.Uri.revive(uri);
               if (!stat || stat.permissions !== undefined || target?.scheme !== "file") return stat;
-              const writable = await access(target.fsPath, constants.W_OK).then(() => true, () => false);
+              const writable = await access(target.fsPath, constants.W_OK).then(
+                () => true,
+                () => false,
+              );
               return writable ? stat : { ...stat, permissions: FilePermission.Readonly };
             },
           };

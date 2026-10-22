@@ -5,7 +5,14 @@ import { NOT_HANDLED } from "./contract.ts";
 import type { ExtensionHost } from "../host.ts";
 import { Disposable } from "../types.ts";
 import { uriOfKey } from "../documents.ts";
-import { findWalkthrough, featuredFor, markdownImageSources, parseCompletionEvent, parseWalkthroughs, replaceMarkdownImages } from "../../../shared/menus-walkthroughs.ts";
+import {
+  findWalkthrough,
+  featuredFor,
+  markdownImageSources,
+  parseCompletionEvent,
+  parseWalkthroughs,
+  replaceMarkdownImages,
+} from "../../../shared/menus-walkthroughs.ts";
 import type { ResourceLabelFormatter } from "../../../shared/menus-walkthroughs.ts";
 
 /**
@@ -346,7 +353,12 @@ export const menusWalkthroughsFeature: HostFeature = {
     const message = payload as { type?: string; key?: string; command?: string; args?: unknown[] } | null;
     // A command of a contributed menu (editor/context, explorer/context, …) with its resource arguments.
     if (message?.type === "run" && typeof message.command === "string") {
-      void host.executeCommand(message.command, (message.args ?? []).map((arg) => reviveMenuArg(arg, host))).catch((error: unknown) => host.log("error", `${message.command}: ${error instanceof Error ? error.message : String(error)}`));
+      void host
+        .executeCommand(
+          message.command,
+          (message.args ?? []).map((arg) => reviveMenuArg(arg, host)),
+        )
+        .catch((error: unknown) => host.log("error", `${message.command}: ${error instanceof Error ? error.message : String(error)}`));
       return;
     }
     // The user opened a walkthrough in the window: its extension may activate on `onWalkthrough:`.

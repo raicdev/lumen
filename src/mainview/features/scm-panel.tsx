@@ -73,7 +73,13 @@ function ResourceRow({ control, group, index }: { control: ScmControlData; group
     if (!resource.description) return;
     const folder = resource.path.slice(0, resource.path.length - resource.label.length - 1);
     const inside = group.resources.filter((entry) => entry.path.startsWith(`${folder}/`) || entry.path.startsWith(`${folder}\\`));
-    if (showContributedMenu(e, "scm/resourceFolder/context", scmLookup(control, group), () => [uriArg(folder), ...inside.map((entry) => resourceRef(control, group, entry.index))])) e.stopPropagation();
+    if (
+      showContributedMenu(e, "scm/resourceFolder/context", scmLookup(control, group), () => [
+        uriArg(folder),
+        ...inside.map((entry) => resourceRef(control, group, entry.index)),
+      ])
+    )
+      e.stopPropagation();
   };
   return (
     <div
@@ -107,7 +113,14 @@ function Group({ control, group }: { control: ScmControlData; group: ScmGroupDat
           <ChevronRight size={14} />
         </span>
         <span className="scm-section-title">{group.label}</span>
-        <MenuActions menuId="scm/resourceGroup/context" lookup={scmLookup(control, group)} args={[groupRef(control, group)]} inline={["inline"]} overflow={false} className="scm-row-actions" />
+        <MenuActions
+          menuId="scm/resourceGroup/context"
+          lookup={scmLookup(control, group)}
+          args={[groupRef(control, group)]}
+          inline={["inline"]}
+          overflow={false}
+          className="scm-row-actions"
+        />
         <span className="badge">{group.resources.length}</span>
       </div>
       {open && group.resources.map((_, index) => <ResourceRow key={`${group.handle}:${index}`} control={control} group={group} index={index} />)}

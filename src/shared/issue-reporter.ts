@@ -41,7 +41,12 @@ export function issueTarget(manifest: Manifest): { kind: "github"; url: string }
 }
 
 /** The issue's markdown body: the user's text, then the versions (and the extension's data). */
-export function issueBody(description: string, system: IssueSystemInfo | null, extension: { id: string; version?: string } | null, extensionData?: string): string {
+export function issueBody(
+  description: string,
+  system: IssueSystemInfo | null,
+  extension: { id: string; version?: string } | null,
+  extensionData?: string,
+): string {
   const lines = [description.trim() || "<!-- Describe the issue -->", ""];
   if (extension) lines.push(`Extension version: ${extension.id}@${extension.version ?? "?"}`);
   if (system) lines.push(`${system.app}`, `OS: ${system.os}`, `Runtime: ${system.runtime}`);

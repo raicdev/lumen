@@ -159,10 +159,16 @@ export function jsonToTask(host: ExtensionHost, json: JsonTask): Task {
   if (json.command !== undefined && (json.type === "shell" || json.type === "process")) {
     const env = options.env;
     if (json.type === "process") {
-      execution = new ProcessExecution(json.command, (json.args ?? []).map((arg) => (typeof arg === "string" ? arg : arg.value)), { cwd: options.cwd, env });
+      execution = new ProcessExecution(
+        json.command,
+        (json.args ?? []).map((arg) => (typeof arg === "string" ? arg : arg.value)),
+        { cwd: options.cwd, env },
+      );
     } else {
       const shellOptions = { cwd: options.cwd, env, executable: shell?.executable, shellArgs: shell?.args };
-      const args = (json.args ?? []).map((arg) => (typeof arg === "string" ? arg : { value: arg.value, quoting: arg.quoting === "escape" ? 1 : arg.quoting === "weak" ? 3 : 2 }));
+      const args = (json.args ?? []).map((arg) =>
+        typeof arg === "string" ? arg : { value: arg.value, quoting: arg.quoting === "escape" ? 1 : arg.quoting === "weak" ? 3 : 2 },
+      );
       execution = json.args === undefined ? new ShellExecution(json.command, shellOptions) : new ShellExecution(json.command, args, shellOptions);
     }
   }
@@ -193,7 +199,9 @@ async function activateTaskExtensions(host: ExtensionHost, type?: string): Promi
   const wanted: Promise<void>[] = [];
   for (const runtime of host.runtimes.values()) {
     if (runtime.activated) continue;
-    const definitions = ((runtime.description.manifest.contributes as { taskDefinitions?: { type?: string }[] } | undefined)?.taskDefinitions ?? []) as { type?: string }[];
+    const definitions = ((runtime.description.manifest.contributes as { taskDefinitions?: { type?: string }[] } | undefined)?.taskDefinitions ?? []) as {
+      type?: string;
+    }[];
     const matches = definitions.some((definition) => type === undefined || definition.type === type);
     const declared = runtime.activationEvents.some((event) => (type === undefined ? event.startsWith("onTaskType:") : event === `onTaskType:${type}`));
     if (matches || declared) wanted.push(host.activate(runtime, `onTaskType:${type ?? "*"}`).catch(() => undefined));
@@ -227,7 +235,14 @@ async function resolveWithProvider(state: TasksState, task: Task): Promise<Task>
       const resolved = await withTimeout(provider.resolveTask(task, noToken()), PROVIDER_TIMEOUT);
       if (resolved instanceof Task && resolved.execution) {
         // The configuration keeps its presentation, matchers and group; the provider supplies what runs.
-        const merged = new Task(task.definition, task.scope, task.name, task.source, resolved.execution, task.problemMatchers.length ? task.problemMatchers : resolved.problemMatchers);
+        const merged = new Task(
+          task.definition,
+          task.scope,
+          task.name,
+          task.source,
+          resolved.execution,
+          task.problemMatchers.length ? task.problemMatchers : resolved.problemMatchers,
+        );
         merged.isBackground = task.isBackground || resolved.isBackground;
         merged.group = task.group ?? resolved.group;
         merged.detail = task.detail ?? resolved.detail;
@@ -269,7 +284,9 @@ function taskKey(task: Task): string {
 }
 
 function matcherRegistry(host: ExtensionHost): MatcherRegistry {
-  const contributions = [...host.runtimes.values()].map((runtime) => (runtime.description.manifest.contributes ?? {}) as { problemMatchers?: unknown; problemPatterns?: unknown });
+  const contributions = [...host.runtimes.values()].map(
+    (runtime) => (runtime.description.manifest.contributes ?? {}) as { problemMatchers?: unknown; problemPatterns?: unknown },
+  );
   return createMatcherRegistry(contributions);
 }
 
@@ -312,7 +329,13 @@ function activeFile(host: ExtensionHost): { file: string | null; line?: number; 
   return out;
 }
 
-function variableContext(host: ExtensionHost, folder: string | null, cwd: string | undefined, inputs: InputDef[], answers: Map<string, string | undefined>): VariableContext {
+function variableContext(
+  host: ExtensionHost,
+  folder: string | null,
+  cwd: string | undefined,
+  inputs: InputDef[],
+  answers: Map<string, string | undefined>,
+): VariableContext {
   const active = activeFile(host);
   return {
     workspaceFolder: folder,
@@ -331,13 +354,19 @@ function variableContext(host: ExtensionHost, folder: string | null, cwd: string
       let value: string | undefined;
       if (definition.type === "pickString") {
         const options = (definition.options ?? []).map((option) => (typeof option === "string" ? { label: option, value: option } : option));
-        const index = await pick(host, options.map((option) => ({ label: option.label, description: option.value !== option.label ? option.value : undefined })), definition.description ?? id);
+        const index = await pick(
+          host,
+          options.map((option) => ({ label: option.label, description: option.value !== option.label ? option.value : undefined })),
+          definition.description ?? id,
+        );
         value = index === null ? undefined : options[index]?.value;
       } else if (definition.type === "command" && definition.command) {
         const result = await host.executeCommand(definition.command, definition.args === undefined ? [] : [definition.args]);
         value = result === undefined || result === null ? undefined : String(result);
       } else {
-        const answer = await host.requestFeatureView(AREA, "input", [{ prompt: definition.description ?? id, value: definition.default ?? "", password: definition.password === true }]);
+        const answer = await host.requestFeatureView(AREA, "input", [
+          { prompt: definition.description ?? id, value: definition.default ?? "", password: definition.password === true },
+        ]);
         value = typeof answer === "string" ? answer : undefined;
       }
       answers.set(id, value);
@@ -354,19 +383,35 @@ async function pick(host: ExtensionHost, items: { label: string; description?: s
 type ResolvedSpec = { execution: ShellExecution | ProcessExecution; cwd: string | undefined; env: Record<string, string | undefined> };
 
 async function resolveSpec(execution: ShellExecution | ProcessExecution, folder: string | null, context: VariableContext): Promise<ResolvedSpec> {
-  const options = (execution.options ?? {}) as { cwd?: string; env?: Record<string, string>; executable?: string; shellArgs?: string[]; shellQuoting?: ShellExecution["options"] extends infer O ? (O extends { shellQuoting?: infer Q } ? Q : never) : never };
+  const options = (execution.options ?? {}) as {
+    cwd?: string;
+    env?: Record<string, string>;
+    executable?: string;
+    shellArgs?: string[];
+    shellQuoting?: ShellExecution["options"] extends infer O ? (O extends { shellQuoting?: infer Q } ? Q : never) : never;
+  };
   let cwd = options.cwd === undefined ? undefined : await expandVariables(options.cwd, context);
   if (cwd && !isAbsolute(cwd)) cwd = resolve(folder ?? process.cwd(), cwd);
   cwd ??= folder ?? undefined;
   const scoped = { ...context, cwd };
   const env: Record<string, string | undefined> = { ...process.env };
   for (const [name, value] of Object.entries(options.env ?? {})) env[name] = await expandVariables(String(value), scoped);
-  const expandedOptions = { ...options, cwd, env: undefined as undefined, executable: options.executable === undefined ? undefined : await expandVariables(options.executable, scoped) };
+  const expandedOptions = {
+    ...options,
+    cwd,
+    env: undefined as undefined,
+    executable: options.executable === undefined ? undefined : await expandVariables(options.executable, scoped),
+  };
   delete expandedOptions.env;
   if (execution instanceof ProcessExecution) {
-    return { execution: new ProcessExecution(await expandVariables(execution.process, scoped), await expandDeep(execution.args, scoped), expandedOptions), cwd, env };
+    return {
+      execution: new ProcessExecution(await expandVariables(execution.process, scoped), await expandDeep(execution.args, scoped), expandedOptions),
+      cwd,
+      env,
+    };
   }
-  const part = async (value: string | { value: string; quoting: number }) => (typeof value === "string" ? await expandVariables(value, scoped) : { value: await expandVariables(value.value, scoped), quoting: value.quoting });
+  const part = async (value: string | { value: string; quoting: number }) =>
+    typeof value === "string" ? await expandVariables(value, scoped) : { value: await expandVariables(value.value, scoped), quoting: value.quoting };
   if (execution.commandLine !== undefined) {
     return { execution: new ShellExecution(await expandVariables(execution.commandLine, scoped), expandedOptions), cwd, env };
   }
@@ -485,8 +530,19 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
       else if (problem.column > 0) endCharacter = startCharacter + 1;
       else endCharacter = lineText?.length ?? 0;
       if (endLine < line) endLine = line;
-      const severity = problem.severity === "error" ? T.DiagnosticSeverity.Error : problem.severity === "warning" ? T.DiagnosticSeverity.Warning : problem.severity === "info" ? T.DiagnosticSeverity.Information : T.DiagnosticSeverity.Hint;
-      const diagnostic = new T.Diagnostic(new T.Range(line, startCharacter, endLine, Math.max(endCharacter, endLine === line ? startCharacter : 0)), problem.message, severity);
+      const severity =
+        problem.severity === "error"
+          ? T.DiagnosticSeverity.Error
+          : problem.severity === "warning"
+            ? T.DiagnosticSeverity.Warning
+            : problem.severity === "info"
+              ? T.DiagnosticSeverity.Information
+              : T.DiagnosticSeverity.Hint;
+      const diagnostic = new T.Diagnostic(
+        new T.Range(line, startCharacter, endLine, Math.max(endCharacter, endLine === line ? startCharacter : 0)),
+        problem.message,
+        severity,
+      );
       if (matcher.source) diagnostic.source = matcher.source;
       if (problem.code) diagnostic.code = problem.code;
       if (problem.severity === "error") counts.errors++;
@@ -534,7 +590,8 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
         if (issue.severity === "warning") host.log("warning", `task '${task.name}': ${issue.message}`);
       }
       const invalid = issues.filter((issue) => issue.severity === "error");
-      if (invalid.length) throw new Error(`The task '${task.name}' is not run because its definition is invalid (${invalid.length} error${invalid.length === 1 ? "" : "s"}).`);
+      if (invalid.length)
+        throw new Error(`The task '${task.name}' is not run because its definition is invalid (${invalid.length} error${invalid.length === 1 ? "" : "s"}).`);
 
       // Tasks this one depends on run first.
       const label = task.name;
@@ -546,7 +603,9 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
         const started: Run[] = [];
         const startDependency = async (dependency: { label: string; type?: string }) => {
           const json = file.tasks.find((candidate) => candidate.label === dependency.label);
-          const target = json ? await resolveWithProvider(state, jsonToTask(host, json)) : (await allTasks(state)).find((candidate) => candidate.name === dependency.label || displayLabel(candidate) === dependency.label);
+          const target = json
+            ? await resolveWithProvider(state, jsonToTask(host, json))
+            : (await allTasks(state)).find((candidate) => candidate.name === dependency.label || displayLabel(candidate) === dependency.label);
           if (!target) throw new Error(`Could not find the task '${dependency.label}' that '${label}' depends on.`);
           emit(`> Running dependency '${dependency.label}'\n`);
           const facade = await executeTask(state, target, [...chain, key]);
@@ -557,7 +616,8 @@ export async function executeTask(state: TasksState, task: Task, chain: string[]
           if (!child) return;
           started.push(child);
           await child.ready;
-          if (child.finished && child.exitCode !== 0 && child.exitCode !== undefined && !child.terminated) throw new Error(`The task '${child.task.name}' failed with exit code ${child.exitCode}.`);
+          if (child.finished && child.exitCode !== 0 && child.exitCode !== undefined && !child.terminated)
+            throw new Error(`The task '${child.task.name}' failed with exit code ${child.exitCode}.`);
           if (child.terminated) throw new Error(`The task '${child.task.name}' was terminated.`);
         };
         run.stop = () => started.forEach(terminateRun);
@@ -714,7 +774,10 @@ function findByReference(tasks: Task[], reference: unknown): Task | undefined {
   if (typeof reference === "string") return tasks.find((task) => task.name === reference) ?? tasks.find((task) => displayLabel(task) === reference);
   if (reference && typeof reference === "object") {
     const { type, task } = reference as { type?: string; task?: string };
-    return tasks.find((candidate) => (type === undefined || candidate.definition?.type === type) && (task === undefined || candidate.name === task || displayLabel(candidate) === task));
+    return tasks.find(
+      (candidate) =>
+        (type === undefined || candidate.definition?.type === type) && (task === undefined || candidate.name === task || displayLabel(candidate) === task),
+    );
   }
   return undefined;
 }
@@ -723,7 +786,9 @@ async function runGroup(state: TasksState, group: "build" | "test"): Promise<voi
   const tasks = (await allTasks(state)).filter((task) => task.group?.id === group);
   const label = group === "build" ? "build" : "test";
   if (!tasks.length) {
-    const choice = await state.host.requestView("showMessage", "info", `No ${label} task to run found. Configure one in tasks.json.`, ["Configure Tasks"], {}).catch(() => null);
+    const choice = await state.host
+      .requestView("showMessage", "info", `No ${label} task to run found. Configure one in tasks.json.`, ["Configure Tasks"], {})
+      .catch(() => null);
     if (choice === 0) await openTasksJson(state.host);
     return;
   }
@@ -744,7 +809,9 @@ export async function runTaskCommand(state: TasksState, command: string, args: u
         return undefined;
       }
       if (!tasks.length && !direct) {
-        const choice = await host.requestView("showMessage", "info", "No tasks found. Configure tasks in tasks.json.", ["Configure Tasks"], {}).catch(() => null);
+        const choice = await host
+          .requestView("showMessage", "info", "No tasks found. Configure tasks in tasks.json.", ["Configure Tasks"], {})
+          .catch(() => null);
         if (choice === 0) await openTasksJson(host);
         return undefined;
       }
@@ -764,9 +831,14 @@ export async function runTaskCommand(state: TasksState, command: string, args: u
         notify(host, "info", "No task is running.");
         return undefined;
       }
-      const target = typeof args[0] === "string" ? runs.find((run) => run.id === args[0] || run.task.name === args[0]) : runs.length === 1 ? runs[0] : undefined;
+      const target =
+        typeof args[0] === "string" ? runs.find((run) => run.id === args[0] || run.task.name === args[0]) : runs.length === 1 ? runs[0] : undefined;
       if (target) return void terminateRun(target);
-      const index = await pick(host, [{ label: "All running tasks" }, ...runs.map((run) => ({ label: displayLabel(run.task) }))], "Select the task to terminate");
+      const index = await pick(
+        host,
+        [{ label: "All running tasks" }, ...runs.map((run) => ({ label: displayLabel(run.task) }))],
+        "Select the task to terminate",
+      );
       if (index === null) return undefined;
       if (index === 0) runs.forEach(terminateRun);
       else terminateRun(runs[index - 1]!);
@@ -778,7 +850,16 @@ export async function runTaskCommand(state: TasksState, command: string, args: u
         notify(host, "info", "No task is running.");
         return undefined;
       }
-      const target = runs.length === 1 ? runs[0]! : runs[(await pick(host, runs.map((run) => ({ label: displayLabel(run.task) })), "Select the task to restart")) ?? -1];
+      const target =
+        runs.length === 1
+          ? runs[0]!
+          : runs[
+              (await pick(
+                host,
+                runs.map((run) => ({ label: displayLabel(run.task) })),
+                "Select the task to restart",
+              )) ?? -1
+            ];
       if (!target) return undefined;
       terminateRun(target);
       await target.done;

@@ -128,10 +128,7 @@ export type CompatReport = {
 
 export type PartialGrade = "high" | "medium" | "low";
 
-export type ExtensionSource =
-  | { type: "openvsx"; namespace: string; name: string }
-  | { type: "vsix"; file: string }
-  | { type: "folder"; path: string };
+export type ExtensionSource = { type: "openvsx"; namespace: string; name: string } | { type: "vsix"; file: string } | { type: "folder"; path: string };
 
 export type ExtensionDescription = {
   /** `publisher.name` */
@@ -539,7 +536,14 @@ export type HostDebugStopped = {
 
 export type HostDebugOutput = { sessionId: string; category: string; text: string; path?: string; line?: number; column?: number };
 
-export type HostDebugExceptionFilter = { filter: string; label: string; description?: string; default?: boolean; supportsCondition?: boolean; conditionDescription?: string };
+export type HostDebugExceptionFilter = {
+  filter: string;
+  label: string;
+  description?: string;
+  default?: boolean;
+  supportsCondition?: boolean;
+  conditionDescription?: string;
+};
 
 export type HostDebugCapabilities = { sessionId: string; capabilities: Record<string, unknown>; exceptionBreakpointFilters: HostDebugExceptionFilter[] };
 
@@ -636,12 +640,21 @@ export type HostInputBox = {
 
 /** Host → view requests that need an answer. */
 export type ViewMethods = {
-  showMessage: (kind: "info" | "warning" | "error", message: string, items: string[], options: { modal?: boolean; detail?: string; source?: string }) => number | null;
+  showMessage: (
+    kind: "info" | "warning" | "error",
+    message: string,
+    items: string[],
+    options: { modal?: boolean; detail?: string; source?: string },
+  ) => number | null;
   showQuickPick: (pick: HostQuickPick) => number[] | null;
   showInputBox: (options: HostInputBox) => string | null;
   showTextDocument: (path: string, options: { selection?: TextRange; preview?: boolean; preserveFocus?: boolean; beside?: boolean }) => boolean;
   /** Open a side-by-side diff of two documents (`vscode.diff`); the modified side is editable. */
-  openDiff: (original: string, modified: string, options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange }) => boolean;
+  openDiff: (
+    original: string,
+    modified: string,
+    options: { title?: string; preview?: boolean; preserveFocus?: boolean; viewColumn?: number; selection?: TextRange },
+  ) => boolean;
   /** Open an untitled editor under the path the host chose (`untitled:Name`). */
   openUntitled: (path: string, language: string, content: string) => boolean;
   setDocumentLanguage: (path: string, language: string) => boolean;
@@ -683,7 +696,13 @@ export const MAIN_METHODS: readonly (keyof MainMethods)[] = ["showOpenDialog", "
 
 /* ── webviews ──────────────────────────────────────────────────────────── */
 
-export type HostWebviewOptions = { enableScripts: boolean; enableForms: boolean; enableCommandUris: boolean; retainContextWhenHidden: boolean; enableFindWidget?: boolean };
+export type HostWebviewOptions = {
+  enableScripts: boolean;
+  enableForms: boolean;
+  enableCommandUris: boolean;
+  retainContextWhenHidden: boolean;
+  enableFindWidget?: boolean;
+};
 
 export type HostWebview = {
   id: string;
@@ -860,7 +879,11 @@ export type HostMethods = {
   /** File decorations for the explorer's files (window.registerFileDecorationProvider). */
   provideFileDecorations: (paths: string[]) => HostFileDecorations;
   /** Open a file in a contributed custom editor; the webview id and provider kind, or `null`. */
-  openCustomEditor: (path: string, viewType: string, options: { preview?: boolean; beside?: boolean }) => { id: string; kind: "text" | "readonly" | "editable" } | null;
+  openCustomEditor: (
+    path: string,
+    viewType: string,
+    options: { preview?: boolean; beside?: boolean },
+  ) => { id: string; kind: "text" | "readonly" | "editable" } | null;
   /** Save an editable custom document (CustomEditorProvider.saveCustomDocument). */
   saveCustomEditor: (path: string, viewType: string) => boolean;
   /** Save an editable custom document under a new name (saveCustomDocumentAs); asks for the path. */
@@ -953,7 +976,14 @@ export type ViewToHost =
   | { type: "executeCommand"; command: string; args: unknown[] }
   | { type: "activate"; event: string }
   | { type: "reply"; id: number; result?: unknown; error?: string }
-  | { type: "quickPickEvent"; id: number; event: "value" | "active" | "accept" | "hide" | "button" | "itemButton"; value?: string; items?: number[]; index?: number }
+  | {
+      type: "quickPickEvent";
+      id: number;
+      event: "value" | "active" | "accept" | "hide" | "button" | "itemButton";
+      value?: string;
+      items?: number[];
+      index?: number;
+    }
   | { type: "inputBoxValue"; id: number; value: string }
   | { type: "terminalClosed"; id: string }
   /** The terminal the user is looking at (or `null` when none is active). */
@@ -968,7 +998,13 @@ export type ViewToHost =
   /** The user closed a webview panel. */
   | { type: "webviewClosed"; id: string }
   /** Something happened in a tree view (items by handle). */
-  | { type: "treeEvent"; viewId: string; event: "expand" | "collapse" | "select" | "open" | "visible" | "hidden" | "checkbox"; handles: string[]; checked?: boolean }
+  | {
+      type: "treeEvent";
+      viewId: string;
+      event: "expand" | "collapse" | "select" | "open" | "visible" | "hidden" | "checkbox";
+      handles: string[];
+      checked?: boolean;
+    }
   /** A command from an item's menu, run with the item (and the selection). */
   | { type: "treeCommand"; viewId: string; command: string; handles: string[] }
   /** A create / delete / rename the user did in the explorer finished (workspace.onDid*). */
@@ -990,7 +1026,15 @@ export type HostToView =
   | { type: "codeLensesChanged" }
   | { type: "statusBar"; item: HostStatusBarItem }
   | { type: "statusBarDispose"; id: string }
-  | { type: "output"; channel: string; extensionId?: string; op: "append" | "replace" | "clear" | "show" | "dispose"; text?: string; preserveFocus?: boolean; log?: boolean }
+  | {
+      type: "output";
+      channel: string;
+      extensionId?: string;
+      op: "append" | "replace" | "clear" | "show" | "dispose";
+      text?: string;
+      preserveFocus?: boolean;
+      log?: boolean;
+    }
   | { type: "diagnostics"; owner: string; entries: [string, Diagnostic[]][]; clear?: boolean }
   | { type: "decorationType"; id: string; options: HostDecorationType | null }
   | { type: "decorations"; path: string; typeId: string; ranges: HostDecoration[] }
@@ -1008,7 +1052,16 @@ export type HostToView =
   | { type: "crashed"; error: string }
   | { type: "webviewCreate"; webview: HostWebview; reveal?: { preserveFocus: boolean; beside: boolean } }
   | { type: "webviewHtml"; id: string; html: string }
-  | { type: "webviewUpdate"; id: string; title?: string; description?: string; badge?: { value: number; tooltip: string } | null; options?: HostWebviewOptions; dirty?: boolean; uri?: string }
+  | {
+      type: "webviewUpdate";
+      id: string;
+      title?: string;
+      description?: string;
+      badge?: { value: number; tooltip: string } | null;
+      options?: HostWebviewOptions;
+      dirty?: boolean;
+      uri?: string;
+    }
   | { type: "webviewPost"; id: string; message: unknown }
   | { type: "webviewReveal"; id: string; preserveFocus: boolean }
   | { type: "webviewDispose"; id: string }
@@ -1103,14 +1156,22 @@ function wireOnEnterRules(value: unknown): HostOnEnterRule[] | undefined {
   const out: HostOnEnterRule[] = [];
   for (const entry of value) {
     if (!entry || typeof entry !== "object") continue;
-    const rule = entry as { beforeText?: RegexLike; afterText?: RegexLike; previousLineText?: RegexLike; action?: { indentAction?: unknown; appendText?: unknown } };
+    const rule = entry as {
+      beforeText?: RegexLike;
+      afterText?: RegexLike;
+      previousLineText?: RegexLike;
+      action?: { indentAction?: unknown; appendText?: unknown };
+    };
     const beforeText = regexSource(rule.beforeText);
     if (!beforeText) continue;
     out.push({
       beforeText,
       afterText: regexSource(rule.afterText),
       previousLineText: regexSource(rule.previousLineText),
-      action: { indentAction: wireIndentAction(rule.action?.indentAction), appendText: typeof rule.action?.appendText === "string" ? rule.action.appendText : undefined },
+      action: {
+        indentAction: wireIndentAction(rule.action?.indentAction),
+        appendText: typeof rule.action?.appendText === "string" ? rule.action.appendText : undefined,
+      },
     });
   }
   return out.length ? out : undefined;
@@ -1135,7 +1196,10 @@ export function wireLanguageConfiguration(value: unknown): HostLanguageConfigura
   const config: HostLanguageConfiguration = {};
   const comments = source.comments;
   if (comments && typeof comments === "object") {
-    const block = Array.isArray(comments.blockComment) && comments.blockComment.length >= 2 ? ([String(comments.blockComment[0]), String(comments.blockComment[1])] as [string, string]) : undefined;
+    const block =
+      Array.isArray(comments.blockComment) && comments.blockComment.length >= 2
+        ? ([String(comments.blockComment[0]), String(comments.blockComment[1])] as [string, string])
+        : undefined;
     const line = typeof comments.lineComment === "string" ? comments.lineComment : undefined;
     if (line || block) config.comments = { lineComment: line, blockComment: block };
   }

@@ -99,7 +99,13 @@ function overviewRuler(field: StateField<ExtensionDecorationState>) {
         this.render();
       }
       update(update: ViewUpdate) {
-        if (update.docChanged || update.geometryChanged || update.viewportChanged || update.transactions.some((tr) => tr.effects.some((effect) => effect.is(setExtensionDecorations)))) this.render();
+        if (
+          update.docChanged ||
+          update.geometryChanged ||
+          update.viewportChanged ||
+          update.transactions.some((tr) => tr.effects.some((effect) => effect.is(setExtensionDecorations)))
+        )
+          this.render();
       }
       destroy() {
         this.dom.remove();
@@ -282,7 +288,10 @@ export function buildExtensionDecorations(doc: Text, path: string): ExtensionDec
     const style = styleFor(type, dark);
     const styleText = css(style);
     const edges = rangeInclusive(type.rangeBehavior);
-    const iconMarker = type.gutterIcon && (type.gutterIcon.light || type.gutterIcon.dark) ? new IconMarker(gutterIconClass(type.gutterIcon), gutterIconStyle(type.gutterIconSize)) : undefined;
+    const iconMarker =
+      type.gutterIcon && (type.gutterIcon.light || type.gutterIcon.dark)
+        ? new IconMarker(gutterIconClass(type.gutterIcon), gutterIconStyle(type.gutterIconSize))
+        : undefined;
     for (const range of ranges) {
       const from = offset(doc, range.startLine, range.startCharacter);
       const to = Math.max(from, offset(doc, range.endLine, range.endCharacter));

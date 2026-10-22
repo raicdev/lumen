@@ -83,8 +83,15 @@ test("submenus nest, are sorted by group and hide when empty", () => {
   );
   const sub = items[0]!;
   assert.equal(sub.type, "submenu");
-  if (sub.type === "submenu") assert.deepEqual(sub.items.map((item) => item.title), ["Stop"]);
-  assert.deepEqual(flattenMenu(items).map((item) => item.command), ["a.stop", "a.run"]);
+  if (sub.type === "submenu")
+    assert.deepEqual(
+      sub.items.map((item) => item.title),
+      ["Stop"],
+    );
+  assert.deepEqual(
+    flattenMenu(items).map((item) => item.command),
+    ["a.stop", "a.run"],
+  );
   assert.deepEqual(undeclaredSubmenus(sources), ["a.unknown"]);
 });
 
@@ -109,7 +116,13 @@ test("walkthroughs parse with steps, media, events and legacy doneOn", () => {
           description: "Learn",
           featuredFor: ["*.ts", "*.py"],
           steps: [
-            { id: "one", title: "One", description: "[Run](command:pub.run?%5B1%5D)", media: { image: "media/a.png", altText: "A" }, completionEvents: ["onCommand:pub.run", "onSettingChanged:editor.tabSize"] },
+            {
+              id: "one",
+              title: "One",
+              description: "[Run](command:pub.run?%5B1%5D)",
+              media: { image: "media/a.png", altText: "A" },
+              completionEvents: ["onCommand:pub.run", "onSettingChanged:editor.tabSize"],
+            },
             { id: "two", title: "Two", description: "text", media: { markdown: "media/b.md" }, doneOn: { command: "pub.two" } },
             { id: "three", title: "Three", description: "x", media: { image: { dark: "d.png", light: "l.png" } } },
             { id: "gone", title: "Gone", description: "x", when: "false" },
@@ -123,7 +136,10 @@ test("walkthroughs parse with steps, media, events and legacy doneOn", () => {
   assert.equal(walkthroughs.length, 1);
   const w = walkthroughs[0]!;
   assert.equal(w.key, "pub.ext#start");
-  assert.deepEqual(w.steps.map((step) => step.id), ["one", "two", "three"]);
+  assert.deepEqual(
+    w.steps.map((step) => step.id),
+    ["one", "two", "three"],
+  );
   assert.deepEqual(w.steps[1]!.completionEvents, ["onCommand:pub.two"]);
   assert.equal(w.steps[0]!.media?.kind, "image");
   assert.equal(w.steps[1]!.media?.kind, "markdown");
@@ -199,7 +215,10 @@ test("steps without completionEvents use their buttons, else selection", () => {
     }),
   ];
   const steps = parseWalkthroughs(sources)[0]!.steps;
-  assert.deepEqual(steps.map((step) => step.completionEvents), [["onCommand:run"], ["onLink:https://e.com"], ["onStepSelected"]]);
+  assert.deepEqual(
+    steps.map((step) => step.completionEvents),
+    [["onCommand:run"], ["onLink:https://e.com"], ["onStepSelected"]],
+  );
   assert.ok(completesOnSelect(steps[2]!));
   assert.ok(!completesOnSelect(steps[0]!));
 });
@@ -216,14 +235,24 @@ test("featured walkthroughs use globs and come first", () => {
     }),
   ];
   const walkthroughs = parseWalkthroughs(sources);
-  assert.deepEqual(walkthroughs.map((walkthrough) => walkthrough.id), ["plain", "ts", "icon"]);
+  assert.deepEqual(
+    walkthroughs.map((walkthrough) => walkthrough.id),
+    ["plain", "ts", "icon"],
+  );
   assert.equal(walkthroughs[2]!.icon, "media/icon.png");
   const ts = walkthroughs[1]!;
   assert.ok(featuredFor(ts, "src/a.ts"));
   assert.ok(featuredFor(ts, "tsconfig.json"));
   assert.ok(!featuredFor(ts, "src/a.js"));
   const ordered = orderWalkthroughs(walkthroughs, (walkthrough) => walkthrough.id === "ts");
-  assert.deepEqual(ordered.map((walkthrough) => [walkthrough.id, !!walkthrough.featured]), [["ts", true], ["plain", false], ["icon", false]]);
+  assert.deepEqual(
+    ordered.map((walkthrough) => [walkthrough.id, !!walkthrough.featured]),
+    [
+      ["ts", true],
+      ["plain", false],
+      ["icon", false],
+    ],
+  );
 });
 
 test("media paths follow the theme kind, markdown images resolve", () => {
@@ -236,7 +265,7 @@ test("media paths follow the theme kind, markdown images resolve", () => {
   assert.equal(mediaPathFor({ kind: "image", path: { light: "l.png", dark: "d.png" } }, "hcLight"), "l.png");
   assert.equal(mediaPathFor({ kind: "image", path: "a.png" }, "hcDark"), "a.png");
 
-  const markdown = "![A](media/a.png) and <img src=\"media/b.png\">\n![](https://e.com/c.png)";
+  const markdown = '![A](media/a.png) and <img src="media/b.png">\n![](https://e.com/c.png)';
   assert.deepEqual(markdownImageSources(markdown), ["media/a.png", "media/b.png", "https://e.com/c.png"]);
   const replaced = replaceMarkdownImages(markdown, (source) => (source.startsWith("media/") ? `data:image/png;base64,${source.length}` : undefined));
   assert.match(replaced, /!\[A\]\(data:image\/png;base64,11\)/);
@@ -304,10 +333,19 @@ test("tab and breadcrumb labels use the formatter, files keep their name", () =>
 test("typescriptServerPlugins are listed and decorate the language service", () => {
   const location = resolve(ROOT, "test/fixtures/menus-walkthroughs/plugin");
   const specs = tsServerPluginsOf([
-    { id: "p.e", location, manifest: { contributes: { typescriptServerPlugins: [{ name: "lumen-test-plugin", enableForWorkspaceTypeScriptVersions: true }, { name: "missing-plugin" }] } } },
+    {
+      id: "p.e",
+      location,
+      manifest: {
+        contributes: { typescriptServerPlugins: [{ name: "lumen-test-plugin", enableForWorkspaceTypeScriptVersions: true }, { name: "missing-plugin" }] },
+      },
+    },
     { id: "q.f", location, manifest: {} },
   ]);
-  assert.deepEqual(specs.map((spec) => spec.name), ["lumen-test-plugin", "missing-plugin"]);
+  assert.deepEqual(
+    specs.map((spec) => spec.name),
+    ["lumen-test-plugin", "missing-plugin"],
+  );
 
   const file = "/virtual/a.ts";
   const files = new Map([[file, "const x = 1;"]]);
@@ -345,13 +383,30 @@ test("menu arguments are revived into Uris, openWalkthrough arguments parsed", (
   assert.equal(reviveMenuArg({ $ref: { area: "scm", control: 1 } }), undefined);
   assert.deepEqual(parseOpenWalkthroughArgs(["p.e#w"]), { key: "p.e#w", toSide: false });
   assert.deepEqual(parseOpenWalkthroughArgs([{ category: "p.e#w", step: "p.e#w#s1" }, true]), { key: "p.e#w", step: "s1", toSide: true });
-  assert.deepEqual(parseOpenWalkthroughArgs([{ category: "p.e#w", step: "p.e#w#s1" }, { toSide: true, inactive: true }]), { key: "p.e#w", step: "s1", toSide: true });
+  assert.deepEqual(
+    parseOpenWalkthroughArgs([
+      { category: "p.e#w", step: "p.e#w#s1" },
+      { toSide: true, inactive: true },
+    ]),
+    { key: "p.e#w", step: "s1", toSide: true },
+  );
   assert.equal(parseOpenWalkthroughArgs([]), null);
 });
 
 function startedHost(extensions: ExtensionDescription[] = []): { host: ExtensionHost; posted: HostToView[] } {
   const host = new ExtensionHost();
-  host.init = { extensions, config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-mw-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions,
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-mw-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   return { host, posted };
@@ -396,11 +451,22 @@ test("host feature: openWalkthrough, command observation, media and label format
   };
   const { host, posted } = startedHost([description]);
   host.workspace = folder;
-  host.runtimes.set("pub.ext", { id: "pub.ext", description, api: null, activated: false, activating: null, exports: undefined, module: null, context: null, activationEvents: ["onWalkthrough:pub.ext#w"] });
+  host.runtimes.set("pub.ext", {
+    id: "pub.ext",
+    description,
+    api: null,
+    activated: false,
+    activating: null,
+    exports: undefined,
+    module: null,
+    context: null,
+    activationEvents: ["onWalkthrough:pub.ext#w"],
+  });
   const feature = hostFeatures.find((candidate) => candidate.area === "menus-walkthroughs")!;
   assert.deepEqual([...watchedCommands(host)], ["pub.watched"]);
   assert.ok(feature.commands?.includes("workbench.action.openWalkthrough"));
-  for (const id of ["welcome.markStepComplete", "welcome.markStepIncomplete", "walkthroughs.selectStep", "resetGettingStartedProgress"]) assert.ok(feature.commands?.includes(id));
+  for (const id of ["welcome.markStepComplete", "welcome.markStepIncomplete", "walkthroughs.selectStep", "resetGettingStartedProgress"])
+    assert.ok(feature.commands?.includes(id));
   feature.init?.(host);
 
   // openWalkthrough: unknown ids are an error, known ones reach the window, no id opens the Welcome page
@@ -409,7 +475,10 @@ test("host feature: openWalkthrough, command observation, media and label format
   await host.executeCommand("workbench.action.openWalkthrough", [{ category: "pub.ext#w", step: "pub.ext#w#s" }, { toSide: true }]);
   await host.executeCommand("workbench.action.openWalkthrough", []);
   const messages = featureMessages(posted);
-  assert.deepEqual(messages.map((message) => message.type), ["open", "open", "welcome"]);
+  assert.deepEqual(
+    messages.map((message) => message.type),
+    ["open", "open", "welcome"],
+  );
   assert.equal(messages[0]!.key, "pub.ext#w");
   assert.equal(messages[1]!.step, "s");
   assert.equal(messages[1]!.toSide, true);
@@ -420,12 +489,15 @@ test("host feature: openWalkthrough, command observation, media and label format
   await host.executeCommand("welcome.markStepIncomplete", ["pub.ext#w#s"]);
   await host.executeCommand("walkthroughs.selectStep", ["pub.ext#w#s"]);
   await host.executeCommand("resetGettingStartedProgress", []);
-  assert.deepEqual(featureMessages(posted).map((message) => [message.type, message.key, message.done]), [
-    ["mark", "pub.ext#w#s", true],
-    ["mark", "pub.ext#w#s", false],
-    ["select", "pub.ext#w#s", undefined],
-    ["reset", undefined, undefined],
-  ]);
+  assert.deepEqual(
+    featureMessages(posted).map((message) => [message.type, message.key, message.done]),
+    [
+      ["mark", "pub.ext#w#s", true],
+      ["mark", "pub.ext#w#s", false],
+      ["select", "pub.ext#w#s", undefined],
+      ["reset", undefined, undefined],
+    ],
+  );
 
   // onCommand completion: only commands a step waits for are reported
   posted.length = 0;

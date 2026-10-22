@@ -4,7 +4,26 @@ import { RangeSetBuilder } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import { Decoration, EditorView, GutterMarker, ViewPlugin, gutter } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
-import { Bug, ChevronDown, ChevronRight, Circle, CircleAlert, CircleCheck, CircleMinus, CircleX, Clock, FlaskConical, ListChecks, LoaderCircle, Play, RefreshCw, Repeat, ShieldCheck, Square, X } from "lucide-react";
+import {
+  Bug,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  CircleAlert,
+  CircleCheck,
+  CircleMinus,
+  CircleX,
+  Clock,
+  FlaskConical,
+  ListChecks,
+  LoaderCircle,
+  Play,
+  RefreshCw,
+  Repeat,
+  ShieldCheck,
+  Square,
+  X,
+} from "lucide-react";
 import { STATE_PRIORITY, TEST_ID_SEPARATOR } from "../../shared/testing";
 import type {
   TestRunArgs,
@@ -139,17 +158,34 @@ function applyEvent(event: TestingHostEvent | ContinuousEvent): void {
     case "runStart":
       store.set((state) => ({
         ...state,
-        runs: [{ id: event.runId, name: event.name, controllerId: event.controllerId, profile: event.profile, kind: event.profileKind, ended: false, output: "", coverage: [] }, ...state.runs].slice(0, MAX_RUNS),
+        runs: [
+          {
+            id: event.runId,
+            name: event.name,
+            controllerId: event.controllerId,
+            profile: event.profile,
+            kind: event.profileKind,
+            ended: false,
+            output: "",
+            coverage: [],
+          },
+          ...state.runs,
+        ].slice(0, MAX_RUNS),
         coverage: event.profileKind === KIND_COVERAGE ? {} : state.coverage,
       }));
       break;
     case "state":
-      store.set((state) => ({ ...state, results: { ...state.results, [event.testId]: { state: event.state, duration: event.duration, messages: event.messages, runId: event.runId } } }));
+      store.set((state) => ({
+        ...state,
+        results: { ...state.results, [event.testId]: { state: event.state, duration: event.duration, messages: event.messages, runId: event.runId } },
+      }));
       break;
     case "output":
       store.set((state) => ({
         ...state,
-        runs: state.runs.map((run) => (run.id === event.runId ? { ...run, output: (run.output + event.text.replace(/\r?\n/g, "\n")).slice(-MAX_OUTPUT) } : run)),
+        runs: state.runs.map((run) =>
+          run.id === event.runId ? { ...run, output: (run.output + event.text.replace(/\r?\n/g, "\n")).slice(-MAX_OUTPUT) } : run,
+        ),
       }));
       break;
     case "coverage":
@@ -185,7 +221,9 @@ function applyEvent(event: TestingHostEvent | ContinuousEvent): void {
 /* ── actions ─────────────────────────────────────────────────────────────── */
 
 function profilesFor(controller: TestWireController, kind: number, items: TestWireItem[]): TestWireProfile[] {
-  return controller.profiles.filter((profile) => profile.kind === kind && (!profile.tag || items.length === 0 || items.every((item) => item.tags.includes(profile.tag!))));
+  return controller.profiles.filter(
+    (profile) => profile.kind === kind && (!profile.tag || items.length === 0 || items.every((item) => item.tags.includes(profile.tag!))),
+  );
 }
 
 /** Run (or debug, or cover) tests; no ids means everything. Asks which profile when there is no default one. */
@@ -214,7 +252,14 @@ async function runTests(kind: number, ids: string[] = []): Promise<void> {
     profileIds.push(candidates[picked[0]!]!.id);
   }
   if (!profileIds.length) {
-    void api.showMessage("info", kind === KIND_DEBUG ? "No test profile can debug these tests." : kind === KIND_COVERAGE ? "No test profile can run these tests with coverage." : "No tests can be run here.");
+    void api.showMessage(
+      "info",
+      kind === KIND_DEBUG
+        ? "No test profile can debug these tests."
+        : kind === KIND_COVERAGE
+          ? "No test profile can run these tests with coverage."
+          : "No tests can be run here.",
+    );
     return;
   }
   const args: TestRunArgs = { kind, include: ids, profileIds };
@@ -279,7 +324,11 @@ async function startContinuous(ids: string[] = [], onlyController?: string): Pro
     let profile: TestWireProfile | undefined = defaults[0] ?? (candidates.length === 1 ? candidates[0] : undefined);
     if (!profile) {
       const picked = await api.showQuickPick(
-        candidates.map((candidate) => ({ label: candidate.label, description: `${controller.label} (${["", "Run", "Debug", "Coverage"][candidate.kind] ?? candidate.kind})`, picked: candidate.isDefault })),
+        candidates.map((candidate) => ({
+          label: candidate.label,
+          description: `${controller.label} (${["", "Run", "Debug", "Coverage"][candidate.kind] ?? candidate.kind})`,
+          picked: candidate.isDefault,
+        })),
         { title: "Start Continuous Run", placeholder: controller.label },
       );
       if (!picked?.length) continue;
@@ -302,7 +351,11 @@ async function selectDefaultProfiles(api: ViewFeatureApi): Promise<void> {
   const profiles = store.get().controllers.flatMap((controller) => controller.profiles.map((profile) => ({ controller, profile })));
   if (!profiles.length) return void api.showMessage("info", "No test profiles are registered.");
   const picked = await api.showQuickPick(
-    profiles.map(({ controller, profile }) => ({ label: profile.label, description: `${controller.label} (${["", "Run", "Debug", "Coverage"][profile.kind] ?? profile.kind})`, picked: profile.isDefault })),
+    profiles.map(({ controller, profile }) => ({
+      label: profile.label,
+      description: `${controller.label} (${["", "Run", "Debug", "Coverage"][profile.kind] ?? profile.kind})`,
+      picked: profile.isDefault,
+    })),
     { title: "Select Default Profiles", canPickMany: true },
   );
   if (!picked) return;
@@ -407,7 +460,8 @@ function profilesMenu(event: React.MouseEvent, kind: number): void {
   const items: ContextMenuItem[] = [];
   for (const controller of store.get().controllers) {
     for (const profile of controller.profiles.filter((candidate) => candidate.kind === kind)) {
-      const lookup = (key: string) => (key === "controllerId" ? controller.id : key === "testing.profile.context.group" ? ["", "run", "debug", "coverage"][kind] : undefined);
+      const lookup = (key: string) =>
+        key === "controllerId" ? controller.id : key === "testing.profile.context.group" ? ["", "run", "debug", "coverage"][kind] : undefined;
       const entries = contributedMenuItems("testing/profiles/context", lookup, [refArg("testing", { profile: profile.id })]);
       if (entries.length) items.push({ type: "submenu", label: `${profile.label} (${controller.label})`, items: entries });
     }
@@ -554,17 +608,38 @@ function TestingSidebar() {
         <span>Testing</span>
         <span className="sidebar-actions">
           {hasKind(KIND_RUN) ? (
-            <button type="button" className="icon-btn" title="Run All Tests" aria-label="Run All Tests" onClick={() => void runTests(KIND_RUN)} onContextMenu={(event) => profilesMenu(event, KIND_RUN)}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Run All Tests"
+              aria-label="Run All Tests"
+              onClick={() => void runTests(KIND_RUN)}
+              onContextMenu={(event) => profilesMenu(event, KIND_RUN)}
+            >
               <Play size={15} />
             </button>
           ) : null}
           {hasKind(KIND_DEBUG) ? (
-            <button type="button" className="icon-btn" title="Debug All Tests" aria-label="Debug All Tests" onClick={() => void runTests(KIND_DEBUG)} onContextMenu={(event) => profilesMenu(event, KIND_DEBUG)}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Debug All Tests"
+              aria-label="Debug All Tests"
+              onClick={() => void runTests(KIND_DEBUG)}
+              onContextMenu={(event) => profilesMenu(event, KIND_DEBUG)}
+            >
               <Bug size={15} />
             </button>
           ) : null}
           {hasKind(KIND_COVERAGE) ? (
-            <button type="button" className="icon-btn" title="Run All Tests with Coverage" aria-label="Run All Tests with Coverage" onClick={() => void runTests(KIND_COVERAGE)} onContextMenu={(event) => profilesMenu(event, KIND_COVERAGE)}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Run All Tests with Coverage"
+              aria-label="Run All Tests with Coverage"
+              onClick={() => void runTests(KIND_COVERAGE)}
+              onContextMenu={(event) => profilesMenu(event, KIND_COVERAGE)}
+            >
               <ShieldCheck size={15} />
             </button>
           ) : null}
@@ -585,11 +660,23 @@ function TestingSidebar() {
               <Square size={14} />
             </button>
           ) : null}
-          <button type="button" className="icon-btn" title="Clear All Results" aria-label="Clear All Results" onClick={() => store.set((s) => ({ ...s, results: {}, coverage: {} }))}>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Clear All Results"
+            aria-label="Clear All Results"
+            onClick={() => store.set((s) => ({ ...s, results: {}, coverage: {} }))}
+          >
             <X size={15} />
           </button>
           {api ? (
-            <button type="button" className="icon-btn" title="Select Default Profiles" aria-label="Select Default Profiles" onClick={() => void selectDefaultProfiles(api)}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Select Default Profiles"
+              aria-label="Select Default Profiles"
+              onClick={() => void selectDefaultProfiles(api)}
+            >
               <ListChecks size={15} />
             </button>
           ) : null}
@@ -626,8 +713,12 @@ function TestingSidebar() {
                     );
                   })()}
                 </div>
-                {controller.items.map((item) => <TestRow key={item.id} item={item} depth={0} controller={controller} state={state} />)}
-                {controller.items.length === 0 ? <div className="tst-empty tst-empty-small">No tests discovered{controller.refreshing ? " yet..." : "."}</div> : null}
+                {controller.items.map((item) => (
+                  <TestRow key={item.id} item={item} depth={0} controller={controller} state={state} />
+                ))}
+                {controller.items.length === 0 ? (
+                  <div className="tst-empty tst-empty-small">No tests discovered{controller.refreshing ? " yet..." : "."}</div>
+                ) : null}
               </div>
             );
           })
@@ -672,7 +763,13 @@ function MessageView({ message, testId, runId, index }: { message: TestWireMessa
       {message.stack?.length ? (
         <div className="tst-stack">
           {message.stack.map((frame, index) => (
-            <button key={index} type="button" className="tst-link" disabled={!frame.path} onClick={() => frame.path && openAt(frame.path, { startLine: frame.line ?? 0, startCharacter: frame.character ?? 0 })}>
+            <button
+              key={index}
+              type="button"
+              className="tst-link"
+              disabled={!frame.path}
+              onClick={() => frame.path && openAt(frame.path, { startLine: frame.line ?? 0, startCharacter: frame.character ?? 0 })}
+            >
               at {frame.label}
               {frame.path ? ` (${basename(frame.path)}${frame.line !== undefined ? `:${frame.line + 1}` : ""})` : ""}
             </button>
@@ -705,12 +802,19 @@ function ResultsPanel() {
           ))}
         </select>
         {!run.ended ? (
-          <button type="button" className="icon-btn" title="Cancel Test Run" aria-label="Cancel Test Run" onClick={() => featureApi?.sendToHost({ kind: "cancel" })}>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Cancel Test Run"
+            aria-label="Cancel Test Run"
+            onClick={() => featureApi?.sendToHost({ kind: "cancel" })}
+          >
             <Square size={14} />
           </button>
         ) : null}
         <span className="tst-panel-counts">
-          <span className="tst-passed">{tally.passed} passed</span> <span className="tst-failed">{tally.failed + tally.errored} failed</span> <span className="tst-skipped">{tally.skipped} skipped</span>
+          <span className="tst-passed">{tally.passed} passed</span> <span className="tst-failed">{tally.failed + tally.errored} failed</span>{" "}
+          <span className="tst-skipped">{tally.skipped} skipped</span>
         </span>
       </div>
       {failures.length ? (
@@ -724,9 +828,18 @@ function ResultsPanel() {
                 onContextMenu={(event) => showContributedMenu(event, "testing/item/result", testLookup(leaf.id), testArgs(leaf.id))}
               >
                 <StateIcon state={result!.state} /> {leaf.label}
-                <MenuActions menuId="testing/item/result" lookup={testLookup(leaf.id)} args={testArgs(leaf.id)} inline={["inline"]} overflow={false} className="tst-result-actions" />
+                <MenuActions
+                  menuId="testing/item/result"
+                  lookup={testLookup(leaf.id)}
+                  args={testArgs(leaf.id)}
+                  inline={["inline"]}
+                  overflow={false}
+                  className="tst-result-actions"
+                />
               </div>
-              {result!.messages?.map((message, index) => <MessageView key={index} message={message} testId={leaf.id} runId={result!.runId} index={index} />)}
+              {result!.messages?.map((message, index) => (
+                <MessageView key={index} message={message} testId={leaf.id} runId={result!.runId} index={index} />
+              ))}
             </div>
           ))}
         </section>
@@ -802,7 +915,8 @@ class TestGutterMarker extends GutterMarker {
     const span = document.createElement("span");
     span.className = `tst-gutter-icon tst-gutter-${this.entry.state ?? "unset"}`;
     span.title = this.entry.state ? `${this.entry.item.label}: ${this.entry.state}. Click to run.` : `Run ${this.entry.item.label}`;
-    span.textContent = ({ passed: "✓", failed: "✕", errored: "!", skipped: "-", running: "↻", queued: "…" } as Record<string, string>)[this.entry.state ?? ""] ?? "▶";
+    span.textContent =
+      ({ passed: "✓", failed: "✕", errored: "!", skipped: "-", running: "↻", queued: "…" } as Record<string, string>)[this.entry.state ?? ""] ?? "▶";
     return span;
   }
 }
@@ -890,7 +1004,9 @@ function testEditorExtensions(path: string): Extension[] {
           const own: ContextMenuItem[] = [
             ...(has(KIND_RUN) ? [{ type: "item" as const, label: "Run Test", action: "run", run: () => void runTests(KIND_RUN, [id]) }] : []),
             ...(has(KIND_DEBUG) ? [{ type: "item" as const, label: "Debug Test", action: "debug", run: () => void runTests(KIND_DEBUG, [id]) }] : []),
-            ...(has(KIND_COVERAGE) ? [{ type: "item" as const, label: "Run Test with Coverage", action: "coverage", run: () => void runTests(KIND_COVERAGE, [id]) }] : []),
+            ...(has(KIND_COVERAGE)
+              ? [{ type: "item" as const, label: "Run Test with Coverage", action: "coverage", run: () => void runTests(KIND_COVERAGE, [id]) }]
+              : []),
             { type: "item", label: "Reveal in Test Explorer", action: "reveal", run: () => selectTest(entry.item) },
           ];
           return showContributedMenu(event as MouseEvent, "testing/item/gutter", testLookup(id), testArgs(id), own);
@@ -937,8 +1053,20 @@ export const testingView: ViewFeature = {
     { id: "workbench.action.testing.runAll", title: "Run All Tests", category: "Test", run: () => runTests(KIND_RUN) },
     { id: "workbench.action.testing.debugAll", title: "Debug All Tests", category: "Test", run: () => runTests(KIND_DEBUG) },
     { id: "workbench.action.testing.coverageAll", title: "Run All Tests with Coverage", category: "Test", run: () => runTests(KIND_COVERAGE) },
-    { id: "workbench.action.testing.reRunFailed", title: "Re-run Failed Tests", category: "Test", run: () => runTests(KIND_RUN, failedLeafIds()), enabled: () => failedLeafIds().length > 0 },
-    { id: "workbench.action.testing.cancelRun", title: "Cancel Test Run", category: "Test", run: (api) => api.sendToHost({ kind: "cancel" }), enabled: () => anyRunning(store.get()) },
+    {
+      id: "workbench.action.testing.reRunFailed",
+      title: "Re-run Failed Tests",
+      category: "Test",
+      run: () => runTests(KIND_RUN, failedLeafIds()),
+      enabled: () => failedLeafIds().length > 0,
+    },
+    {
+      id: "workbench.action.testing.cancelRun",
+      title: "Cancel Test Run",
+      category: "Test",
+      run: (api) => api.sendToHost({ kind: "cancel" }),
+      enabled: () => anyRunning(store.get()),
+    },
     {
       id: "workbench.action.testing.startContinuousRun",
       title: "Start Continuous Run",
@@ -961,7 +1089,12 @@ export const testingView: ViewFeature = {
         for (const controller of store.get().controllers) if (controller.canRefresh) api.sendToHost({ kind: "refresh", controllerId: controller.id });
       },
     },
-    { id: "workbench.action.testing.clearResults", title: "Clear All Results", category: "Test", run: () => store.set((state) => ({ ...state, results: {}, coverage: {} })) },
+    {
+      id: "workbench.action.testing.clearResults",
+      title: "Clear All Results",
+      category: "Test",
+      run: () => store.set((state) => ({ ...state, results: {}, coverage: {} })),
+    },
     { id: "workbench.action.testing.selectDefaultProfiles", title: "Select Default Profiles", category: "Test", run: (api) => selectDefaultProfiles(api) },
   ],
 

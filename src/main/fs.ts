@@ -1,13 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  statSync,
-  unlinkSync,
-  renameSync,
-  rmSync,
-  readFileSync,
-} from "fs";
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, renameSync, rmSync, readFileSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join, basename, dirname, extname, relative } from "path";
 import type { FileEntry, SearchOptions } from "../shared/types.ts";
@@ -32,13 +23,54 @@ const IGNORE = new Set([
 ]);
 
 const TEXT_EXTS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
-  ".json", ".jsonc", ".html", ".htm", ".css", ".scss", ".less",
-  ".md", ".mdx", ".txt", ".log", ".py", ".rs", ".go", ".toml",
-  ".yaml", ".yml", ".xml", ".svg", ".sh", ".bash", ".zsh", ".ps1",
-  ".sql", ".graphql", ".gql", ".vue", ".svelte", ".env",
-  ".gitignore", ".editorconfig", ".prettierrc", ".eslintrc",
-  ".lock", ".csv", ".tsv", ".ini", ".cfg", ".conf", ".dockerfile",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".mts",
+  ".cts",
+  ".json",
+  ".jsonc",
+  ".html",
+  ".htm",
+  ".css",
+  ".scss",
+  ".less",
+  ".md",
+  ".mdx",
+  ".txt",
+  ".log",
+  ".py",
+  ".rs",
+  ".go",
+  ".toml",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".svg",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".ps1",
+  ".sql",
+  ".graphql",
+  ".gql",
+  ".vue",
+  ".svelte",
+  ".env",
+  ".gitignore",
+  ".editorconfig",
+  ".prettierrc",
+  ".eslintrc",
+  ".lock",
+  ".csv",
+  ".tsv",
+  ".ini",
+  ".cfg",
+  ".conf",
+  ".dockerfile",
 ]);
 
 export function isProbablyText(filePath: string): boolean {
@@ -133,10 +165,7 @@ export async function writeTextFile(filePath: string, content: string): Promise<
   }
 }
 
-export async function createFile(
-  filePath: string,
-  content = "",
-): Promise<{ success: boolean; error?: string }> {
+export async function createFile(filePath: string, content = ""): Promise<{ success: boolean; error?: string }> {
   try {
     if (existsSync(filePath)) return { success: false, error: "Path already exists" };
     const parent = filePath.replace(/[\\/][^\\/]+$/, "");
@@ -309,11 +338,7 @@ function buildMatcher(query: string, options: SearchOptions): RegExp {
 }
 
 /** Walk the text files of a workspace, honouring the ignore list and include/exclude globs. */
-function walkTextFiles(
-  root: string,
-  options: SearchOptions & { maxFileBytes?: number },
-  visit: (full: string, relativePath: string) => boolean | void,
-): void {
+function walkTextFiles(root: string, options: SearchOptions & { maxFileBytes?: number }, visit: (full: string, relativePath: string) => boolean | void): void {
   const include = globList(options.include);
   const exclude = globList(options.exclude);
   const maxFileBytes = options.maxFileBytes ?? 512 * 1024;

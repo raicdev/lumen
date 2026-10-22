@@ -161,7 +161,9 @@ function httpTransport(spec: Extract<McpServerSpec, { type: "http" }>): Transpor
       const id = nextId++;
       const response = await post({ jsonrpc: "2.0", id, method, params });
       const text = await response.text();
-      const message = (response.headers.get("content-type") ?? "").includes("text/event-stream") ? messageFromSse(text, id) : (JSON.parse(text) as JsonRpcMessage);
+      const message = (response.headers.get("content-type") ?? "").includes("text/event-stream")
+        ? messageFromSse(text, id)
+        : (JSON.parse(text) as JsonRpcMessage);
       if (!message) throw new Error(`no response to ${method}`);
       if (message.error) throw new Error(message.error.message);
       return message.result;

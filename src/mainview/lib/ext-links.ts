@@ -289,12 +289,5 @@ function linkEvents(source: DocumentLinkSource, onOpen: (target: DocumentLinkTar
 }
 
 export function documentLinksExtension(source: DocumentLinkSource, onOpen: (target: DocumentLinkTarget) => void): Extension {
-  return [
-    linksField,
-    ctrlField,
-    pointerField,
-    linkDecorations,
-    linkEvents(source, onOpen),
-    ViewPlugin.define((view) => new DocumentLinkPlugin(view, source)),
-  ];
+  return [linksField, ctrlField, pointerField, linkDecorations, linkEvents(source, onOpen), ViewPlugin.define((view) => new DocumentLinkPlugin(view, source))];
 }

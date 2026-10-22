@@ -194,7 +194,10 @@ export function contributedIcons(extensions: readonly { id: string; location: st
  * Follow a contributed icon's aliases to a font glyph, or to the id of an icon that is
  * not contributed (a built-in codicon). `undefined` when `id` is not contributed.
  */
-export function resolveContributedIcon(id: string, icons: Map<string, ContributedIcon>): { extensionId: string; fontPath: string; fontCharacter: string } | { codicon: string } | undefined {
+export function resolveContributedIcon(
+  id: string,
+  icons: Map<string, ContributedIcon>,
+): { extensionId: string; fontPath: string; fontCharacter: string } | { codicon: string } | undefined {
   let current = id;
   for (let depth = 0; depth < 10; depth++) {
     const icon = icons.get(current);
@@ -239,7 +242,10 @@ function lookup(associations: IconAssociations | undefined, target: IconTarget):
 function defaultIcon(associations: IconAssociations | undefined, target: IconTarget): string | undefined {
   if (!associations) return undefined;
   if (target.kind === "file") return associations.file;
-  if (target.root) return (target.expanded ? associations.rootFolderExpanded : associations.rootFolder) ?? (target.expanded ? associations.folderExpanded : associations.folder);
+  if (target.root)
+    return (
+      (target.expanded ? associations.rootFolderExpanded : associations.rootFolder) ?? (target.expanded ? associations.folderExpanded : associations.folder)
+    );
   return target.expanded ? associations.folderExpanded : associations.folder;
 }
 

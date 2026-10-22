@@ -47,4 +47,3 @@ export const languagesExtraView: ViewFeature = {
 
   editorExtensions: (path, languageId, feature) => languagesExtraEditorExtensions(path, languageId, feature),
 };
-

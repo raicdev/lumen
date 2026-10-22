@@ -38,11 +38,11 @@ git tag -l v<version>                         # must print nothing
 
 ## 2. Bump the version (four places)
 
-| File | What |
-| --- | --- |
-| `package.json` | `"version"` |
-| `lumen.config.ts` | `app.version`: names the setup and its version info |
-| `src/main/main.ts` | `const APP_VERSION`: what the updater compares against |
+| File                   | What                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `package.json`         | `"version"`                                                                  |
+| `lumen.config.ts`      | `app.version`: names the setup and its version info                          |
+| `src/main/main.ts`     | `const APP_VERSION`: what the updater compares against                       |
 | `src/mainview/App.tsx` | the About dialog's fallback `version:` in `workbench.action.showAboutDialog` |
 
 Afterwards, grep for the old version to make sure nothing was missed. The
@@ -116,6 +116,7 @@ rather than developers. Match the earlier releases (`gh release view v0.2.0 -R r
 Both need the WebView2 runtime (preinstalled on Windows 10/11). The executables are not code-signed, so SmartScreen may warn on first launch.
 
 SHA-256:
+
 - `Lumen-<version>-win32-x64-setup.exe`: `<HASH>`
 - `Lumen-v<version>-win32-x64.zip`: `<HASH>`
 ```

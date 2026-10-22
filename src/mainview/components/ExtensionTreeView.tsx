@@ -85,7 +85,11 @@ export function TreeIcon({ icon }: { icon?: HostTreeIcon }) {
 
 /** A command's icon, or its title when it has none. */
 export function ActionButton({ action, onRun }: { action: ViewAction; onRun: () => void }) {
-  const icon = action.icon?.startsWith("$(") ? <WithCodicons text={action.icon} size={14} /> : action.icon ? <img src={action.icon} alt="" className="view-action-image" /> : null;
+  const icon = action.icon?.startsWith("$(") ? (
+    <WithCodicons text={action.icon} size={14} />
+  ) : action.icon ? (
+    <img src={action.icon} alt="" className="view-action-image" />
+  ) : null;
   return (
     <button
       type="button"
@@ -108,7 +112,11 @@ function showActionMenu(x: number, y: number, actions: ViewAction[], run: (actio
     const items: ContextMenuItem[] = [];
     list.forEach((action, index) => {
       if (index && list[index - 1]!.group !== action.group) items.push({ type: "separator" });
-      items.push(action.submenu ? { type: "submenu", label: action.title, items: toItems(action.submenu) } : { type: "item", label: action.title, action: action.command, run: () => run(action) });
+      items.push(
+        action.submenu
+          ? { type: "submenu", label: action.title, items: toItems(action.submenu) }
+          : { type: "item", label: action.title, action: action.command, run: () => run(action) },
+      );
     });
     return items;
   };
@@ -185,7 +193,10 @@ function runLink(target: string) {
 
 /** contributes.viewsWelcome: paragraphs with links; a line that is only a link is a button. */
 function Welcome({ contents }: { contents: string[] }) {
-  const lines = contents.flatMap((content) => content.split(/\r?\n/)).map((line) => line.trim()).filter(Boolean);
+  const lines = contents
+    .flatMap((content) => content.split(/\r?\n/))
+    .map((line) => line.trim())
+    .filter(Boolean);
   return (
     <div className="ext-tree-welcome">
       {lines.map((line, index) => {
@@ -232,7 +243,9 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
   const anchor = useRef<string | null>(null);
   const rows = useMemo(() => rowsOf(state), [state, state.version]);
   const itemMenu = (item: HostTreeItem) =>
-    treeService.menu("view/item/context", (key) => (key === "view" ? viewId : key === "viewItem" ? (item.contextValue ?? "") : key === "listMultiSelection" ? state.selection.length > 1 : undefined));
+    treeService.menu("view/item/context", (key) =>
+      key === "view" ? viewId : key === "viewItem" ? (item.contextValue ?? "") : key === "listMultiSelection" ? state.selection.length > 1 : undefined,
+    );
 
   // Shown while the element has a size: a hidden side bar or collapsed section does not count.
   useEffect(() => {
@@ -268,7 +281,11 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
       const to = rows.findIndex((row) => row.item.handle === handle);
       if (from >= 0 && to >= 0) {
         const [start, end] = from < to ? [from, to] : [to, from];
-        treeService.select(viewId, rows.slice(start, end + 1).map((row) => row.item.handle), handle);
+        treeService.select(
+          viewId,
+          rows.slice(start, end + 1).map((row) => row.item.handle),
+          handle,
+        );
         return;
       }
     }
@@ -528,7 +545,11 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
         );
       })}
       {tooltip && (
-        <div className="lumen-tooltip lumen-tooltip-markdown visible ext-tree-tooltip markdown-body" style={{ left: tooltip.x, top: tooltip.y }} dangerouslySetInnerHTML={{ __html: tooltip.html }} />
+        <div
+          className="lumen-tooltip lumen-tooltip-markdown visible ext-tree-tooltip markdown-body"
+          style={{ left: tooltip.x, top: tooltip.y }}
+          dangerouslySetInnerHTML={{ __html: tooltip.html }}
+        />
       )}
     </div>
   );

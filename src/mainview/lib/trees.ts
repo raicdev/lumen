@@ -1,5 +1,13 @@
 import { useSyncExternalStore } from "react";
-import type { ExtensionManifest, HostToView, HostTreeItem, HostTreeTooltip, HostTreeView, MenuContribution, ViewWelcomeContribution } from "../../shared/extensions";
+import type {
+  ExtensionManifest,
+  HostToView,
+  HostTreeItem,
+  HostTreeTooltip,
+  HostTreeView,
+  MenuContribution,
+  ViewWelcomeContribution,
+} from "../../shared/extensions";
 import { extensionService } from "./extensions";
 import { resolveContributedMenu } from "../features/menus-walkthroughs/menus";
 import type { ResolvedMenuItem } from "../../shared/menus-walkthroughs";
@@ -220,7 +228,10 @@ ${handle ?? ROOT}`);
       }
       if (item.collapsible === "none") state.expanded.delete(item.handle);
     }
-    state.children.set(key, items.map((item) => item.handle));
+    state.children.set(
+      key,
+      items.map((item) => item.handle),
+    );
     // The host forgot what was below these items: collapsed ones load again when expanded.
     for (const item of items) {
       if (state.expanded.has(item.handle)) continue;

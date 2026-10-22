@@ -27,17 +27,13 @@ export const rpc = defineViewRPC<LumenRPC>({
         window.dispatchEvent(new CustomEvent("lumen:menu", { detail: { action } }));
       },
       diagnostics: ({ diagnostics }) => {
-        window.dispatchEvent(
-          new CustomEvent("lumen:diagnostics", { detail: { diagnostics } }),
-        );
+        window.dispatchEvent(new CustomEvent("lumen:diagnostics", { detail: { diagnostics } }));
       },
       forceQuit: () => {
         window.dispatchEvent(new CustomEvent("lumen:force-quit"));
       },
       terminalData: ({ id, data }) => {
-        window.dispatchEvent(
-          new CustomEvent("lumen:terminal-data", { detail: { id, data } }),
-        );
+        window.dispatchEvent(new CustomEvent("lumen:terminal-data", { detail: { id, data } }));
       },
       workspaceChanged: ({ paths, git }) => {
         window.dispatchEvent(new CustomEvent("lumen:workspace-changed", { detail: { paths, git } }));
@@ -49,9 +45,7 @@ export const rpc = defineViewRPC<LumenRPC>({
         window.dispatchEvent(new CustomEvent("lumen:update-state", { detail: state }));
       },
       terminalExit: ({ id, code }) => {
-        window.dispatchEvent(
-          new CustomEvent("lumen:terminal-exit", { detail: { id, code } }),
-        );
+        window.dispatchEvent(new CustomEvent("lumen:terminal-exit", { detail: { id, code } }));
       },
     },
   },

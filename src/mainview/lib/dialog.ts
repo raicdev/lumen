@@ -24,8 +24,7 @@ export type DialogOptions = {
 const ICONS: Record<DialogKind | "edit" | "close", string> = {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   question: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
-  warning:
-    '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
   error: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
   danger:
     '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2z"/>',
@@ -136,13 +135,7 @@ export function showDialog(options: DialogOptions): Promise<string | null> {
     const destructive = options.buttons.some((b) => b.role === "danger");
     const kind =
       options.kind ??
-      (destructive
-        ? options.buttons.some((b) => b.role === "primary")
-          ? "warning"
-          : "danger"
-        : options.buttons.length === 1
-          ? "info"
-          : "question");
+      (destructive ? (options.buttons.some((b) => b.role === "primary") ? "warning" : "danger") : options.buttons.length === 1 ? "info" : "question");
     const body = `
       <p class="modal-message">${escapeHtml(options.message)}</p>
       ${options.detail ? `<p class="modal-detail">${escapeHtml(options.detail)}</p>` : ""}
@@ -186,12 +179,7 @@ export function showDialog(options: DialogOptions): Promise<string | null> {
   });
 }
 
-export function showPrompt(options: {
-  title: string;
-  message: string;
-  defaultValue?: string;
-  placeholder?: string;
-}): Promise<string | null> {
+export function showPrompt(options: { title: string; message: string; defaultValue?: string; placeholder?: string }): Promise<string | null> {
   return new Promise((resolve) => {
     const body = `
       <p class="modal-message">${escapeHtml(options.message)}</p>
@@ -251,12 +239,7 @@ export function showAbout(info: { name: string; version: string; platform: strin
 }
 
 function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/\n/g, "<br>");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\n/g, "<br>");
 }
 
 function escapeAttr(s: string) {

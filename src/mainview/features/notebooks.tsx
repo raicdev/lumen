@@ -60,12 +60,21 @@ function command(id: string, title: string, run: (api: ViewFeatureApi, path: str
       const doc = path ? docs.get()[path] : undefined;
       if (!path || !doc) return;
       const cell = selectedCell(path) ?? doc.cells[0]?.id ?? null;
-      return run(api, path, cell, Math.max(0, doc.cells.findIndex((candidate) => candidate.id === cell)));
+      return run(
+        api,
+        path,
+        cell,
+        Math.max(
+          0,
+          doc.cells.findIndex((candidate) => candidate.id === cell),
+        ),
+      );
     },
   };
 }
 
-const insert = (offset: 0 | 1, kind: 1 | 2) => (api: ViewFeatureApi, path: string, _cell: string | null, index: number) => call(api, path, "insert", index + offset, kind);
+const insert = (offset: 0 | 1, kind: 1 | 2) => (api: ViewFeatureApi, path: string, _cell: string | null, index: number) =>
+  call(api, path, "insert", index + offset, kind);
 
 /** "Open in Notebook Editor": Reopen With for notebook contributions, including `"priority": "option"` ones. */
 const openInNotebookEditor: FeatureCommand = {

@@ -1,6 +1,13 @@
 import { RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, GutterMarker, ViewPlugin, WidgetType, gutter, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import type { CommentActionRequest, CommentActionWire, CommentRangeWire, CommentThreadWire, CommentWire, CommentsHostMessage } from "../../shared/comments-wire";
+import type {
+  CommentActionRequest,
+  CommentActionWire,
+  CommentRangeWire,
+  CommentThreadWire,
+  CommentWire,
+  CommentsHostMessage,
+} from "../../shared/comments-wire";
 import { api as rpc } from "../lib/rpc";
 import type { ViewFeature, ViewFeatureApi } from "./types";
 import { createStore } from "./store";
@@ -154,13 +161,24 @@ function renderComment(thread: CommentThreadWire, comment: CommentWire, api: Vie
   if (comment.label) header.append(element("span", "cm-comment-chip", comment.label));
   if (comment.timestamp) header.append(element("span", "cm-comment-time", new Date(comment.timestamp).toLocaleString()));
   const actions = element("span", "cm-comment-actions");
-  for (const action of comment.actions) actions.append(button(action.title, "cm-comment-link-button", () => void runAction(api, { threadId: thread.id, kind: "comment", command: action.command, commentIndex: comment.index })));
+  for (const action of comment.actions)
+    actions.append(
+      button(
+        action.title,
+        "cm-comment-link-button",
+        () => void runAction(api, { threadId: thread.id, kind: "comment", command: action.command, commentIndex: comment.index }),
+      ),
+    );
   header.append(actions);
   root.append(header, renderMarkdown(comment.body));
   if (comment.reactions.length > 0) {
     const reactions = element("div", "cm-comment-reactions");
     comment.reactions.forEach((reaction, reactionIndex) => {
-      const chip = button("", `cm-comment-reaction${reaction.authorHasReacted ? " reacted" : ""}`, () => void runAction(api, { threadId: thread.id, kind: "reaction", commentIndex: comment.index, reactionIndex }));
+      const chip = button(
+        "",
+        `cm-comment-reaction${reaction.authorHasReacted ? " reacted" : ""}`,
+        () => void runAction(api, { threadId: thread.id, kind: "reaction", commentIndex: comment.index, reactionIndex }),
+      );
       if (reaction.icon) {
         const icon = element("img");
         icon.src = reaction.icon;
@@ -224,7 +242,8 @@ function renderReply(thread: CommentThreadWire, api: ViewFeatureApi, view: Edito
   });
   if (thread.draft) buttons.append(button("Cancel", "cm-comment-button", () => void api.requestHost("discard", [thread.id])));
   root.append(input, buttons);
-  if (thread.replyActions.length === 0) root.append(element("div", "cm-comment-hint", "This extension contributes no reply command (comments/commentThread/context)."));
+  if (thread.replyActions.length === 0)
+    root.append(element("div", "cm-comment-hint", "This extension contributes no reply command (comments/commentThread/context)."));
   queueMicrotask(() => {
     sync();
     grow();
@@ -257,12 +276,18 @@ class ThreadWidget extends WidgetType {
     const { thread, api } = this;
     const root = element("div", `cm-comment-thread${thread.state === 1 ? " resolved" : ""}`);
     const header = element("div", "cm-comment-thread-header");
-    header.append(button(thread.collapsed ? "▸" : "▾", "cm-comment-toggle", () => setCollapsed(api, thread, !thread.collapsed), thread.collapsed ? "Expand" : "Collapse"));
+    header.append(
+      button(thread.collapsed ? "▸" : "▾", "cm-comment-toggle", () => setCollapsed(api, thread, !thread.collapsed), thread.collapsed ? "Expand" : "Collapse"),
+    );
     header.append(element("span", "cm-comment-thread-title", thread.label ?? thread.controllerLabel));
-    if (thread.comments.length > 0) header.append(element("span", "cm-comment-count", `${thread.comments.length} comment${thread.comments.length === 1 ? "" : "s"}`));
+    if (thread.comments.length > 0)
+      header.append(element("span", "cm-comment-count", `${thread.comments.length} comment${thread.comments.length === 1 ? "" : "s"}`));
     if (thread.state === 1) header.append(element("span", "cm-comment-chip", "Resolved"));
     const titleActions = element("span", "cm-comment-actions");
-    for (const action of thread.titleActions) titleActions.append(button(action.title, "cm-comment-link-button", () => void runAction(api, { threadId: thread.id, kind: "thread", command: action.command })));
+    for (const action of thread.titleActions)
+      titleActions.append(
+        button(action.title, "cm-comment-link-button", () => void runAction(api, { threadId: thread.id, kind: "thread", command: action.command })),
+      );
     header.append(titleActions);
     if (thread.draft) header.append(button("×", "cm-comment-toggle", () => void api.requestHost("discard", [thread.id]), "Discard"));
     root.append(header);

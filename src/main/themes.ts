@@ -49,7 +49,12 @@ const TM_THEME_COLORS: Record<string, string> = {
   gutterForeground: "editorLineNumber.foreground",
 };
 
-type Loaded = { colors: Record<string, string>; tokenColors: TokenColorRule[]; semanticHighlighting?: boolean; semanticTokenColors: Record<string, SemanticTokenStyle> };
+type Loaded = {
+  colors: Record<string, string>;
+  tokenColors: TokenColorRule[];
+  semanticHighlighting?: boolean;
+  semanticTokenColors: Record<string, SemanticTokenStyle>;
+};
 
 async function readThemeFile(path: string, root: string): Promise<unknown> {
   if (!insideFolder(root, path)) throw new Error(`${path} is outside the extension`);
@@ -61,7 +66,10 @@ async function readThemeFile(path: string, root: string): Promise<unknown> {
 
 function tokenRules(value: unknown): TokenColorRule[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((rule): rule is TokenColorRule => !!rule && typeof rule === "object" && !!(rule as TokenColorRule).settings && typeof (rule as TokenColorRule).settings === "object");
+  return value.filter(
+    (rule): rule is TokenColorRule =>
+      !!rule && typeof rule === "object" && !!(rule as TokenColorRule).settings && typeof (rule as TokenColorRule).settings === "object",
+  );
 }
 
 async function loadInto(result: Loaded, path: string, root: string, seen: Set<string>): Promise<void> {

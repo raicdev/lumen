@@ -89,7 +89,12 @@ export function renderMarkdownUnsafe(source: string): string {
     }
     if (/^\s*\|/.test(line) && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lines[i + 1] ?? "")) {
       flush();
-      const cells = (row: string) => row.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+      const cells = (row: string) =>
+        row
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((cell) => cell.trim());
       const head = cells(line);
       i += 2;
       const rows: string[][] = [];
@@ -109,8 +114,45 @@ export function renderMarkdownUnsafe(source: string): string {
 }
 
 const ALLOWED_TAGS = new Set([
-  "a", "b", "blockquote", "br", "code", "del", "details", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "input",
-  "kbd", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub", "summary", "sup", "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
+  "a",
+  "b",
+  "blockquote",
+  "br",
+  "code",
+  "del",
+  "details",
+  "div",
+  "em",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "hr",
+  "i",
+  "img",
+  "input",
+  "kbd",
+  "li",
+  "ol",
+  "p",
+  "pre",
+  "s",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "summary",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "th",
+  "thead",
+  "tr",
+  "u",
+  "ul",
 ]);
 const ALLOWED_ATTRIBUTES = new Set(["alt", "title", "width", "height", "align", "colspan", "rowspan", "type", "checked", "disabled", "data-lang", "style"]);
 

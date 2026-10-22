@@ -105,12 +105,20 @@
   overflow: hidden;
 }
 
-.dialog-info { --dialog-tone: var(--info); }
+.dialog-info {
+  --dialog-tone: var(--info);
+}
 .dialog-question,
-.dialog-edit { --dialog-tone: var(--vscode-focusBorder); }
-.dialog-warning { --dialog-tone: var(--warning); }
+.dialog-edit {
+  --dialog-tone: var(--vscode-focusBorder);
+}
+.dialog-warning {
+  --dialog-tone: var(--warning);
+}
 .dialog-error,
-.dialog-danger { --dialog-tone: var(--danger); }
+.dialog-danger {
+  --dialog-tone: var(--danger);
+}
 
 .dialog-overlay.closing {
   pointer-events: none;

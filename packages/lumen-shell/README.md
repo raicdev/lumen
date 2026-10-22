@@ -19,23 +19,23 @@ without a giant framework.
 
 ## Design decisions
 
-| Concern | Decision |
-| --- | --- |
-| Window + webview | the small `webview` C library (prebuilt binaries vendored in `native/`), loaded through our own [koffi](https://koffi.dev) FFI bindings |
-| Event loop | **ours**: the Win32 message queue (CoreFoundation / GLib elsewhere) is pumped in an `await`able loop, so async handlers resolve while the window stays responsive. `webview_run()` is deliberately never called. |
-| IPC | JSON envelopes over a single native binding (`__lumen_invoke`) + `eval` for the other direction; requests, responses and messages share one protocol |
-| Assets | served from `127.0.0.1` by `node:http` (a real origin is required for bindings, `localStorage`, `fetch`) |
-| Native dialogs | WinForms via PowerShell (`FolderBrowserDialog`, `OpenFileDialog`, `MessageBox`) — no C# compilation needed |
-| Menus | real Win32 menu bar (FFI) on Windows, in-page menu bar elsewhere; items dispatch `menu-action` events |
-| Close guard | the window is subclassed so `WM_CLOSE` can be intercepted and an async guard (unsaved changes) runs first |
-| Frameless windows | `frame: false` drops only the caption in `WM_NCCALCSIZE` (side/bottom resize borders, shadow and snapping stay native); `[data-lumen-drag-region]` drags via `WM_NCLBUTTONDOWN`, the prelude adds the top resize edge |
-| Snap layouts | the page marks its maximize button with `data-lumen-maximize-button`; a transparent child window over it answers `WM_NCHITTEST` with `HTMAXBUTTON` (as Windows Terminal does), so Windows 11 shows the snap layouts flyout |
-| Stable origin | the asset server prefers a port derived from the app identifier, so `localStorage` survives restarts |
-| No startup flash | the window is DWM-cloaked until the page reports its first painted frame; `backgroundColor` also feeds WebView2's default background and the window class brush |
-| Bundling | esbuild for the view and the main process; in dev the main process runs from source (Node type stripping) |
-| Packaging | `lumen-shell package` bundles both sides, builds a Node [single executable](https://nodejs.org/api/single-executable-applications.html) launcher and copies the native libraries/addons next to it; on Windows the executable gets the `package.icon`, version info and the GUI subsystem (no console window) |
-| Installer | `lumen-shell installer` wraps the packaged app in a per-user NSIS setup (Start menu shortcut, uninstaller, installed apps entry); it waits for the running app to exit, and `/S /RELAUNCH` installs silently and starts the app again |
-| Updates | `autoUpdater` checks the latest GitHub release (tag `v<semver>`), downloads its `<App>-<version>-win32-<arch>-setup.exe`, verifies the SHA-256 digest GitHub publishes for the asset and runs it silently over the installation when the app exits |
+| Concern           | Decision                                                                                                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Window + webview  | the small `webview` C library (prebuilt binaries vendored in `native/`), loaded through our own [koffi](https://koffi.dev) FFI bindings                                                                                                                                                                       |
+| Event loop        | **ours**: the Win32 message queue (CoreFoundation / GLib elsewhere) is pumped in an `await`able loop, so async handlers resolve while the window stays responsive. `webview_run()` is deliberately never called.                                                                                              |
+| IPC               | JSON envelopes over a single native binding (`__lumen_invoke`) + `eval` for the other direction; requests, responses and messages share one protocol                                                                                                                                                          |
+| Assets            | served from `127.0.0.1` by `node:http` (a real origin is required for bindings, `localStorage`, `fetch`)                                                                                                                                                                                                      |
+| Native dialogs    | WinForms via PowerShell (`FolderBrowserDialog`, `OpenFileDialog`, `MessageBox`) — no C# compilation needed                                                                                                                                                                                                    |
+| Menus             | real Win32 menu bar (FFI) on Windows, in-page menu bar elsewhere; items dispatch `menu-action` events                                                                                                                                                                                                         |
+| Close guard       | the window is subclassed so `WM_CLOSE` can be intercepted and an async guard (unsaved changes) runs first                                                                                                                                                                                                     |
+| Frameless windows | `frame: false` drops only the caption in `WM_NCCALCSIZE` (side/bottom resize borders, shadow and snapping stay native); `[data-lumen-drag-region]` drags via `WM_NCLBUTTONDOWN`, the prelude adds the top resize edge                                                                                         |
+| Snap layouts      | the page marks its maximize button with `data-lumen-maximize-button`; a transparent child window over it answers `WM_NCHITTEST` with `HTMAXBUTTON` (as Windows Terminal does), so Windows 11 shows the snap layouts flyout                                                                                    |
+| Stable origin     | the asset server prefers a port derived from the app identifier, so `localStorage` survives restarts                                                                                                                                                                                                          |
+| No startup flash  | the window is DWM-cloaked until the page reports its first painted frame; `backgroundColor` also feeds WebView2's default background and the window class brush                                                                                                                                               |
+| Bundling          | esbuild for the view and the main process; in dev the main process runs from source (Node type stripping)                                                                                                                                                                                                     |
+| Packaging         | `lumen-shell package` bundles both sides, builds a Node [single executable](https://nodejs.org/api/single-executable-applications.html) launcher and copies the native libraries/addons next to it; on Windows the executable gets the `package.icon`, version info and the GUI subsystem (no console window) |
+| Installer         | `lumen-shell installer` wraps the packaged app in a per-user NSIS setup (Start menu shortcut, uninstaller, installed apps entry); it waits for the running app to exit, and `/S /RELAUNCH` installs silently and starts the app again                                                                         |
+| Updates           | `autoUpdater` checks the latest GitHub release (tag `v<semver>`), downloads its `<App>-<version>-win32-<arch>-setup.exe`, verifies the SHA-256 digest GitHub publishes for the asset and runs it silently over the installation when the app exits                                                            |
 
 ## API
 
@@ -113,15 +113,15 @@ Configured by `lumen.config.ts` in the project root (`app`, `main`, `view`).
 
 ## Platform notes
 
-| | Windows | macOS | Linux |
-| --- | --- | --- | --- |
-| Window, event loop, assets, IPC, dialogs | ✅ | ✅ | ✅ |
-| Custom window chrome (min / max / …) | ✅ | in-app | in-app |
-| Frameless window (`frame: false`) | ✅ | – | – |
-| Snap layouts flyout | ✅ (Windows 11) | – | – |
-| Hidden until first paint | ✅ | – | – |
-| Native menu bar | ✅ | in-page (prelude) | in-page (prelude) |
-| Close guard (`WM_CLOSE` interception) | ✅ | – | – |
+|                                          | Windows         | macOS             | Linux             |
+| ---------------------------------------- | --------------- | ----------------- | ----------------- |
+| Window, event loop, assets, IPC, dialogs | ✅              | ✅                | ✅                |
+| Custom window chrome (min / max / …)     | ✅              | in-app            | in-app            |
+| Frameless window (`frame: false`)        | ✅              | –                 | –                 |
+| Snap layouts flyout                      | ✅ (Windows 11) | –                 | –                 |
+| Hidden until first paint                 | ✅              | –                 | –                 |
+| Native menu bar                          | ✅              | in-page (prelude) | in-page (prelude) |
+| Close guard (`WM_CLOSE` interception)    | ✅              | –                 | –                 |
 
 Native dialogs on Windows need `powershell.exe` + WinForms (present on every
 Windows install); macOS/Linux use `osascript` / `zenity`.

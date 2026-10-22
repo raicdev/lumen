@@ -1,4 +1,26 @@
-import { Blocks, Bug, Ellipsis, LayoutPanelLeft, Maximize2, Minimize2, X, ChevronDown, ListCollapse, Eraser, FilePlus, Files, FolderPlus, GitBranch, ListTree, Plus, RefreshCw, Search, Settings, SquareSplitHorizontal, Trash2 } from "lucide-react";
+import {
+  Blocks,
+  Bug,
+  Ellipsis,
+  LayoutPanelLeft,
+  Maximize2,
+  Minimize2,
+  X,
+  ChevronDown,
+  ListCollapse,
+  Eraser,
+  FilePlus,
+  Files,
+  FolderPlus,
+  GitBranch,
+  ListTree,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  SquareSplitHorizontal,
+  Trash2,
+} from "lucide-react";
 import { commandExecuted, evaluateCompletion, refreshContext, setContextLookup, setVisibleViews } from "./features/menus-walkthroughs/state";
 import { ModalEditorTitleActions } from "./features/menus-walkthroughs/MenuActions";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -86,7 +108,18 @@ import { DebugView } from "./components/DebugView";
 import { DebugToolbar } from "./components/DebugToolbar";
 import { DebugConsole } from "./components/DebugConsole";
 import { debugService } from "./lib/debug";
-import { debugStep, debugUi, editBreakpoint, isDebugging, isStopped, restartDebugging, samePath, startDebugging, stopDebugging, toggleBreakpoint } from "./lib/debug-ui";
+import {
+  debugStep,
+  debugUi,
+  editBreakpoint,
+  isDebugging,
+  isStopped,
+  restartDebugging,
+  samePath,
+  startDebugging,
+  stopDebugging,
+  toggleBreakpoint,
+} from "./lib/debug-ui";
 import { OutlineView } from "./components/OutlineView";
 import { ScmView, gitDecoration } from "./components/ScmView";
 import { SettingsEditor } from "./components/SettingsEditor";
@@ -97,7 +130,17 @@ import { Welcome } from "./components/Welcome";
 import { ExtensionsView, type ExtensionAction, type ExtensionTarget } from "./components/ExtensionsView";
 import { ExtensionDetails } from "./components/ExtensionDetails";
 import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus, TextRange } from "../shared/types";
-import type { ExtensionDescription, HostDebugConfiguration, HostFileOperation, HostInputBox, HostQuickPick, HostStatusBarItem, HostTabGroup, HostWorkspaceSymbol, MarketplaceExtension } from "../shared/extensions";
+import type {
+  ExtensionDescription,
+  HostDebugConfiguration,
+  HostFileOperation,
+  HostInputBox,
+  HostQuickPick,
+  HostStatusBarItem,
+  HostTabGroup,
+  HostWorkspaceSymbol,
+  MarketplaceExtension,
+} from "../shared/extensions";
 import { normalizeFileSystemKey, sameDocumentKey } from "../shared/file-systems";
 
 /** What the app knows about an open document besides the editor state. */
@@ -153,7 +196,8 @@ async function writeDocument(path: string, content: string): Promise<{ success: 
 }
 
 /** Tabs that are not text documents. */
-const isSpecialTab = (path: string | null | undefined): path is string => isTerminalTab(path) || isWebviewTab(path) || isFeatureEditorTab(path) || isDiffTab(path);
+const isSpecialTab = (path: string | null | undefined): path is string =>
+  isTerminalTab(path) || isWebviewTab(path) || isFeatureEditorTab(path) || isDiffTab(path);
 
 /** A custom editor tab (`webview:<id>` bound to a file): its file, provider kind and dirty state. */
 type CustomEditorTabInfo = { id: string; uri: string; viewType: string; kind: "text" | "readonly" | "editable"; dirty: boolean };
@@ -280,7 +324,8 @@ export function App() {
     return merged;
   }, [diagnostics, ext.diagnostics]);
   const extensionKeybindings = useMemo(
-    () => extensionService.contributedKeybindings().map((binding) => ({ key: binding.key, command: binding.command, whenExpr: binding.when, args: binding.args })),
+    () =>
+      extensionService.contributedKeybindings().map((binding) => ({ key: binding.key, command: binding.command, whenExpr: binding.when, args: binding.args })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ext.extensions],
   );
@@ -289,7 +334,9 @@ export function App() {
     void reloadConfiguredColorTheme(true);
   }, [ext.extensions]);
   useEffect(() => {
-    setContributedLanguageLabels(Object.fromEntries(extensionService.contributedLanguages().map((language) => [language.id, language.aliases?.[0] ?? language.id])));
+    setContributedLanguageLabels(
+      Object.fromEntries(extensionService.contributedLanguages().map((language) => [language.id, language.aliases?.[0] ?? language.id])),
+    );
   }, [ext.extensions]);
 
   workspaceRootRef.current = workspaceRoot;
@@ -507,7 +554,9 @@ export function App() {
 
   const syncDirtyState = useCallback(() => {
     const dirty = [...docs.current.keys()].some((path) => isDocDirty(path)) || webviewService.dirtyCustomEditors().length > 0;
-    void api().request.setDirtyState({ dirty }).catch(() => {});
+    void api()
+      .request.setDirtyState({ dirty })
+      .catch(() => {});
   }, [isDocDirty]);
 
   const touchMru = (path: string) => {
@@ -564,7 +613,8 @@ export function App() {
       // The same provider resource with another path case is the open document's tab.
       path = openDocumentKey(docs.current, path);
       // workbench.editor.useModal "all": files open in the modal editor part.
-      const toModal = !options.groupId && getSettings()["workbench.editor.useModal"] === "all" && !isTerminalTab(path) && !isWebviewTab(path) && !isDiffTab(path);
+      const toModal =
+        !options.groupId && getSettings()["workbench.editor.useModal"] === "all" && !isTerminalTab(path) && !isWebviewTab(path) && !isDiffTab(path);
       if (toModal) ensureModalGroup();
       const groupId = toModal ? MODAL_GROUP : options.groupId && groupsRef.current[options.groupId] ? options.groupId : activeGroupIdRef.current;
       focusGroup(groupId);
@@ -593,14 +643,23 @@ export function App() {
 
       // A feature's editor (notebooks) renders the whole file: its own tab, taking the place of a plain tab of the file.
       const featureTab = parseFeatureEditorTab(path);
-      const featureOpener = featureTab ? editorOpenerById(featureTab.openerId) : options.viewType === "default" || isUntitled(path) ? null : findEditorOpener(path);
+      const featureOpener = featureTab
+        ? editorOpenerById(featureTab.openerId)
+        : options.viewType === "default" || isUntitled(path)
+          ? null
+          : findEditorOpener(path);
       if (isFeatureEditorTab(path) && !featureOpener) return false;
       if (featureOpener) {
         const filePath = featureTab?.path ?? path;
         const tabPath = featureEditorTabPath(featureOpener.id, filePath);
         setTabs((prev) => {
           if (prev.some((tab) => tab.path === tabPath)) return prev;
-          const tab: TabInfo = { path: tabPath, name: featureOpener.title?.(filePath) ?? basename(filePath), dirty: isFeatureEditorDirty(tabPath), preview: false };
+          const tab: TabInfo = {
+            path: tabPath,
+            name: featureOpener.title?.(filePath) ?? basename(filePath),
+            dirty: isFeatureEditorDirty(tabPath),
+            preview: false,
+          };
           const plain = prev.findIndex((t) => t.path === filePath);
           if (plain >= 0) return prev.map((t, index) => (index === plain ? tab : t));
           const activeIndex = prev.findIndex((t) => t.path === editor.getCurrent()?.path);
@@ -633,7 +692,9 @@ export function App() {
           ? { viewType: forcedViewType, displayName: forcedViewType, priority: "option" as const, extensionId: "", selector: [] }
           : extensionService.defaultCustomEditorFor(path, docs.current.get(path)?.language);
         if (contribution && !alreadyTextTab) {
-          const opened = await extensionService.call("openCustomEditor", path, contribution.viewType, { preview: !!options.preview, beside: false }).catch(() => null);
+          const opened = await extensionService
+            .call("openCustomEditor", path, contribution.viewType, { preview: !!options.preview, beside: false })
+            .catch(() => null);
           if (opened) {
             if (opened.kind === "text") {
               // The extension edits the file's text document: keep the view's copy in sync.
@@ -642,7 +703,15 @@ export function App() {
                 if (!("error" in result)) {
                   const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
                   const content = result.content.replace(/\r\n/g, "\n");
-                  docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly, readOnlyMessage: result.readOnlyMessage });
+                  docs.current.set(path, {
+                    content,
+                    savedContent: content,
+                    language: result.language,
+                    eol,
+                    savedEol: eol,
+                    readOnly: !!result.readOnly,
+                    readOnlyMessage: result.readOnlyMessage,
+                  });
                 }
               }
               extensionService.documentOpened(path);
@@ -662,7 +731,15 @@ export function App() {
         }
         const eol = result.content.includes("\r\n") ? "CRLF" : "LF";
         const content = result.content.replace(/\r\n/g, "\n");
-        docs.current.set(path, { content, savedContent: content, language: result.language, eol, savedEol: eol, readOnly: !!result.readOnly, readOnlyMessage: result.readOnlyMessage });
+        docs.current.set(path, {
+          content,
+          savedContent: content,
+          language: result.language,
+          eol,
+          savedEol: eol,
+          readOnly: !!result.readOnly,
+          readOnlyMessage: result.readOnlyMessage,
+        });
       }
       const doc = docs.current.get(path)!;
       const preview = !!options.preview && getSettings()["workbench.editor.enablePreview"];
@@ -682,7 +759,10 @@ export function App() {
             docs.current.delete(replaced);
             editorDirty.current.delete(replaced);
             mru.current = mru.current.filter((p) => p !== replaced);
-            if (!isUntitled(replaced)) void api().request.lspClose({ path: replaced }).catch(() => {});
+            if (!isUntitled(replaced))
+              void api()
+                .request.lspClose({ path: replaced })
+                .catch(() => {});
           });
           const next = [...prev];
           next[previewIndex] = tab;
@@ -926,7 +1006,8 @@ export function App() {
     }
     // Custom editor tabs are not in `docs` (an editable document is the extension's).
     for (const entry of webviewService.dirtyCustomEditors()) {
-      const ok = entry.kind === "text" ? await saveDoc(entry.uri) : !!(await extensionService.call("saveCustomEditor", entry.uri, entry.viewType).catch(() => false));
+      const ok =
+        entry.kind === "text" ? await saveDoc(entry.uri) : !!(await extensionService.call("saveCustomEditor", entry.uri, entry.viewType).catch(() => false));
       if (ok) saved++;
     }
     return saved;
@@ -1009,7 +1090,9 @@ export function App() {
           // A text custom editor keeps the file open in the window: close it with its last tab.
           if (custom) {
             const stillOpen = Object.values(groupsRef.current).some((group) =>
-              group.tabs.some((tab) => tab.path !== path && !closing.has(tab.path) && (tab.path === custom.uri || customEditorTabInfo(tab.path)?.uri === custom.uri)),
+              group.tabs.some(
+                (tab) => tab.path !== path && !closing.has(tab.path) && (tab.path === custom.uri || customEditorTabInfo(tab.path)?.uri === custom.uri),
+              ),
             );
             if (!stillOpen) {
               docs.current.delete(custom.uri);
@@ -1021,7 +1104,9 @@ export function App() {
         }
         if (!isUntitled(path) && !isVirtualDocument(path)) {
           closedStack.current.push(path);
-          void api().request.lspClose({ path }).catch(() => {});
+          void api()
+            .request.lspClose({ path })
+            .catch(() => {});
         }
         docs.current.delete(path);
         editorDirty.current.delete(path);
@@ -1156,8 +1241,7 @@ export function App() {
       await api().request.setWorkspace({ path });
       terminalService.setDefaultCwd(path);
       if (projectState?.layout) applyLayout(projectState.layout);
-      const terminalIds =
-        projectState?.terminals && !terminalService.getSnapshot().instances.length ? restoreTerminals(projectState.terminals) : [];
+      const terminalIds = projectState?.terminals && !terminalService.getSnapshot().instances.length ? restoreTerminals(projectState.terminals) : [];
       /** Saved tab entry → current tab path (terminal placeholders → new terminal ids). */
       /** Saved webview panels → placeholder webviews (their extensions restore them once the host runs). */
       const webviewIds = new Map<number, string>();
@@ -1763,10 +1847,12 @@ export function App() {
         break;
       }
       case "rename":
-        void showPrompt({ title: "Rename Terminal", message: "Enter a name for the terminal", defaultValue: terminalService.info(id)?.title ?? "" }).then((name) => {
-          if (name) terminalService.rename(id, name);
-          terminalService.focus(id);
-        });
+        void showPrompt({ title: "Rename Terminal", message: "Enter a name for the terminal", defaultValue: terminalService.info(id)?.title ?? "" }).then(
+          (name) => {
+            if (name) terminalService.rename(id, name);
+            terminalService.focus(id);
+          },
+        );
         break;
     }
   }
@@ -1789,30 +1875,27 @@ export function App() {
   }, []);
 
   /** Tell the user how an install went (VS Code extensions: with their compatibility). */
-  const reportInstall = useCallback(
-    (result: { extension?: ExtensionDescription; cancelled?: boolean; error?: string }) => {
-      if (result.cancelled) return;
-      if (result.error || !result.extension) {
-        toast(`Installing the extension failed: ${result.error ?? "unknown error"}`, "error");
-        return;
-      }
-      const extension = result.extension;
-      const name = extension.manifest.displayName ?? extension.manifest.name;
-      const level = extension.compat?.level;
-      if (extension.kind === "vscode" && level && level !== "full") {
-        const grade = compatGrade(extension.compat);
-        void notify(
-          grade === "limited" || grade === "low" ? "warning" : "info",
-          `${name} was converted from a VS Code extension. Compatibility: ${COMPAT_GRADES[grade].label.toLowerCase()} — ${COMPAT_GRADES[grade].text}`,
-          ["Show Compatibility"],
-          "Extensions",
-        ).then((choice) => {
-          if (choice === 0) setExtensionTarget({ installed: extension });
-        });
-      } else toast(`Installed ${name} ${extension.manifest.version}${extension.kind === "vscode" ? " (converted from VS Code)" : ""}`, "success");
-    },
-    [],
-  );
+  const reportInstall = useCallback((result: { extension?: ExtensionDescription; cancelled?: boolean; error?: string }) => {
+    if (result.cancelled) return;
+    if (result.error || !result.extension) {
+      toast(`Installing the extension failed: ${result.error ?? "unknown error"}`, "error");
+      return;
+    }
+    const extension = result.extension;
+    const name = extension.manifest.displayName ?? extension.manifest.name;
+    const level = extension.compat?.level;
+    if (extension.kind === "vscode" && level && level !== "full") {
+      const grade = compatGrade(extension.compat);
+      void notify(
+        grade === "limited" || grade === "low" ? "warning" : "info",
+        `${name} was converted from a VS Code extension. Compatibility: ${COMPAT_GRADES[grade].label.toLowerCase()} — ${COMPAT_GRADES[grade].text}`,
+        ["Show Compatibility"],
+        "Extensions",
+      ).then((choice) => {
+        if (choice === 0) setExtensionTarget({ installed: extension });
+      });
+    } else toast(`Installed ${name} ${extension.manifest.version}${extension.kind === "vscode" ? " (converted from VS Code)" : ""}`, "success");
+  }, []);
 
   const installFromMarketplace = useCallback(
     async (entry: MarketplaceExtension) => {
@@ -1949,18 +2032,22 @@ export function App() {
       const uri = custom?.uri ?? path;
       if (isUntitled(uri)) return;
       const choices = extensionService.customEditorsFor(uri, docs.current.get(uri)?.language);
-      pick("Reopen Editor With…", [
-        { id: "default", label: "Text Editor" },
-        ...choices.map((choice) => ({ id: choice.viewType, label: choice.displayName, description: choice.priority === "option" ? "option" : undefined })),
-      ], (id) => {
-        void (async () => {
-          const group = groupId && groupsRef.current[groupId] ? groupId : activeGroupIdRef.current;
-          const holders = allTabPaths().filter((tab) => tab === uri || customEditorTabInfo(tab)?.uri === uri);
-          if (holders.length && !(await closeTabs(holders))) return;
-          const opened = await openFile(uri, { groupId: group, viewType: id });
-          if (!opened && id !== "default") toast(`No custom editor handles ${basename(uri)}`, "info");
-        })();
-      });
+      pick(
+        "Reopen Editor With…",
+        [
+          { id: "default", label: "Text Editor" },
+          ...choices.map((choice) => ({ id: choice.viewType, label: choice.displayName, description: choice.priority === "option" ? "option" : undefined })),
+        ],
+        (id) => {
+          void (async () => {
+            const group = groupId && groupsRef.current[groupId] ? groupId : activeGroupIdRef.current;
+            const holders = allTabPaths().filter((tab) => tab === uri || customEditorTabInfo(tab)?.uri === uri);
+            if (holders.length && !(await closeTabs(holders))) return;
+            const opened = await openFile(uri, { groupId: group, viewType: id });
+            if (!opened && id !== "default") toast(`No custom editor handles ${basename(uri)}`, "info");
+          })();
+        },
+      );
     },
     [pick, closeTabs, openFile],
   );
@@ -2015,25 +2102,30 @@ export function App() {
     openFile(debugPath(path), { line: line - 1, character: Math.max(0, (column ?? 1) - 1), preview, focus: !preview });
 
   /** Start debugging (F5): continue when paused, else launch the selected configuration. */
-  const startDebug = useCallback(async (options: { noDebug?: boolean; pick?: boolean; config?: HostDebugConfiguration | null } = {}) => {
-    if (!options.noDebug && isStopped()) return void debugStep("continue");
-    if (options.config) debugUi.selectConfig(options.config.name);
-    await startDebugging(workspaceRootRef.current, editorRef.current?.getCurrent()?.language ?? null, {
-      noDebug: options.noDebug,
-      // "Select and Start Debugging": ask, then start again with the choice.
-      pick: !options.pick ? undefined : async (configs) => {
-        pick(
-          "Select a launch configuration",
-          configs.map((c) => ({ id: c.name, label: c.name, description: c.type })),
-          (name) => {
-            debugUi.selectConfig(name);
-            void act.current.startDebug();
-          },
-        );
-        return null;
-      },
-    });
-  }, [pick]);
+  const startDebug = useCallback(
+    async (options: { noDebug?: boolean; pick?: boolean; config?: HostDebugConfiguration | null } = {}) => {
+      if (!options.noDebug && isStopped()) return void debugStep("continue");
+      if (options.config) debugUi.selectConfig(options.config.name);
+      await startDebugging(workspaceRootRef.current, editorRef.current?.getCurrent()?.language ?? null, {
+        noDebug: options.noDebug,
+        // "Select and Start Debugging": ask, then start again with the choice.
+        pick: !options.pick
+          ? undefined
+          : async (configs) => {
+              pick(
+                "Select a launch configuration",
+                configs.map((c) => ({ id: c.name, label: c.name, description: c.type })),
+                (name) => {
+                  debugUi.selectConfig(name);
+                  void act.current.startDebug();
+                },
+              );
+              return null;
+            },
+      });
+    },
+    [pick],
+  );
 
   /** Open .vscode/launch.json, creating it from the installed debuggers' initial configurations. */
   const openLaunchJson = useCallback(async () => {
@@ -2052,7 +2144,9 @@ export function App() {
       const debuggers = debugService.debuggers();
       const chosen = debuggers.find((d) => language && d.languages?.includes(language)) ?? debuggers[0];
       const configurations = chosen?.initialConfigurations ?? [];
-      await api().request.createDir({ path: dir }).catch(() => {});
+      await api()
+        .request.createDir({ path: dir })
+        .catch(() => {});
       await api().request.createFile({ path: file, content: `${JSON.stringify({ version: "0.2.0", configurations }, null, 2)}\n` });
     }
     await openFile(file);
@@ -2146,9 +2240,8 @@ export function App() {
       editor()?.run(command);
       if (command !== "find" && command !== "replace") editor()?.focus();
     };
-    const toggleSetting =
-      (key: "editor.minimap.enabled" | "breadcrumbs.enabled" | "workbench.statusBar.visible" | "workbench.activityBar.visible") => () =>
-        updateSetting(key, !getSettings()[key]);
+    const toggleSetting = (key: "editor.minimap.enabled" | "breadcrumbs.enabled" | "workbench.statusBar.visible" | "workbench.activityBar.visible") => () =>
+      updateSetting(key, !getSettings()[key]);
     const hasEditor = () => !!editor()?.getCurrent() || !!customEditorTabInfo(st().activePath);
     const activeTabs = () => st().tabs;
     const activeIndex = () => st().tabs.findIndex((t) => t.path === st().activePath);
@@ -2202,8 +2295,20 @@ export function App() {
       },
       { id: "workbench.action.files.openFolder", title: "Open Folder…", category: "File", run: () => a().pickFolder() },
       // Used by workspace.updateWorkspaceFolders: the window follows the extension's first folder.
-      { id: "lumen.workspace.openFolderPath", title: "Open Folder by Path", category: "File", enabled: () => false, run: (path?: unknown) => typeof path === "string" && path ? a().openWorkspace(path) : undefined },
-      { id: "workbench.action.closeFolder", title: "Close Folder", category: "Workspaces", enabled: () => !!workspaceRootRef.current, run: () => a().closeFolder() },
+      {
+        id: "lumen.workspace.openFolderPath",
+        title: "Open Folder by Path",
+        category: "File",
+        enabled: () => false,
+        run: (path?: unknown) => (typeof path === "string" && path ? a().openWorkspace(path) : undefined),
+      },
+      {
+        id: "workbench.action.closeFolder",
+        title: "Close Folder",
+        category: "Workspaces",
+        enabled: () => !!workspaceRootRef.current,
+        run: () => a().closeFolder(),
+      },
       { id: "workbench.action.files.save", title: "Save", category: "File", enabled: hasEditor, run: () => st().activePath && a().saveDoc(st().activePath!) },
       {
         id: "workbench.action.files.saveAs",
@@ -2285,7 +2390,11 @@ export function App() {
         id: "workbench.action.closeEditorsInGroup",
         title: "Close All Editors in Group",
         category: "View",
-        run: () => a().closeTabs(activeTabs().map((t) => t.path), activeGroupIdRef.current),
+        run: () =>
+          a().closeTabs(
+            activeTabs().map((t) => t.path),
+            activeGroupIdRef.current,
+          ),
       },
       { id: "workbench.action.splitEditor", title: "Split Editor Right", category: "View", run: () => a().splitEditor("right") },
       { id: "workbench.action.splitEditorDown", title: "Split Editor Down", category: "View", run: () => a().splitEditor("bottom") },
@@ -2295,7 +2404,13 @@ export function App() {
       { id: "workbench.action.moveEditorToPreviousGroup", title: "Move Editor into Previous Group", category: "View", run: () => a().moveEditorToGroup(-1) },
       { id: "workbench.action.joinAllGroups", title: "Join All Editor Groups", category: "View", run: () => a().joinAllGroups() },
       { id: "workbench.action.openEditorInModal", title: "Open Active Editor in Modal", category: "View", run: () => a().openActiveEditorInModal() },
-      { id: "workbench.action.closeModalEditor", title: "Close Modal Editor", category: "View", enabled: () => !!groupsRef.current[MODAL_GROUP], run: () => a().closeModalEditor() },
+      {
+        id: "workbench.action.closeModalEditor",
+        title: "Close Modal Editor",
+        category: "View",
+        enabled: () => !!groupsRef.current[MODAL_GROUP],
+        run: () => a().closeModalEditor(),
+      },
       {
         id: "workbench.action.toggleModalEditorMaximized",
         title: "Toggle Modal Editor Maximized",
@@ -2343,13 +2458,25 @@ export function App() {
         id: "workbench.action.closeOtherEditors",
         title: "Close Other Editors",
         category: "View",
-        run: () => a().closeTabs(activeTabs().filter((t) => t.path !== st().activePath).map((t) => t.path), activeGroupIdRef.current),
+        run: () =>
+          a().closeTabs(
+            activeTabs()
+              .filter((t) => t.path !== st().activePath)
+              .map((t) => t.path),
+            activeGroupIdRef.current,
+          ),
       },
       {
         id: "workbench.action.closeUnmodifiedEditors",
         title: "Close Saved Editors",
         category: "View",
-        run: () => a().closeTabs(activeTabs().filter((t) => !t.dirty).map((t) => t.path), activeGroupIdRef.current),
+        run: () =>
+          a().closeTabs(
+            activeTabs()
+              .filter((t) => !t.dirty)
+              .map((t) => t.path),
+            activeGroupIdRef.current,
+          ),
       },
       {
         id: "workbench.action.reopenClosedEditor",
@@ -2402,7 +2529,13 @@ export function App() {
       },
       { id: "workbench.action.debug.configure", title: "Open 'launch.json'", category: "Debug", run: () => void a().openLaunchJson() },
       { id: "workbench.action.debug.continue", title: "Continue", category: "Debug", enabled: isStopped, run: () => void debugStep("continue") },
-      { id: "workbench.action.debug.pause", title: "Pause", category: "Debug", enabled: () => isDebugging() && !isStopped(), run: () => void debugStep("pause") },
+      {
+        id: "workbench.action.debug.pause",
+        title: "Pause",
+        category: "Debug",
+        enabled: () => isDebugging() && !isStopped(),
+        run: () => void debugStep("pause"),
+      },
       { id: "workbench.action.debug.stepOver", title: "Step Over", category: "Debug", enabled: isStopped, run: () => void debugStep("next") },
       { id: "workbench.action.debug.stepInto", title: "Step Into", category: "Debug", enabled: isStopped, run: () => void debugStep("in") },
       { id: "workbench.action.debug.stepOut", title: "Step Out", category: "Debug", enabled: isStopped, run: () => void debugStep("out") },
@@ -2444,14 +2577,24 @@ export function App() {
       { id: "workbench.actions.view.problems", title: "Toggle Problems", category: "View", run: () => a().showPanel("problems", true) },
       { id: "workbench.action.terminal.toggleTerminal", title: "Toggle Terminal", category: "View", run: () => a().showPanel("terminal", true) },
       { id: "workbench.action.terminal.new", title: "Create New Terminal", category: "Terminal", run: () => a().newTerminal() },
-      { id: "workbench.action.terminal.newWithProfile", title: "Create New Terminal (With Profile)", category: "Terminal", run: () => a().pickProfile((profile) => a().newTerminal({ profileId: profile })) },
+      {
+        id: "workbench.action.terminal.newWithProfile",
+        title: "Create New Terminal (With Profile)",
+        category: "Terminal",
+        run: () => a().pickProfile((profile) => a().newTerminal({ profileId: profile })),
+      },
       {
         id: "workbench.action.terminal.split",
         title: "Split Terminal",
         category: "Terminal",
         run: () => a().newTerminal({ splitWith: activeTerminalId() ?? undefined }),
       },
-      { id: "workbench.action.createTerminalEditor", title: "Create New Terminal in Editor Area", category: "Terminal", run: () => a().newTerminal({ location: "editor" }) },
+      {
+        id: "workbench.action.createTerminalEditor",
+        title: "Create New Terminal in Editor Area",
+        category: "Terminal",
+        run: () => a().newTerminal({ location: "editor" }),
+      },
       {
         id: "workbench.action.terminal.moveToEditor",
         title: "Move Terminal into Editor Area",
@@ -2501,9 +2644,27 @@ export function App() {
         category: "Terminal",
         run: () => a().pickProfile((profile) => updateSetting("terminal.integrated.defaultProfile", profile)),
       },
-      { id: "workbench.action.positionPanelBottom", title: "Move Panel To Bottom", category: "View", checked: () => st().panelPosition === "bottom", run: () => a().movePanel("bottom") },
-      { id: "workbench.action.positionPanelLeft", title: "Move Panel Left", category: "View", checked: () => st().panelPosition === "left", run: () => a().movePanel("left") },
-      { id: "workbench.action.positionPanelRight", title: "Move Panel Right", category: "View", checked: () => st().panelPosition === "right", run: () => a().movePanel("right") },
+      {
+        id: "workbench.action.positionPanelBottom",
+        title: "Move Panel To Bottom",
+        category: "View",
+        checked: () => st().panelPosition === "bottom",
+        run: () => a().movePanel("bottom"),
+      },
+      {
+        id: "workbench.action.positionPanelLeft",
+        title: "Move Panel Left",
+        category: "View",
+        checked: () => st().panelPosition === "left",
+        run: () => a().movePanel("left"),
+      },
+      {
+        id: "workbench.action.positionPanelRight",
+        title: "Move Panel Right",
+        category: "View",
+        checked: () => st().panelPosition === "right",
+        run: () => a().movePanel("right"),
+      },
       {
         id: "workbench.action.toggleSidebarVisibility",
         title: "Toggle Primary Side Bar Visibility",
@@ -2537,7 +2698,13 @@ export function App() {
         },
       },
       { id: "workbench.action.toggleZenMode", title: "Toggle Zen Mode", category: "View", checked: () => st().zenMode, run: () => setZenMode((v) => !v) },
-      { id: "workbench.action.toggleFullScreen", title: "Toggle Full Screen", category: "View", checked: () => !!document.fullscreenElement, run: () => toggleFullScreen() },
+      {
+        id: "workbench.action.toggleFullScreen",
+        title: "Toggle Full Screen",
+        category: "View",
+        checked: () => !!document.fullscreenElement,
+        run: () => toggleFullScreen(),
+      },
       {
         id: "workbench.action.toggleActivityBarVisibility",
         title: "Toggle Activity Bar Visibility",
@@ -2816,7 +2983,9 @@ export function App() {
             category: contribution.category,
             run: () => extensionService.executeCommand(contribution.command),
             enabled: () =>
-              contribution.paletteWhen !== "false" && extensionService.when(contribution.paletteWhen, contextKey) && extensionService.when(contribution.enablement, contextKey),
+              contribution.paletteWhen !== "false" &&
+              extensionService.when(contribution.paletteWhen, contextKey) &&
+              extensionService.when(contribution.enablement, contextKey),
           },
         ]),
       ),
@@ -2843,7 +3012,12 @@ export function App() {
     for (const view of [...viewLayout.containers.flatMap((container) => container.views), ...viewLayout.explorerViews]) {
       list.push({ id: `${view.id}.focus`, title: `Focus on ${view.name} View`, category: "View", run: () => act.current.revealView(view.id) });
       if (view.type !== "webview") {
-        list.push({ id: `workbench.actions.treeView.${view.id}.collapseAll`, title: `Collapse All (${view.name})`, category: "View", run: () => treeService.collapseAll(view.id) });
+        list.push({
+          id: `workbench.actions.treeView.${view.id}.collapseAll`,
+          title: `Collapse All (${view.name})`,
+          category: "View",
+          run: () => treeService.collapseAll(view.id),
+        });
       }
     }
     // Commands of feature plug-ins (src/mainview/features).
@@ -2995,7 +3169,10 @@ export function App() {
         openDiff: (original, modified, options) => act.current.openDiff(resolveDoc(original), resolveDoc(modified), options),
         editorFor: async (path, open) => {
           const target = resolveDoc(path);
-          const holder = editorRef.current?.getCurrent()?.path === target ? editorRef.current : [...editors.current.values()].find((editor) => editor.getCurrent()?.path === target);
+          const holder =
+            editorRef.current?.getCurrent()?.path === target
+              ? editorRef.current
+              : [...editors.current.values()].find((editor) => editor.getCurrent()?.path === target);
           if (holder) return holder;
           if (!open || !(await act.current.openFile(target, {}))) return null;
           return editorRef.current;
@@ -3094,7 +3271,17 @@ export function App() {
       openFile: async (path, options) => await act.current.openFile(resolveDoc(path), options),
       showQuickPick: (pick: HostQuickPick) =>
         new Promise((resolve) => openHostQuick({ kind: "hostPick", pick, onAccept: (items) => resolve(items), onCancel: () => resolve(null) })),
-      showInputBox: (options: HostInputBox) => new Promise((resolve) => openHostQuick({ kind: "input", id: options.id ?? -Date.now(), options, validation: null, onAccept: (value) => resolve(value), onCancel: () => resolve(null) })),
+      showInputBox: (options: HostInputBox) =>
+        new Promise((resolve) =>
+          openHostQuick({
+            kind: "input",
+            id: options.id ?? -Date.now(),
+            options,
+            validation: null,
+            onAccept: (value) => resolve(value),
+            onCancel: () => resolve(null),
+          }),
+        ),
       runCommand: (id, args) => {
         if (!allCommandsRef.current.has(id) && !extensionService.getSnapshot().hostCommands.has(id)) return false;
         runCommandRef.current(id, false, args[0]);
@@ -3314,7 +3501,8 @@ export function App() {
   }, [dragKind]);
   useEffect(() => {
     const down = (e: MouseEvent) => {
-      if ((e.target as HTMLElement | null)?.closest?.(".resizer, .panel-resizer, .editor-split-sash, .explorer-views-sash")) document.body.classList.add("lumen-resizing");
+      if ((e.target as HTMLElement | null)?.closest?.(".resizer, .panel-resizer, .editor-split-sash, .explorer-views-sash"))
+        document.body.classList.add("lumen-resizing");
     };
     const up = () => document.body.classList.remove("lumen-resizing");
     window.addEventListener("mousedown", down, true);
@@ -3428,10 +3616,13 @@ export function App() {
         if (existing) clearTimeout(existing);
         timers.set(
           path,
-          setTimeout(() => {
-            timers.delete(path);
-            if (editorDirty.current.get(path)) void saveDocRef.current(path);
-          }, Math.max(100, s["files.autoSaveDelay"])),
+          setTimeout(
+            () => {
+              timers.delete(path);
+              if (editorDirty.current.get(path)) void saveDocRef.current(path);
+            },
+            Math.max(100, s["files.autoSaveDelay"]),
+          ),
         );
       }
     });
@@ -3552,9 +3743,10 @@ export function App() {
       if (choice === "save") {
         for (const path of dirty) if (!(await saveDocRef.current(path))) return { allow: false, dirtyCount: total };
         for (const entry of dirtyCustom) {
-          const saved = entry.kind === "text"
-            ? await saveDocRef.current(entry.uri)
-            : !!(await extensionService.call("saveCustomEditor", entry.uri, entry.viewType).catch(() => false));
+          const saved =
+            entry.kind === "text"
+              ? await saveDocRef.current(entry.uri)
+              : !!(await extensionService.call("saveCustomEditor", entry.uri, entry.viewType).catch(() => false));
           if (!saved) return { allow: false, dirtyCount: total };
         }
         return { allow: true, dirtyCount: 0 };
@@ -3681,7 +3873,20 @@ export function App() {
     }
     const state: WorkspaceState = {
       version: 1,
-      layout: { sidebarVisible, sidebarWidth, explorerViewsHeight, auxBarVisible, auxBarWidth, auxBarView, sideView, panelVisible, panelHeight, panelWidth, panelPosition, panelTab },
+      layout: {
+        sidebarVisible,
+        sidebarWidth,
+        explorerViewsHeight,
+        auxBarVisible,
+        auxBarWidth,
+        auxBarView,
+        sideView,
+        panelVisible,
+        panelHeight,
+        panelWidth,
+        panelPosition,
+        panelTab,
+      },
       editors: {
         tabs: [...new Set(Object.values(savedGroups).flatMap((group) => group.tabs))],
         active: saveTab(activePath),
@@ -3696,7 +3901,9 @@ export function App() {
       },
       webviews: webviewList,
     };
-    void api().request.workspaceStateSet({ root: workspaceRoot, state }).catch(() => {});
+    void api()
+      .request.workspaceStateSet({ root: workspaceRoot, state })
+      .catch(() => {});
   }, [
     workspaceRoot,
     groups,
@@ -3721,8 +3928,34 @@ export function App() {
   ]);
 
   useEffect(() => {
-    saveLayout({ sidebarVisible, sidebarWidth, explorerViewsHeight, auxBarVisible, auxBarWidth, auxBarView, sideView, panelVisible, panelHeight, panelWidth, panelPosition, panelTab });
-  }, [sidebarVisible, sidebarWidth, explorerViewsHeight, auxBarVisible, auxBarWidth, auxBarView, sideView, panelVisible, panelHeight, panelWidth, panelPosition, panelTab]);
+    saveLayout({
+      sidebarVisible,
+      sidebarWidth,
+      explorerViewsHeight,
+      auxBarVisible,
+      auxBarWidth,
+      auxBarView,
+      sideView,
+      panelVisible,
+      panelHeight,
+      panelWidth,
+      panelPosition,
+      panelTab,
+    });
+  }, [
+    sidebarVisible,
+    sidebarWidth,
+    explorerViewsHeight,
+    auxBarVisible,
+    auxBarWidth,
+    auxBarView,
+    sideView,
+    panelVisible,
+    panelHeight,
+    panelWidth,
+    panelPosition,
+    panelTab,
+  ]);
 
   // Terminals in the editor area are editor tabs: keep the tabs in sync with them.
   useEffect(() => {
@@ -3731,16 +3964,16 @@ export function App() {
     const ids = new Set(inEditor.map((instance) => terminalTabPath(instance.id)));
     const open = new Set(allTabPaths());
     const added = inEditor.filter((instance) => !open.has(terminalTabPath(instance.id)));
-    const staleGroups = Object.values(groupsRef.current).filter((group) =>
-      group.tabs.some((tab) => isTerminalTab(tab.path) && !ids.has(tab.path)),
-    );
+    const staleGroups = Object.values(groupsRef.current).filter((group) => group.tabs.some((tab) => isTerminalTab(tab.path) && !ids.has(tab.path)));
     const titleOf = (path: string) => terminalService.info(terminalIdOf(path))?.title;
     const renamed = Object.values(groupsRef.current).some((group) =>
       group.tabs.some((tab) => isTerminalTab(tab.path) && ids.has(tab.path) && tab.name !== titleOf(tab.path)),
     );
     if (!added.length && !staleGroups.length && !renamed) return;
 
-    mapAllTabs((tab) => (isTerminalTab(tab.path) && ids.has(tab.path) && tab.name !== titleOf(tab.path) ? { ...tab, name: titleOf(tab.path) ?? tab.name } : tab));
+    mapAllTabs((tab) =>
+      isTerminalTab(tab.path) && ids.has(tab.path) && tab.name !== titleOf(tab.path) ? { ...tab, name: titleOf(tab.path) ?? tab.name } : tab,
+    );
     for (const group of staleGroups) {
       // The terminal left the editor area (killed, or moved to the panel).
       const stale = group.tabs.filter((tab) => isTerminalTab(tab.path) && !ids.has(tab.path)).map((tab) => tab.path);
@@ -3852,7 +4085,10 @@ export function App() {
         if (fallback) void openFile(fallback, { recordNav: false, groupId: tab.groupId });
         else setActivePath(null, tab.groupId);
       }
-      setTabs((prev) => [...prev, { path: tab.path, name: terminalService.info(terminalIdOf(tab.path))?.title ?? "terminal", dirty: false, preview: false }], target);
+      setTabs(
+        (prev) => [...prev, { path: tab.path, name: terminalService.info(terminalIdOf(tab.path))?.title ?? "terminal", dirty: false, preview: false }],
+        target,
+      );
       focusGroup(target);
       setActivePath(tab.path, target);
       terminalService.focus(terminalIdOf(tab.path));
@@ -3949,7 +4185,9 @@ export function App() {
     .filter(Boolean)
     .join(" — ");
   useEffect(() => {
-    void api().request.setWindowTitle({ title: windowTitle }).catch(() => {});
+    void api()
+      .request.setWindowTitle({ title: windowTitle })
+      .catch(() => {});
   }, [windowTitle]);
 
   /* ── explorer & tab actions ───────────────────────────────────────────── */
@@ -3958,10 +4196,13 @@ export function App() {
   const relativeToRoot = useCallback(
     (path: string) => {
       const roots = [...(workspaceRoot ? [workspaceRoot] : []), ...explorerRootEntries.map((root) => root.path)];
-      const root = roots
-        .filter((candidate) => isInside(path, candidate))
-        .sort((a, b) => b.length - a.length)[0];
-      return root ? path.slice(root.length).replace(/^[\\/]+/, "").replace(/\\/g, "/") : path;
+      const root = roots.filter((candidate) => isInside(path, candidate)).sort((a, b) => b.length - a.length)[0];
+      return root
+        ? path
+            .slice(root.length)
+            .replace(/^[\\/]+/, "")
+            .replace(/\\/g, "/")
+        : path;
     },
     [workspaceRoot, explorerRootEntries],
   );
@@ -4099,16 +4340,28 @@ export function App() {
           await closeTabs([path], groupId);
           break;
         case "close-others":
-          await closeTabs(tabs.filter((tab) => tab.path !== path).map((tab) => tab.path), groupId);
+          await closeTabs(
+            tabs.filter((tab) => tab.path !== path).map((tab) => tab.path),
+            groupId,
+          );
           break;
         case "close-right":
-          await closeTabs(tabs.slice(index + 1).map((tab) => tab.path), groupId);
+          await closeTabs(
+            tabs.slice(index + 1).map((tab) => tab.path),
+            groupId,
+          );
           break;
         case "close-saved":
-          await closeTabs(tabs.filter((tab) => !tab.dirty).map((tab) => tab.path), groupId);
+          await closeTabs(
+            tabs.filter((tab) => !tab.dirty).map((tab) => tab.path),
+            groupId,
+          );
           break;
         case "close-all":
-          await closeTabs(tabs.map((tab) => tab.path), groupId);
+          await closeTabs(
+            tabs.map((tab) => tab.path),
+            groupId,
+          );
           break;
         case "split-right":
         case "split-down": {
@@ -4212,7 +4465,6 @@ export function App() {
     window.addEventListener("mouseup", onUp);
   };
 
-
   /* ── derived view data ────────────────────────────────────────────────── */
 
   const decorations: TreeDecorations = useMemo(() => {
@@ -4238,7 +4490,9 @@ export function App() {
     const counts = new Map<string, number>();
     for (const tab of list) counts.set(tab.name, (counts.get(tab.name) ?? 0) + 1);
     return list.map((tab) =>
-      (counts.get(tab.name) ?? 0) > 1 && !isUntitled(tab.path) && !isTerminalTab(tab.path) && !isDiffTab(tab.path) ? { ...tab, hint: basename(dirname(tab.path)) } : tab,
+      (counts.get(tab.name) ?? 0) > 1 && !isUntitled(tab.path) && !isTerminalTab(tab.path) && !isDiffTab(tab.path)
+        ? { ...tab, hint: basename(dirname(tab.path)) }
+        : tab,
     );
   };
 
@@ -4252,10 +4506,7 @@ export function App() {
   /** Where the sidebar's New File / New Folder buttons create: the local root, or the first provided root. */
   const newEntryRoot = workspaceRoot ?? explorerRootEntries[0]?.path ?? null;
   /** Workspace folders of provided file systems (Quick Open / Find in Files walk them). */
-  const providerRootPaths = useMemo(
-    () => explorerRootEntries.filter((root) => root.scheme !== "file").map((root) => root.path),
-    [explorerRootEntries],
-  );
+  const providerRootPaths = useMemo(() => explorerRootEntries.filter((root) => root.scheme !== "file").map((root) => root.path), [explorerRootEntries]);
   const showActivityBar = settings["workbench.activityBar.visible"] && !zenMode;
   const showSidebar = sidebarVisible && !zenMode;
   const showPanelArea = panelVisible && !zenMode;
@@ -4327,7 +4578,8 @@ export function App() {
     if (showPanelArea) {
       ids.push(panelTab);
       if (panelTab.startsWith(FEATURE_VIEW_PREFIX)) ids.push(panelTab.slice(FEATURE_VIEW_PREFIX.length));
-      else if (panelTab.startsWith("view:")) addViews(viewLayout.containers.find((container) => container.location === "panel" && `view:${container.id}` === panelTab)?.views);
+      else if (panelTab.startsWith("view:"))
+        addViews(viewLayout.containers.find((container) => container.location === "panel" && `view:${container.id}` === panelTab)?.views);
     }
     setVisibleViews(ids);
     refreshContext();
@@ -4337,15 +4589,19 @@ export function App() {
   // The side bar shows a container that is not there (gone, or all its views hidden): back to the
   // Explorer — after a moment, so `when` context keys extensions set while starting have arrived.
   const sideViewMissing =
-    ext.ready && sideView.startsWith("view:") && !sideView.startsWith(FEATURE_VIEW_PREFIX) && !sideContainers.some((container) => `view:${container.id}` === sideView);
+    ext.ready &&
+    sideView.startsWith("view:") &&
+    !sideView.startsWith(FEATURE_VIEW_PREFIX) &&
+    !sideContainers.some((container) => `view:${container.id}` === sideView);
   useEffect(() => {
     if (!sideViewMissing) return;
     const timer = setTimeout(() => setSideView("explorer"), 3000);
     return () => clearTimeout(timer);
   }, [sideViewMissing]);
   const viewBadge = (views: { id: string }[]) =>
-    webviews.filter((webview) => webview.kind === "view" && views.some((view) => view.id === webview.viewType)).reduce((sum, webview) => sum + (webview.badge?.value ?? 0), 0) +
-    views.reduce((sum, view) => sum + (treeViews.get(view.id)?.badge?.value ?? 0), 0);
+    webviews
+      .filter((webview) => webview.kind === "view" && views.some((view) => view.id === webview.viewType))
+      .reduce((sum, webview) => sum + (webview.badge?.value ?? 0), 0) + views.reduce((sum, view) => sum + (treeViews.get(view.id)?.badge?.value ?? 0), 0);
   activity.splice(
     activity.length - 1,
     0,
@@ -4433,8 +4689,12 @@ export function App() {
   };
 
   const sidebarTitle = sideView.startsWith("view:")
-    ? (sideContainers.find((container) => `view:${container.id}` === sideView)?.title ?? featureViews.find((view) => featureViewId(view.id) === sideView)?.title ?? "")
-    : { explorer: "Explorer", search: "Search", scm: "Source Control", debug: "Run and Debug", outline: "Outline", extensions: "Extensions" }[sideView as "explorer"];
+    ? (sideContainers.find((container) => `view:${container.id}` === sideView)?.title ??
+      featureViews.find((view) => featureViewId(view.id) === sideView)?.title ??
+      "")
+    : { explorer: "Explorer", search: "Search", scm: "Source Control", debug: "Run and Debug", outline: "Outline", extensions: "Extensions" }[
+        sideView as "explorer"
+      ];
 
   const extensionsMenu = (x: number, y: number) =>
     void showContextMenu(x, y, [
@@ -4532,16 +4792,11 @@ export function App() {
         )}
         {showsEditor && docs.current.get(path!)?.readOnlyMessage && (
           <div className="editor-readonly-banner" title={docs.current.get(path!)!.readOnlyMessage}>
-            <div
-              className="markdown-body"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(docs.current.get(path!)!.readOnlyMessage!) }}
-            />
+            <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(docs.current.get(path!)!.readOnlyMessage!) }} />
           </div>
         )}
         <div className="editor-host">
-          {!path && singleGroup && (
-            <Welcome recent={recent} keys={keys} onRun={(id) => runCommand(id)} onOpenRecent={(folder) => void openWorkspace(folder)} />
-          )}
+          {!path && singleGroup && <Welcome recent={recent} keys={keys} onRun={(id) => runCommand(id)} onOpenRecent={(folder) => void openWorkspace(folder)} />}
           {!group.tabs.length && !singleGroup && (
             <div className="empty-group">
               <button type="button" className="icon-btn empty-group-close" title="Close Editor Group" onClick={() => void closeGroup(groupId)}>
@@ -4791,7 +5046,9 @@ export function App() {
                   </>
                 )}
                 {/* Features' sections (Timeline) follow the file of the active editor (a notebook's too). */}
-                <FeatureExplorerSections activePath={activePath ? (parseFeatureEditorTab(activePath)?.path ?? (isSpecialTab(activePath) ? null : activePath)) : null} />
+                <FeatureExplorerSections
+                  activePath={activePath ? (parseFeatureEditorTab(activePath)?.path ?? (isSpecialTab(activePath) ? null : activePath)) : null}
+                />
               </div>
               {sideContainers.map((container) => (
                 <div key={container.id} className="sidebar-panel" hidden={sideView !== `view:${container.id}`}>
@@ -4835,9 +5092,7 @@ export function App() {
                       ],
                     }).then((choice) => {
                       if (choice === "discard") {
-                        void gitAction((root) =>
-                          api().request.gitDiscard({ root, files: files.map((f) => ({ path: f.path, untracked: f.index === "?" })) }),
-                        );
+                        void gitAction((root) => api().request.gitDiscard({ root, files: files.map((f) => ({ path: f.path, untracked: f.index === "?" })) }));
                       }
                     })
                   }
@@ -4966,12 +5221,7 @@ export function App() {
                   <button type="button" className="icon-btn" title="New Terminal (Ctrl+Shift+`)" onClick={() => newTerminal()}>
                     <Plus size={16} strokeWidth={1.75} />
                   </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    title="Launch Profile…"
-                    onClick={() => pickProfile((profileId) => newTerminal({ profileId }))}
-                  >
+                  <button type="button" className="icon-btn" title="Launch Profile…" onClick={() => pickProfile((profileId) => newTerminal({ profileId }))}>
                     <ChevronDown size={15} strokeWidth={1.75} />
                   </button>
                   <button
@@ -5021,7 +5271,12 @@ export function App() {
                     </button>
                   ))}
                 </div>
-                <button type="button" className="icon-btn" title={`Hide Secondary Side Bar (${keys.get("workbench.action.toggleAuxiliaryBar") ?? ""})`} onClick={() => setAuxBarVisible(false)}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title={`Hide Secondary Side Bar (${keys.get("workbench.action.toggleAuxiliaryBar") ?? ""})`}
+                  onClick={() => setAuxBarVisible(false)}
+                >
                   <X size={16} strokeWidth={1.75} />
                 </button>
               </div>
@@ -5044,7 +5299,9 @@ export function App() {
           errors={errorCount}
           warnings={warningCount}
           cursor={editorActive ? cursor : null}
-          indentation={editorActive ? (settings["editor.insertSpaces"] ? `Spaces: ${settings["editor.tabSize"]}` : `Tab Size: ${settings["editor.tabSize"]}`) : null}
+          indentation={
+            editorActive ? (settings["editor.insertSpaces"] ? `Spaces: ${settings["editor.tabSize"]}` : `Tab Size: ${settings["editor.tabSize"]}`) : null
+          }
           eol={editorActive ? (activeDoc?.eol ?? null) : null}
           language={activeLanguage && editorActive ? languageLabel(activeLanguage) : null}
           lsp={activeLanguage && editorActive && isSmart(activeLanguage) ? lspStatusLabel(activeLanguage) : null}
@@ -5076,9 +5333,7 @@ export function App() {
         listFiles={async () => {
           const local = workspaceRoot ? (await api().request.listWorkspaceFiles({ root: workspaceRoot })).files : [];
           // VS Code searches provided schemes only through providers: walk their workspace folders instead.
-          const provided = providerRootPaths.length
-            ? await extensionService.call("providerListFiles", providerRootPaths, 20000).catch(() => [])
-            : [];
+          const provided = providerRootPaths.length ? await extensionService.call("providerListFiles", providerRootPaths, 20000).catch(() => []) : [];
           return [...local, ...provided];
         }}
         recentEditors={mru.current.filter((path) => path !== activePath)}

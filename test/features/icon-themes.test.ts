@@ -4,7 +4,14 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ExtensionHost } from "../../src/main/exthost/host.ts";
-import { contributedIcons, fontCharacterOf, iconIdFor, normalizeFileIconTheme, normalizeProductIconTheme, resolveContributedIcon } from "../../src/shared/icon-themes.ts";
+import {
+  contributedIcons,
+  fontCharacterOf,
+  iconIdFor,
+  normalizeFileIconTheme,
+  normalizeProductIconTheme,
+  resolveContributedIcon,
+} from "../../src/shared/icon-themes.ts";
 
 /**
  * File / product icon themes: normalization and lookup (shared) and the host
@@ -92,16 +99,36 @@ test("the host loads theme files and serves their assets as data: URIs, only ins
   mkdirSync(join(extension, "icons"), { recursive: true });
   writeFileSync(join(extension, "icons", "a.svg"), "<svg/>");
   writeFileSync(join(dir, "secret.svg"), "<svg/>");
-  writeFileSync(join(extension, "theme.json"), `// comment\n{"iconDefinitions":{"a":{"iconPath":"./icons/a.svg"},"out":{"iconPath":"../secret.svg"}},"file":"a",}`);
+  writeFileSync(
+    join(extension, "theme.json"),
+    `// comment\n{"iconDefinitions":{"a":{"iconPath":"./icons/a.svg"},"out":{"iconPath":"../secret.svg"}},"file":"a",}`,
+  );
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: dir, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: dir,
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.post = () => undefined;
   host.runtimes.set("pub.ext", { description: { location: extension } } as never);
-  const loaded = (await host.methods.feature("icon-themes", "load", ["file", "pub.ext", join(extension, "theme.json")])) as { key: string; theme: { iconDefinitions: Record<string, { path?: string }> } };
+  const loaded = (await host.methods.feature("icon-themes", "load", ["file", "pub.ext", join(extension, "theme.json")])) as {
+    key: string;
+    theme: { iconDefinitions: Record<string, { path?: string }> };
+  };
   const definitions = loaded.theme.iconDefinitions;
   assert.equal(definitions.a!.path, join(extension, "icons", "a.svg"));
   assert.equal(definitions.out, undefined);
-  const assets = (await host.methods.feature("icon-themes", "assets", [loaded.key, [definitions.a!.path, join(dir, "secret.svg"), join(extension, "nope.svg")]])) as Record<string, string | null>;
+  const assets = (await host.methods.feature("icon-themes", "assets", [
+    loaded.key,
+    [definitions.a!.path, join(dir, "secret.svg"), join(extension, "nope.svg")],
+  ])) as Record<string, string | null>;
   assert.equal(assets[definitions.a!.path!], `data:image/svg+xml;base64,${Buffer.from("<svg/>").toString("base64")}`);
   assert.equal(assets[join(dir, "secret.svg")], null);
   assert.equal(assets[join(extension, "nope.svg")], null);
@@ -142,10 +169,24 @@ test("contributes.icons: font glyphs, aliases and the host serving the font", as
   writeFileSync(join(extension, "font", "icons.woff"), "font");
   writeFileSync(join(dir, "secret.woff"), "font");
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: dir, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: dir,
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.post = () => undefined;
   host.runtimes.set("pub.ext", { description: { location: extension } } as never);
-  assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(extension, "font", "icons.woff")]), `data:font/woff;base64,${Buffer.from("font").toString("base64")}`);
+  assert.equal(
+    await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(extension, "font", "icons.woff")]),
+    `data:font/woff;base64,${Buffer.from("font").toString("base64")}`,
+  );
   assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(dir, "secret.woff")]), null);
   assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.ext", join(extension, "font", "icons.svg")]), null);
   assert.equal(await host.methods.feature("icon-themes", "iconFont", ["pub.other", join(extension, "font", "icons.woff")]), null);

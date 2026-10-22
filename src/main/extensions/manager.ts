@@ -356,7 +356,9 @@ export class ExtensionManager {
     // A package for another platform lacks this platform's binaries (like VS Code, refuse it).
     const target = vsixTargetPlatform(vsix);
     if (!runsOn(target)) {
-      throw new Error(`${id} ${manifest.version} is the package for ${platformLabel(target!)}; this computer needs the one for ${platformLabel(currentTargetPlatform())}.`);
+      throw new Error(
+        `${id} ${manifest.version} is the package for ${platformLabel(target!)}; this computer needs the one for ${platformLabel(currentTargetPlatform())}.`,
+      );
     }
     mkdirSync(this.dir, { recursive: true });
     const staging = join(this.dir, `.staging-${randomBytes(4).toString("hex")}`);

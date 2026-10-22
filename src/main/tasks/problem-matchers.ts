@@ -73,11 +73,25 @@ const STYLISH: MatcherPattern[] = [
 
 export const BUILTIN_PATTERNS: Record<string, MatcherPattern | MatcherPattern[]> = {
   "eslint-stylish": STYLISH,
-  "eslint-compact": { regexp: "^(.+):\\sline\\s(\\d+),\\scol\\s(\\d+),\\s(Error|Warning|Info)\\s-\\s(.+)\\s\\((.+)\\)$", file: 1, line: 2, column: 3, severity: 4, message: 5, code: 6 },
+  "eslint-compact": {
+    regexp: "^(.+):\\sline\\s(\\d+),\\scol\\s(\\d+),\\s(Error|Warning|Info)\\s-\\s(.+)\\s\\((.+)\\)$",
+    file: 1,
+    line: 2,
+    column: 3,
+    severity: 4,
+    message: 5,
+    code: 6,
+  },
 };
 
 export const BUILTIN_MATCHERS: Record<string, ProblemMatcherDef> = {
-  tsc: { owner: "typescript", source: "ts", applyTo: "allDocuments", fileLocation: ["relative", "${cwd}"], pattern: { regexp: TS_FILE, file: 1, line: 2, column: 3, severity: 4, code: 5, message: 6 } },
+  tsc: {
+    owner: "typescript",
+    source: "ts",
+    applyTo: "allDocuments",
+    fileLocation: ["relative", "${cwd}"],
+    pattern: { regexp: TS_FILE, file: 1, line: 2, column: 3, severity: 4, code: 5, message: 6 },
+  },
   "tsc-watch": {
     base: "$tsc",
     background: {
@@ -88,11 +102,52 @@ export const BUILTIN_MATCHERS: Record<string, ProblemMatcherDef> = {
   },
   "eslint-compact": { owner: "eslint", applyTo: "allDocuments", fileLocation: "absolute", pattern: "$eslint-compact" },
   "eslint-stylish": { owner: "eslint", applyTo: "allDocuments", fileLocation: "absolute", pattern: "$eslint-stylish" },
-  gcc: { owner: "cpp", source: "gcc", fileLocation: ["relative", "${workspaceFolder}"], pattern: { regexp: "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$", file: 1, line: 2, column: 3, severity: 4, message: 5 } },
-  go: { owner: "go", source: "go", fileLocation: ["relative", "${workspaceFolder}"], pattern: { regexp: "^\\s*(.*\\.go):(\\d+)(?::(\\d+))?:\\s+(.*)$", file: 1, line: 2, column: 3, message: 4 } },
-  msCompile: { owner: "msCompile", source: "cpp", fileLocation: "absolute", pattern: { regexp: "^\\s*(?:\\s*\\d+>)?(\\S.*)\\((\\d+|\\d+,\\d+|\\d+,\\d+,\\d+,\\d+)\\)\\s*:\\s+(error|warning|info)\\s+(\\w{1,2}\\d+)\\s*:\\s*(.*)$", file: 1, location: 2, severity: 3, code: 4, message: 5 } },
-  lessCompile: { owner: "lessCompile", source: "less", fileLocation: "absolute", severity: "error", pattern: { regexp: "^\\s*(.*) in file (.*) line no. (\\d+)$", message: 1, file: 2, line: 3 } },
-  jshint: { owner: "jshint", source: "jshint", fileLocation: "absolute", pattern: { regexp: "^(.*):\\s+line\\s+(\\d+),\\s+col\\s+(\\d+),\\s(.+?)(?:\\s+\\((\\w)(\\d+)\\))?$", file: 1, line: 2, column: 3, message: 4, severity: 5, code: 6 } },
+  gcc: {
+    owner: "cpp",
+    source: "gcc",
+    fileLocation: ["relative", "${workspaceFolder}"],
+    pattern: { regexp: "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$", file: 1, line: 2, column: 3, severity: 4, message: 5 },
+  },
+  go: {
+    owner: "go",
+    source: "go",
+    fileLocation: ["relative", "${workspaceFolder}"],
+    pattern: { regexp: "^\\s*(.*\\.go):(\\d+)(?::(\\d+))?:\\s+(.*)$", file: 1, line: 2, column: 3, message: 4 },
+  },
+  msCompile: {
+    owner: "msCompile",
+    source: "cpp",
+    fileLocation: "absolute",
+    pattern: {
+      regexp: "^\\s*(?:\\s*\\d+>)?(\\S.*)\\((\\d+|\\d+,\\d+|\\d+,\\d+,\\d+,\\d+)\\)\\s*:\\s+(error|warning|info)\\s+(\\w{1,2}\\d+)\\s*:\\s*(.*)$",
+      file: 1,
+      location: 2,
+      severity: 3,
+      code: 4,
+      message: 5,
+    },
+  },
+  lessCompile: {
+    owner: "lessCompile",
+    source: "less",
+    fileLocation: "absolute",
+    severity: "error",
+    pattern: { regexp: "^\\s*(.*) in file (.*) line no. (\\d+)$", message: 1, file: 2, line: 3 },
+  },
+  jshint: {
+    owner: "jshint",
+    source: "jshint",
+    fileLocation: "absolute",
+    pattern: {
+      regexp: "^(.*):\\s+line\\s+(\\d+),\\s+col\\s+(\\d+),\\s(.+?)(?:\\s+\\((\\w)(\\d+)\\))?$",
+      file: 1,
+      line: 2,
+      column: 3,
+      message: 4,
+      severity: 5,
+      code: 6,
+    },
+  },
 };
 
 export type MatcherRegistry = {
@@ -300,7 +355,10 @@ export class MatcherRunner {
     let endLine = parseInt(data.endLine ?? "", 10);
     let endColumn = parseInt(data.endColumn ?? "", 10);
     if (data.location) {
-      const parts = data.location.replace(/[()\s]/g, "").split(/[,.]/).map((part) => parseInt(part, 10));
+      const parts = data.location
+        .replace(/[()\s]/g, "")
+        .split(/[,.]/)
+        .map((part) => parseInt(part, 10));
       if (parts.length === 1) line = parts[0]!;
       else if (parts.length === 2) [line, column] = parts as [number, number];
       else if (parts.length === 3) [line, column, endColumn] = parts as [number, number, number];

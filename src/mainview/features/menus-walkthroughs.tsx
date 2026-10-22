@@ -83,7 +83,15 @@ export const menusWalkthroughsView: ViewFeature = {
   },
 
   onHostMessage: (payload) => {
-    const message = payload as { type: string; key?: string; step?: string; toSide?: boolean; done?: boolean; ids?: string[]; formatters?: ResourceLabelFormatter[] };
+    const message = payload as {
+      type: string;
+      key?: string;
+      step?: string;
+      toSide?: boolean;
+      done?: boolean;
+      ids?: string[];
+      formatters?: ResourceLabelFormatter[];
+    };
     switch (message.type) {
       case "open":
         if (message.key) void openWalkthrough(message.key, message.step, message.toSide === true);

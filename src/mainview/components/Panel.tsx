@@ -55,22 +55,14 @@ function SeverityIcon({ severity }: { severity: Diagnostic["severity"] }) {
   return <Icon className={`severity-icon ${severity}`} size={15} />;
 }
 
-function FileGroup({
-  path,
-  root,
-  count,
-  children,
-}: {
-  path: string;
-  root: string | null;
-  count: number;
-  children: ReactNode;
-}) {
+function FileGroup({ path, root, count, children }: { path: string; root: string | null; count: number; children: ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="panel-group">
       <button type="button" className="panel-group-header" onClick={() => setOpen((v) => !v)}>
-        <span className={`chevron${open ? " open" : ""}`}><ChevronRight size={14} /></span>
+        <span className={`chevron${open ? " open" : ""}`}>
+          <ChevronRight size={14} />
+        </span>
         <FileIcon name={basename(path)} />
         <span className="panel-group-name">{basename(path)}</span>
         <span className="panel-group-dir">{relativeDir(root, path)}</span>
@@ -87,18 +79,11 @@ function ProblemsView({ diagnostics, root, onOpen }: { diagnostics: Map<string, 
   return (
     <div className="panel-list">
       {files.map(([path, list]) => {
-        const shown = list
-          .filter((d) => d.severity !== "hint")
-          .sort((a, b) => a.startLine - b.startLine || a.startCharacter - b.startCharacter);
+        const shown = list.filter((d) => d.severity !== "hint").sort((a, b) => a.startLine - b.startLine || a.startCharacter - b.startCharacter);
         return (
           <FileGroup key={path} path={path} root={root} count={shown.length}>
             {shown.map((d, index) => (
-              <button
-                key={index}
-                type="button"
-                className="panel-row"
-                onClick={() => onOpen(path, d.startLine, d.startCharacter)}
-              >
+              <button key={index} type="button" className="panel-row" onClick={() => onOpen(path, d.startLine, d.startCharacter)}>
                 <SeverityIcon severity={d.severity} />
                 <span className="panel-row-text">{d.message.split("\n")[0]}</span>
                 <span className="panel-row-meta">
@@ -134,12 +119,7 @@ function ReferencesView({ references, root, onOpen }: { references: ReferencesRe
             const lead = text.length - text.trimStart().length;
             const end = location.endLine === location.startLine ? location.endCharacter : text.length;
             return (
-              <button
-                key={index}
-                type="button"
-                className="panel-row"
-                onClick={() => onOpen(path, location.startLine, location.startCharacter)}
-              >
+              <button key={index} type="button" className="panel-row" onClick={() => onOpen(path, location.startLine, location.startCharacter)}>
                 <span className="panel-row-line">{location.startLine + 1}</span>
                 <span className="panel-row-text code">
                   {text.slice(lead, location.startCharacter)}
@@ -204,10 +184,7 @@ function OutputView() {
 }
 
 export function Panel(props: Props) {
-  const problemCount = [...props.diagnostics.values()].reduce(
-    (sum, list) => sum + list.filter((d) => d.severity !== "hint").length,
-    0,
-  );
+  const problemCount = [...props.diagnostics.values()].reduce((sum, list) => sum + list.filter((d) => d.severity !== "hint").length, 0);
   // Panel tabs of feature plug-ins (src/mainview/features) sit with the extensions' ones.
   const extraTabs = [...props.extraTabs, ...useFeaturePanelTabs()];
   const tabs: { id: PanelTab; label: string; badge?: number }[] = [
@@ -235,13 +212,26 @@ export function Panel(props: Props) {
     return [
       ...(tab
         ? [
-            { type: "item" as const, label: `Hide '${tab.label}'`, action: "hideTab", disabled: lastShown || hidden.has(tab.id), run: () => setTabHidden(tab.id, true) },
+            {
+              type: "item" as const,
+              label: `Hide '${tab.label}'`,
+              action: "hideTab",
+              disabled: lastShown || hidden.has(tab.id),
+              run: () => setTabHidden(tab.id, true),
+            },
             { type: "separator" as const },
           ]
         : []),
       ...tabs.map((entry) => {
         const shown = !hidden.has(entry.id);
-        return { type: "item" as const, label: entry.label, action: `tab:${entry.id}`, checked: shown, disabled: shown && lastShown, run: () => setTabHidden(entry.id, shown) };
+        return {
+          type: "item" as const,
+          label: entry.label,
+          action: `tab:${entry.id}`,
+          checked: shown,
+          disabled: shown && lastShown,
+          run: () => setTabHidden(entry.id, shown),
+        };
       }),
       { type: "item", label: "Reset Panel Tabs", action: "resetTabs", disabled: !hidden.size, run: () => updateSetting("workbench.panel.hidden", []) },
       { type: "separator" },

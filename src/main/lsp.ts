@@ -244,9 +244,7 @@ function cssDiagnostics(path: string, content: string): Diagnostic[] {
 
 function htmlDiagnostics(path: string, content: string): Diagnostic[] {
   const diags: Diagnostic[] = [];
-  const voidTags = new Set([
-    "area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr",
-  ]);
+  const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
   const stack: { tag: string; line: number }[] = [];
   const tagRe = /<\/?([a-zA-Z][\w:-]*)\b[^>]*\/?>/g;
   const lines = content.split(/\r?\n/);
@@ -494,11 +492,7 @@ export class LanguageServiceHub {
       if (configPath) {
         const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
         if (!configFile.error) {
-          const parsed = ts.parseJsonConfigFileContent(
-            configFile.config,
-            ts.sys,
-            dirname(configPath),
-          );
+          const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, dirname(configPath));
           this.compilerOptions = {
             ...this.compilerOptions,
             ...parsed.options,
@@ -600,14 +594,14 @@ export class LanguageServiceHub {
 
     if (this.service) this.service.dispose();
     const base = ts.createLanguageService(servicesHost, ts.createDocumentRegistry());
-    this.service = this.tsPlugins.length ? applyTsServerPlugins(ts, base, servicesHost, this.tsPlugins, (message) => console.warn(`[lsp] ${message}`), root ?? process.cwd()) : base;
+    this.service = this.tsPlugins.length
+      ? applyTsServerPlugins(ts, base, servicesHost, this.tsPlugins, (message) => console.warn(`[lsp] ${message}`), root ?? process.cwd())
+      : base;
   }
 
   private collectTsFiles(root: string, max: number): string[] {
     const out: string[] = [];
-    const ignore = new Set([
-      "node_modules", ".git", "dist", "build", "artifacts", "coverage", ".electrobun",
-    ]);
+    const ignore = new Set(["node_modules", ".git", "dist", "build", "artifacts", "coverage", ".electrobun"]);
     const walk = (dir: string) => {
       if (out.length >= max) return;
       let names: string[];
@@ -869,12 +863,7 @@ export class LanguageServiceHub {
     return locations;
   }
 
-  getRenameEdits(
-    path: string,
-    line: number,
-    character: number,
-    newName: string,
-  ): { edits: FileEdits[]; error?: string } {
+  getRenameEdits(path: string, line: number, character: number, newName: string): { edits: FileEdits[]; error?: string } {
     const target = this.offsetIn(path, line, character);
     if (!target) return { edits: [], error: "Rename is only available for TypeScript and JavaScript." };
     const service = this.service!;

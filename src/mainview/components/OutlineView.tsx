@@ -31,11 +31,7 @@ function SymbolNode({
   const active = activePath[activePath.length - 1] === symbol;
   return (
     <>
-      <div
-        className={`tree-item${active ? " active" : ""}`}
-        style={{ paddingLeft: 8 + depth * 12 }}
-        onClick={() => onReveal(symbol)}
-      >
+      <div className={`tree-item${active ? " active" : ""}`} style={{ paddingLeft: 8 + depth * 12 }} onClick={() => onReveal(symbol)}>
         <span
           className={`chevron${open ? " open" : ""}`}
           style={hasChildren ? undefined : { opacity: 0 }}
@@ -103,15 +99,7 @@ export function OutlineView({ symbols, cursorLine, onReveal, collapseToken }: Pr
   return (
     <div className="file-tree outline-tree" ref={rootRef}>
       {symbols.map((symbol, index) => (
-        <SymbolNode
-          key={`${symbol.name}:${index}`}
-          symbol={symbol}
-          depth={0}
-          activePath={activePath}
-          onReveal={onReveal}
-          collapsed={current}
-          toggle={toggle}
-        />
+        <SymbolNode key={`${symbol.name}:${index}`} symbol={symbol} depth={0} activePath={activePath} onReveal={onReveal} collapsed={current} toggle={toggle} />
       ))}
     </div>
   );

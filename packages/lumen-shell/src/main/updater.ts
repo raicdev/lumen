@@ -77,9 +77,7 @@ export function releaseUpdate(release: GitHubRelease, current: string, assetPatt
   const order = compareVersions(version, running.core);
   // A stable release is newer than the pre-releases of its own version (0.2.2 over 0.2.2-beta.1).
   if (order < 0 || (order === 0 && !running.prerelease)) return null;
-  const asset = assetPattern
-    ? (release.assets ?? []).find((entry) => typeof entry.name === "string" && assetPattern.test(entry.name))
-    : undefined;
+  const asset = assetPattern ? (release.assets ?? []).find((entry) => typeof entry.name === "string" && assetPattern.test(entry.name)) : undefined;
   const digest = typeof asset?.digest === "string" ? /^sha256:([0-9a-f]{64})$/i.exec(asset.digest) : null;
   return {
     version: version.join("."),
@@ -106,7 +104,9 @@ function safeFileName(name: string): string {
 }
 
 async function sha256Of(path: string): Promise<string> {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 class AutoUpdater {

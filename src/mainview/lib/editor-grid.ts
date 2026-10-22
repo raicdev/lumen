@@ -3,9 +3,7 @@
  * are editor groups. Rows lay children out left → right, columns top → bottom.
  */
 
-export type GridNode =
-  | { type: "leaf"; groupId: string }
-  | { type: "split"; id: string; direction: "row" | "column"; children: GridNode[]; sizes: number[] };
+export type GridNode = { type: "leaf"; groupId: string } | { type: "split"; id: string; direction: "row" | "column"; children: GridNode[]; sizes: number[] };
 
 export type DropSide = "left" | "right" | "top" | "bottom";
 
@@ -127,10 +125,7 @@ export function layoutGrid(root: GridNode): { leaves: { groupId: string; rect: R
           splitId: node.id,
           index: index - 1,
           direction: node.direction,
-          rect:
-            node.direction === "row"
-              ? { x: childRect.x, y: rect.y, w: 0, h: rect.h }
-              : { x: rect.x, y: childRect.y, w: rect.w, h: 0 },
+          rect: node.direction === "row" ? { x: childRect.x, y: rect.y, w: 0, h: rect.h } : { x: rect.x, y: childRect.y, w: rect.w, h: 0 },
           span: node.direction === "row" ? rect.w : rect.h,
         });
       }

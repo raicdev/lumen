@@ -99,10 +99,7 @@ export function extractSymbols(language: string, text: string): DocumentSymbol[]
 }
 
 /** Depth-first list with the container name, for "Go to Symbol". */
-export function flattenSymbols(
-  symbols: DocumentSymbol[],
-  container = "",
-): { symbol: DocumentSymbol; container: string }[] {
+export function flattenSymbols(symbols: DocumentSymbol[], container = ""): { symbol: DocumentSymbol; container: string }[] {
   const out: { symbol: DocumentSymbol; container: string }[] = [];
   for (const symbol of symbols) {
     out.push({ symbol, container });

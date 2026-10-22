@@ -97,7 +97,11 @@ function PortsPanel() {
                 </td>
                 <td>
                   <span className="ports-cell">
-                    <a href="#" onClick={(e) => (e.preventDefault(), void rpc().request.openExternal({ url: urlOf(port) }))} title={`Open ${urlOf(port)} in the browser`}>
+                    <a
+                      href="#"
+                      onClick={(e) => (e.preventDefault(), void rpc().request.openExternal({ url: urlOf(port) }))}
+                      title={`Open ${urlOf(port)} in the browser`}
+                    >
                       {port.localAddress}
                     </a>
                     <MenuActions menuId="ports/item/origin/inline" lookup={lookup} args={args} inline={() => true} overflow={false} className="ports-inline" />

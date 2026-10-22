@@ -44,7 +44,8 @@ const MISSING_TYPES = new Set(API_TYPES_MISSING);
 const TOP_LEVEL = new Set(["version"]);
 
 /** Activation events that Lumen never raises. */
-const SILENT_EVENTS = /^(onTaskType|onUri|onNotebook|onAuthenticationRequest|onTerminalProfile|onSearch|onWalkthrough|onOpenExternalUri|onIssueReporterOpened|onChatParticipant|onLanguageModelTool)\b/;
+const SILENT_EVENTS =
+  /^(onTaskType|onUri|onNotebook|onAuthenticationRequest|onTerminalProfile|onSearch|onWalkthrough|onOpenExternalUri|onIssueReporterOpened|onChatParticipant|onLanguageModelTool)\b/;
 
 /** Features whose absence makes an extension mostly useless. */
 // Every namespace is implemented now (some partially); only unknown members still count as unsupported.
@@ -261,9 +262,7 @@ function levelOf(report: Omit<CompatReport, keyof Rating>): CompatReport["level"
   const used = report.apis.length ? report.apis : report.contributions;
   if (used.length && used.every((entry) => entry.status === "unsupported")) return "limited";
   const anyGap =
-    usedUnsupported.length > 0 ||
-    report.apis.some((api) => api.status === "partial") ||
-    report.contributions.some((c) => c.status !== "supported");
+    usedUnsupported.length > 0 || report.apis.some((api) => api.status === "partial") || report.contributions.some((c) => c.status !== "supported");
   return anyGap ? "partial" : "full";
 }
 
@@ -310,9 +309,7 @@ export function transpileExtension(sourceDir: string, target?: string, options: 
     warnings.push(`The entry point ${manifest.main} is missing from the package.`);
   }
 
-  const apis = [...usage]
-    .map(([name, count]) => ({ name, count, ...statusOfMember(name) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const apis = [...usage].map(([name, count]) => ({ name, count, ...statusOfMember(name) })).sort((a, b) => a.name.localeCompare(b.name));
   const partialReport = {
     transpilerVersion: TRANSPILER_VERSION,
     rewrittenImports,

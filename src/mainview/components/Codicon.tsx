@@ -103,7 +103,7 @@ const ICONS: Record<string, LucideIcon> = {
   "circle-outline": Circle,
   error: CircleX,
   "circle-slash": CircleX,
-  "pass": CircleCheck,
+  pass: CircleCheck,
   "pass-filled": CircleCheck,
   info: Info,
   issues: CircleAlert,
@@ -170,7 +170,7 @@ const ICONS: Record<string, LucideIcon> = {
   "symbol-class": Box,
   "symbol-module": Braces,
   "symbol-namespace": Braces,
-  "json": Braces,
+  json: Braces,
   "collapse-all": ChevronsDownUp,
   "expand-all": ChevronsUpDown,
   "cloud-download-alt": Download,
@@ -219,7 +219,12 @@ export function WithCodicons({ text, size = 13 }: { text: string; size?: number 
         if (glyph) {
           const glyphSpin = !!match[2] || match[1] === "loading";
           return (
-            <span key={index} className={`codicon product-icon${glyphSpin ? " spin" : ""}`} style={{ fontFamily: `"${glyph.family}"`, fontSize: size, lineHeight: 1 }} aria-hidden="true">
+            <span
+              key={index}
+              className={`codicon product-icon${glyphSpin ? " spin" : ""}`}
+              style={{ fontFamily: `"${glyph.family}"`, fontSize: size, lineHeight: 1 }}
+              aria-hidden="true"
+            >
               {glyph.char}
             </span>
           );

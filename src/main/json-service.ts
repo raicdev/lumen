@@ -6,8 +6,7 @@ import type { CompletionItem, Diagnostic, HoverInfo } from "../shared/types.ts";
 
 // Under plain Node the package resolves to its UMD (CommonJS) build, whose
 // exports only show up on `default`; the packaged bundle uses its ESM build.
-const jsonLanguageService =
-  (jsonLanguageServiceModule as { default?: typeof jsonLanguageServiceModule }).default ?? jsonLanguageServiceModule;
+const jsonLanguageService = (jsonLanguageServiceModule as { default?: typeof jsonLanguageServiceModule }).default ?? jsonLanguageServiceModule;
 const { getLanguageService, TextDocument } = jsonLanguageService;
 
 /**
@@ -121,7 +120,19 @@ export async function jsonDiagnostics(path: string, content: string): Promise<Di
 }
 
 /** LSP CompletionItemKind → the editor's completion types. */
-const COMPLETION_KINDS: Record<number, string> = { 5: "property", 6: "variable", 7: "class", 9: "namespace", 10: "property", 12: "constant", 13: "enum", 14: "keyword", 15: "text", 17: "text", 20: "enumMember" };
+const COMPLETION_KINDS: Record<number, string> = {
+  5: "property",
+  6: "variable",
+  7: "class",
+  9: "namespace",
+  10: "property",
+  12: "constant",
+  13: "enum",
+  14: "keyword",
+  15: "text",
+  17: "text",
+  20: "enumMember",
+};
 
 const markdownOf = (value: unknown): string => {
   if (typeof value === "string") return value;
@@ -162,6 +173,8 @@ export async function jsonHover(path: string, content: string, line: number, cha
   const range = hover.range;
   return {
     contents,
-    range: range ? { startLine: range.start.line, startCharacter: range.start.character, endLine: range.end.line, endCharacter: range.end.character } : undefined,
+    range: range
+      ? { startLine: range.start.line, startCharacter: range.start.character, endLine: range.end.line, endCharacter: range.end.character }
+      : undefined,
   };
 }

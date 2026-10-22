@@ -10,7 +10,15 @@ import { executeInteractive, inputUriOf, openInteractive } from "./notebooks/int
 import { NotebookService, globMatches, notebookService } from "./notebooks/model.ts";
 import type { Serializer } from "./notebooks/model.ts";
 import { NotebookVariablesRequestKind, notebookVariables, variableMenuArg } from "./notebooks/variables.ts";
-import { NotebookCellOutput, NotebookCellStatusBarAlignment, NotebookCellStatusBarItem, NotebookEdit, NotebookEditorRevealType, TabInputInteractiveWindow, TabInputNotebookDiff } from "./notebooks/types.ts";
+import {
+  NotebookCellOutput,
+  NotebookCellStatusBarAlignment,
+  NotebookCellStatusBarItem,
+  NotebookEdit,
+  NotebookEditorRevealType,
+  TabInputInteractiveWindow,
+  TabInputNotebookDiff,
+} from "./notebooks/types.ts";
 
 /**
  * Host side of the "notebooks" area: workspace.registerNotebookSerializer /
@@ -30,12 +38,16 @@ async function showNotebook(service: NotebookService, host: ExtensionHost, docum
   if (doc.untitled) throw new Error("Untitled notebooks live in memory only: save the notebook before showing it");
   // Like window.showTextDocument: the view column and preserveFocus go to the window, which
   // picks the editor group (Beside asks for a new one; One..Nine for a group by its position).
-  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preview: options.preview, preserveFocus: options.preserveFocus, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside }]);
+  await host.requestFeatureView("notebooks", "show", [
+    doc.viewPath,
+    { preview: options.preview, preserveFocus: options.preserveFocus, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside },
+  ]);
   // The editor appears when the window has mounted the notebook.
   for (let waited = 0; waited < 5000; waited += 50) {
     const editor = service.editorOf(doc);
     if (editor && service.visibleEditors.includes(editor)) {
-      if (options.selections?.length) (editor as { selections: unknown }).selections = options.selections.map((range) => new NotebookRange(range.start, range.end));
+      if (options.selections?.length)
+        (editor as { selections: unknown }).selections = options.selections.map((range) => new NotebookRange(range.start, range.end));
       return editor;
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -43,14 +55,25 @@ async function showNotebook(service: NotebookService, host: ExtensionHost, docum
   throw new Error(`The notebook ${document.uri.toString()} did not open`);
 }
 
-const emptyDoc = (path: string, error: string) => ({ path, notebookType: "", version: 0, dirty: false, metadata: {}, cells: [], controller: null, controllers: [], error });
+const emptyDoc = (path: string, error: string) => ({
+  path,
+  notebookType: "",
+  version: 0,
+  dirty: false,
+  metadata: {},
+  cells: [],
+  controller: null,
+  controllers: [],
+  error,
+});
 
 /** Does some `contributes.notebooks` selector claim the file (whatever its priority)? */
 function hasNotebookEditor(host: ExtensionHost, path: string): boolean {
   if (path.toLowerCase().endsWith(".ipynb")) return true;
   for (const runtime of host.runtimes.values()) {
     const contributed = (runtime.description.manifest.contributes as { notebooks?: { selector?: { filenamePattern?: string }[] }[] } | undefined)?.notebooks;
-    if (contributed?.some((entry) => entry.selector?.some((selector) => !!selector.filenamePattern && globMatches(selector.filenamePattern, path)))) return true;
+    if (contributed?.some((entry) => entry.selector?.some((selector) => !!selector.filenamePattern && globMatches(selector.filenamePattern, path))))
+      return true;
   }
   return false;
 }
@@ -103,7 +126,8 @@ async function onRequest(host: ExtensionHost, method: string, args: unknown[]): 
     case "run": {
       const [, which, from] = request.args;
       const index = from ? cellOf(from).index : 0;
-      const cells = which === "all" ? doc.cells : which === "above" ? doc.cells.slice(0, index) : which === "below" ? doc.cells.slice(index) : which.map(cellOf);
+      const cells =
+        which === "all" ? doc.cells : which === "above" ? doc.cells.slice(0, index) : which === "below" ? doc.cells.slice(index) : which.map(cellOf);
       service.run(doc, cells);
       return true;
     }
@@ -149,8 +173,12 @@ export const notebooksFeature: HostFeature = {
     const service = notebookService(host);
     return {
       notebooks: {
-        createNotebookController: (id: string, notebookType: string, label: string, handler?: (cells: unknown[], notebook: unknown, controller: unknown) => unknown) =>
-          service.createController(extensionId, id, notebookType, label, handler),
+        createNotebookController: (
+          id: string,
+          notebookType: string,
+          label: string,
+          handler?: (cells: unknown[], notebook: unknown, controller: unknown) => unknown,
+        ) => service.createController(extensionId, id, notebookType, label, handler),
         createRendererMessaging: (rendererId: string) => {
           // Renderer scripts do not run in Lumen (outputs are rendered natively), so no renderer ever answers.
           const received = new T.EventEmitter<{ editor: unknown; message: unknown }>();
@@ -217,7 +245,16 @@ export const notebooksFeature: HostFeature = {
     return NOT_HANDLED;
   },
 
-  types: { TabInputInteractiveWindow, NotebookVariablesRequestKind, NotebookCellOutput, NotebookEdit, NotebookEditorRevealType, NotebookCellStatusBarAlignment, NotebookCellStatusBarItem, TabInputNotebookDiff },
+  types: {
+    TabInputInteractiveWindow,
+    NotebookVariablesRequestKind,
+    NotebookCellOutput,
+    NotebookEdit,
+    NotebookEditorRevealType,
+    NotebookCellStatusBarAlignment,
+    NotebookCellStatusBarItem,
+    TabInputNotebookDiff,
+  },
 
   init: (host) => {
     const service = notebookService(host);
@@ -234,7 +271,9 @@ export const notebooksFeature: HostFeature = {
         }
         if (!(input instanceof TabInputNotebook)) continue;
         const key = keyOfUri(input.uri);
-        const stillOpen = host.tabGroups.all.some((group) => group.tabs.some((other) => other.input instanceof TabInputNotebook && keyOfUri(other.input.uri) === key));
+        const stillOpen = host.tabGroups.all.some((group) =>
+          group.tabs.some((other) => other.input instanceof TabInputNotebook && keyOfUri(other.input.uri) === key),
+        );
         const doc = service.find(key);
         if (doc && !stillOpen && doc.viewed) service.close(doc);
       }

@@ -133,7 +133,14 @@ export class Uri {
     if (this.scheme) out += `${this.scheme}:`;
     if (this.authority || this.scheme === "file") out += "//";
     // user@host:port keeps its delimiters.
-    if (this.authority) out += skipEncoding ? this.authority.toLowerCase() : this.authority.toLowerCase().split(/([:@[\]])/).map((part) => (/^[:@[\]]$/.test(part) ? part : encode(part, false))).join("");
+    if (this.authority)
+      out += skipEncoding
+        ? this.authority.toLowerCase()
+        : this.authority
+            .toLowerCase()
+            .split(/([:@[\]])/)
+            .map((part) => (/^[:@[\]]$/.test(part) ? part : encode(part, false)))
+            .join("");
     if (this.path) {
       let path = this.path;
       const drive = /^\/([a-zA-Z]):/.exec(path) ?? /^([a-zA-Z]):/.exec(path);
@@ -149,7 +156,16 @@ export class Uri {
   }
 
   toJSON(): UriComponents & { $mid: number; fsPath: string; external: string } {
-    return { $mid: 1, scheme: this.scheme, authority: this.authority, path: this.path, query: this.query, fragment: this.fragment, fsPath: this.fsPath, external: this.toString() };
+    return {
+      $mid: 1,
+      scheme: this.scheme,
+      authority: this.authority,
+      path: this.path,
+      query: this.query,
+      fragment: this.fragment,
+      fsPath: this.fsPath,
+      external: this.toString(),
+    };
   }
 }
 
@@ -273,7 +289,9 @@ export class Selection extends Range {
   constructor(anchorOrLine: Position | number, activeOrCharacter: Position | number, activeLine?: number, activeCharacter?: number) {
     const anchor = typeof anchorOrLine === "number" ? new Position(anchorOrLine, activeOrCharacter as number) : toPosition(anchorOrLine);
     const active =
-      typeof anchorOrLine === "number" ? new Position(activeLine ?? anchorOrLine, activeCharacter ?? (activeOrCharacter as number)) : toPosition(activeOrCharacter as Position);
+      typeof anchorOrLine === "number"
+        ? new Position(activeLine ?? anchorOrLine, activeCharacter ?? (activeOrCharacter as number))
+        : toPosition(activeOrCharacter as Position);
     super(anchor, active);
     this.anchor = anchor;
     this.active = active;
@@ -417,7 +435,8 @@ export class WorkspaceEdit {
   set(uri: Uri, edits: readonly unknown[] | null | undefined): void {
     for (let i = this._entries.length - 1; i >= 0; i--) {
       const entry = this._entries[i]!;
-      if ((entry.kind === "text" || entry.kind === "snippet" || entry.kind === "notebook") && entry.uri.toString() === uri.toString()) this._entries.splice(i, 1);
+      if ((entry.kind === "text" || entry.kind === "snippet" || entry.kind === "notebook") && entry.uri.toString() === uri.toString())
+        this._entries.splice(i, 1);
     }
     for (const item of edits ?? []) {
       const [edit, metadata] = Array.isArray(item) ? (item as [unknown, WorkspaceEditEntryMetadata | undefined]) : [item, undefined];
@@ -429,7 +448,11 @@ export class WorkspaceEdit {
   get(uri: Uri): TextEdit[] {
     return this._entries.flatMap((entry) => (entry.kind === "text" && entry.uri.toString() === uri.toString() ? [entry.edit] : []));
   }
-  createFile(uri: Uri, options?: { overwrite?: boolean; ignoreIfExists?: boolean; contents?: CreateFileContents }, metadata?: WorkspaceEditEntryMetadata): void {
+  createFile(
+    uri: Uri,
+    options?: { overwrite?: boolean; ignoreIfExists?: boolean; contents?: CreateFileContents },
+    metadata?: WorkspaceEditEntryMetadata,
+  ): void {
     this._entries.push({ kind: "create", uri, options, metadata });
   }
   deleteFile(uri: Uri, options?: { recursive?: boolean; ignoreIfNotExists?: boolean }, metadata?: WorkspaceEditEntryMetadata): void {
@@ -460,7 +483,10 @@ export class SnippetString {
     this.value = value;
   }
   static isSnippetString(thing: unknown): thing is SnippetString {
-    return thing instanceof SnippetString || (!!thing && typeof (thing as SnippetString).value === "string" && typeof (thing as SnippetString).appendTabstop === "function");
+    return (
+      thing instanceof SnippetString ||
+      (!!thing && typeof (thing as SnippetString).value === "string" && typeof (thing as SnippetString).appendTabstop === "function")
+    );
   }
   static #escape(value: string) {
     return value.replace(/[$}\\]/g, "\\$&");
@@ -511,7 +537,10 @@ export class MarkdownString {
     this.supportThemeIcons = supportThemeIcons;
   }
   static isMarkdownString(thing: unknown): thing is MarkdownString {
-    return thing instanceof MarkdownString || (!!thing && typeof (thing as MarkdownString).value === "string" && typeof (thing as MarkdownString).appendMarkdown === "function");
+    return (
+      thing instanceof MarkdownString ||
+      (!!thing && typeof (thing as MarkdownString).value === "string" && typeof (thing as MarkdownString).appendMarkdown === "function")
+    );
   }
   appendText(value: string): MarkdownString {
     this.value += value.replace(/[\\`*_{}[\]()#+\-.!|<>]/g, "\\$&").replace(/\n/g, "\n\n");
@@ -609,7 +638,10 @@ export type Command = { title: string; command: string; tooltip?: string; argume
 export class Hover {
   contents: (MarkdownString | string | { language: string; value: string })[];
   range?: Range;
-  constructor(contents: MarkdownString | string | { language: string; value: string } | (MarkdownString | string | { language: string; value: string })[], range?: Range) {
+  constructor(
+    contents: MarkdownString | string | { language: string; value: string } | (MarkdownString | string | { language: string; value: string })[],
+    range?: Range,
+  ) {
     this.contents = Array.isArray(contents) ? contents : [contents];
     this.range = range;
   }
@@ -1052,7 +1084,10 @@ export class TreeItem {
   collapsibleState?: TreeItemCollapsibleState;
   checkboxState?: TreeItemCheckboxState | { state: TreeItemCheckboxState; tooltip?: string };
   accessibilityInformation?: { label: string; role?: string };
-  constructor(labelOrUri: string | { label: string; highlights?: [number, number][] } | Uri, collapsibleState: TreeItemCollapsibleState = TreeItemCollapsibleState.None) {
+  constructor(
+    labelOrUri: string | { label: string; highlights?: [number, number][] } | Uri,
+    collapsibleState: TreeItemCollapsibleState = TreeItemCollapsibleState.None,
+  ) {
     if (Uri.isUri(labelOrUri)) this.resourceUri = labelOrUri;
     else this.label = labelOrUri;
     this.collapsibleState = collapsibleState;
@@ -1464,7 +1499,15 @@ export class DebugStackFrame {
   readonly line: number;
   readonly column: number;
   readonly session: unknown;
-  constructor(threadId: number, id: number, name: string, source?: { name?: string; path?: string; sourceReference?: number }, line = 0, column = 0, session?: unknown) {
+  constructor(
+    threadId: number,
+    id: number,
+    name: string,
+    source?: { name?: string; path?: string; sourceReference?: number },
+    line = 0,
+    column = 0,
+    session?: unknown,
+  ) {
     this.threadId = threadId;
     this.id = id;
     this.name = name;

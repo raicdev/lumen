@@ -73,21 +73,8 @@ import {
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
-import {
-  searchKeymap,
-  highlightSelectionMatches,
-  openSearchPanel,
-  selectNextOccurrence,
-  selectSelectionMatches,
-} from "@codemirror/search";
-import {
-  forceLinting,
-  lintKeymap,
-  linter,
-  nextDiagnostic,
-  previousDiagnostic,
-  type Diagnostic as CMDiagnostic,
-} from "@codemirror/lint";
+import { searchKeymap, highlightSelectionMatches, openSearchPanel, selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
+import { forceLinting, lintKeymap, linter, nextDiagnostic, previousDiagnostic, type Diagnostic as CMDiagnostic } from "@codemirror/lint";
 import { Chunk, unifiedMergeView } from "@codemirror/merge";
 import { showMinimap } from "@replit/codemirror-minimap";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
@@ -127,31 +114,10 @@ import { debugEditorExtension, onDebugMarksChange, syncDebugMarks } from "./debu
 import type { CompletionItem, Diagnostic, TextEdit, TextRange } from "../../shared/types";
 import type { HostCompletionItem, HostDocumentHighlight, HostSelection } from "../../shared/extensions";
 
-const SMART_LANGS = new Set([
-  "typescript",
-  "javascript",
-  "json",
-  "python",
-  "css",
-  "html",
-  "shell",
-  "yaml",
-]);
+const SMART_LANGS = new Set(["typescript", "javascript", "json", "python", "css", "html", "shell", "yaml"]);
 
 /** Languages CodeMirror packages handle themselves; extension grammars must not override them. */
-const BUILT_IN_LANGUAGES = new Set([
-  "typescript",
-  "javascript",
-  "json",
-  "html",
-  "vue",
-  "svelte",
-  "xml",
-  "css",
-  "markdown",
-  "python",
-  "rust",
-]);
+const BUILT_IN_LANGUAGES = new Set(["typescript", "javascript", "json", "html", "vue", "svelte", "xml", "css", "markdown", "python", "rust"]);
 
 const themeConf = new Compartment();
 
@@ -569,7 +535,7 @@ function transformLines(view: EditorView, transform: (lines: string[]) => string
 function transformSelections(view: EditorView, transform: (text: string) => string): boolean {
   view.dispatch(
     view.state.changeByRange((range) => {
-      const target = range.empty ? view.state.wordAt(range.head) ?? range : range;
+      const target = range.empty ? (view.state.wordAt(range.head) ?? range) : range;
       const insert = transform(view.state.sliceDoc(target.from, target.to));
       return {
         changes: { from: target.from, to: target.to, insert },
@@ -893,9 +859,7 @@ export class EditorController {
       if (cached.scroll) effects.push(cached.scroll);
       if (effects.length) this.view.dispatch({ effects });
     } else {
-      this.view.setState(
-        EditorState.create({ doc: doc.content, extensions: this.buildExtensions(doc.language, doc.path) }),
-      );
+      this.view.setState(EditorState.create({ doc: doc.content, extensions: this.buildExtensions(doc.language, doc.path) }));
       const effects: StateEffect<unknown>[] = [readOnlyConf.reconfigure(readOnlyExtensions(!!doc.readOnly))];
       const base = this.gitBases.get(doc.path);
       if (base && getSettings()["editor.gitGutter"]) effects.push(setGitBase.of(base));
@@ -976,9 +940,14 @@ export class EditorController {
     const path = this.current.path;
     this.applyTextMateLanguage(language, path);
     if (noLanguageService(path)) return;
-    if (isSmart(previous)) void api().request.lspClose({ path }).catch(() => {});
+    if (isSmart(previous))
+      void api()
+        .request.lspClose({ path })
+        .catch(() => {});
     if (isSmart(language)) {
-      void api().request.lspOpen({ path, content: this.getContent(), language }).catch(() => {});
+      void api()
+        .request.lspOpen({ path, content: this.getContent(), language })
+        .catch(() => {});
     }
   }
 
@@ -1104,8 +1073,7 @@ export class EditorController {
     if (!this.current) return false;
     const { path, language } = this.current;
     return (
-      extensionService.providersFor("formatting", path, language).length > 0 ||
-      extensionService.providersFor("rangeFormatting", path, language).length > 0
+      extensionService.providersFor("formatting", path, language).length > 0 || extensionService.providersFor("rangeFormatting", path, language).length > 0
     );
   }
 
@@ -1155,12 +1123,18 @@ export class EditorController {
   setSelections(selections: HostSelection[]) {
     if (!this.view || !selections.length) return;
     const text = this.view.state.doc.toString();
-    const ranges = selections.map((s) => EditorSelection.range(offsetOf(text, s.anchorLine, s.anchorCharacter), offsetOf(text, s.activeLine, s.activeCharacter)));
+    const ranges = selections.map((s) =>
+      EditorSelection.range(offsetOf(text, s.anchorLine, s.anchorCharacter), offsetOf(text, s.activeLine, s.activeCharacter)),
+    );
     this.view.dispatch({ selection: EditorSelection.create(ranges), scrollIntoView: true });
   }
 
   /** Insert a VS Code snippet at the selections (or the given ranges). */
-  insertSnippet(body: string, ranges: { startLine: number; startCharacter: number; endLine: number; endCharacter: number }[] | null, variables: SnippetVariables = {}) {
+  insertSnippet(
+    body: string,
+    ranges: { startLine: number; startCharacter: number; endLine: number; endCharacter: number }[] | null,
+    variables: SnippetVariables = {},
+  ) {
     const view = this.view;
     if (!view) return false;
     const text = view.state.doc.toString();
@@ -1168,7 +1142,12 @@ export class EditorController {
       ? { from: offsetOf(text, ranges[0].startLine, ranges[0].startCharacter), to: offsetOf(text, ranges[0].endLine, ranges[0].endCharacter) }
       : view.state.selection.main;
     const selected = view.state.sliceDoc(target.from, target.to);
-    snippet(snippetToTemplate(body, { TM_SELECTED_TEXT: selected, ...this.snippetVariables(), ...variables }))(view, null as unknown as Completion, target.from, target.to);
+    snippet(snippetToTemplate(body, { TM_SELECTED_TEXT: selected, ...this.snippetVariables(), ...variables }))(
+      view,
+      null as unknown as Completion,
+      target.from,
+      target.to,
+    );
     return true;
   }
 
@@ -1264,9 +1243,7 @@ export class EditorController {
       case "lowerCase":
         return transformSelections(view, (text) => text.toLowerCase());
       case "titleCase":
-        return transformSelections(view, (text) =>
-          text.toLowerCase().replace(/(^|[\s_-])(\p{L})/gu, (_m, sep: string, ch: string) => sep + ch.toUpperCase()),
-        );
+        return transformSelections(view, (text) => text.toLowerCase().replace(/(^|[\s_-])(\p{L})/gu, (_m, sep: string, ch: string) => sep + ch.toUpperCase()));
       case "sortLinesAscending":
         return transformLines(view, (lines) => [...lines].sort((a, b) => a.localeCompare(b)));
       case "sortLinesDescending":
@@ -1560,7 +1537,8 @@ export class EditorController {
       if (!extensionService.providersFor("definition", current.path, current.language).length) return;
       try {
         const [location] = await extensionService.call("provideDefinition", current.path, line, character);
-        if (location) for (const cb of self.openListeners) cb({ path: extensionService.viewPath(location.path), line: location.line, character: location.character });
+        if (location)
+          for (const cb of self.openListeners) cb({ path: extensionService.viewPath(location.path), line: location.line, character: location.character });
       } catch {
         /* ignore */
       }
@@ -1569,10 +1547,7 @@ export class EditorController {
 
     /** Jump to the first location an extension provider of the kind returns. */
     const goToProviderLocation =
-      (
-        kind: "typeDefinition" | "implementation" | "declaration",
-        method: "provideTypeDefinition" | "provideImplementation" | "provideDeclaration",
-      ) =>
+      (kind: "typeDefinition" | "implementation" | "declaration", method: "provideTypeDefinition" | "provideImplementation" | "provideDeclaration") =>
       async () => {
         const current = self.current;
         if (!self.view || !current) return;
@@ -1580,7 +1555,8 @@ export class EditorController {
         if (!extensionService.providersFor(kind, current.path, current.language).length) return;
         try {
           const [location] = await extensionService.call(method, current.path, line, character);
-          if (location) for (const cb of self.openListeners) cb({ path: extensionService.viewPath(location.path), line: location.line, character: location.character });
+          if (location)
+            for (const cb of self.openListeners) cb({ path: extensionService.viewPath(location.path), line: location.line, character: location.character });
         } catch {
           /* ignore */
         }
@@ -1636,9 +1612,12 @@ export class EditorController {
       linkedEditingExtension(() => self.current),
       onTypeFormattingExtension(() => self.current),
       inlineCompletionExtension(() => self.current),
-      documentLinksExtension(() => self.current, (target) => {
-        for (const cb of self.openListeners) cb(target);
-      }),
+      documentLinksExtension(
+        () => self.current,
+        (target) => {
+          for (const cb of self.openListeners) cb(target);
+        },
+      ),
       colorProviderExtension(() => self.current),
       languageConf.of(languageExtension(language)),
       languageConfigConf.of(languageConfigExtensions(extensionService.languageConfiguration(language))),

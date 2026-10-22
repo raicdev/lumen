@@ -89,7 +89,10 @@ function downloadFor(detail: RawExtension, target: string): string | undefined {
  * has no build for it, the newest of the last few versions that has one.
  */
 async function resolveDownload(namespace: string, name: string, version: string | undefined, target: string): Promise<{ url: string; version: string }> {
-  const path = [namespace, name, version].filter(Boolean).map((part) => encodeURIComponent(part!)).join("/");
+  const path = [namespace, name, version]
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part!))
+    .join("/");
   const detail = await getJson<RawExtension>(`${REGISTRY}/api/${path}`);
   if (detail.error) throw new Error(detail.error);
   const url = downloadFor(detail, target);
@@ -99,7 +102,9 @@ async function resolveDownload(namespace: string, name: string, version: string 
       .filter((candidate) => /^\d/.test(candidate) && candidate !== detail.version)
       .slice(0, OLDER_VERSIONS_TRIED);
     for (const candidate of older) {
-      const previous = await getJson<RawExtension>(`${REGISTRY}/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(candidate)}`).catch(() => null);
+      const previous = await getJson<RawExtension>(
+        `${REGISTRY}/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(candidate)}`,
+      ).catch(() => null);
       const previousUrl = previous && !previous.error ? downloadFor(previous, target) : undefined;
       if (previousUrl) return { url: previousUrl, version: previous!.version };
     }
@@ -125,7 +130,10 @@ export async function downloadFromMarketplace(namespace: string, name: string, v
 
 /** README and listing details of a version (the latest when omitted). */
 export async function marketplaceDetails(namespace: string, name: string, version?: string): Promise<MarketplaceDetails> {
-  const path = [namespace, name, version].filter(Boolean).map((part) => encodeURIComponent(part!)).join("/");
+  const path = [namespace, name, version]
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part!))
+    .join("/");
   const detail = await getJson<RawExtension>(`${REGISTRY}/api/${path}`);
   if (detail.error) throw new Error(detail.error);
   const text = async (url: string | undefined): Promise<string | null> => {

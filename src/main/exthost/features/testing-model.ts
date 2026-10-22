@@ -156,7 +156,13 @@ export class FileCoverage {
   branchCoverage?: TestCoverageCount;
   declarationCoverage?: TestCoverageCount;
   includesTests?: TestItemImpl[];
-  constructor(uri: Uri, statementCoverage: TestCoverageCount, branchCoverage?: TestCoverageCount, declarationCoverage?: TestCoverageCount, includesTests?: TestItemImpl[]) {
+  constructor(
+    uri: Uri,
+    statementCoverage: TestCoverageCount,
+    branchCoverage?: TestCoverageCount,
+    declarationCoverage?: TestCoverageCount,
+    includesTests?: TestItemImpl[],
+  ) {
     this.uri = uri;
     this.statementCoverage = statementCoverage;
     this.branchCoverage = branchCoverage;
@@ -377,8 +383,17 @@ export class TestRunProfileImpl {
   readonly onDidChangeDefault: (listener: (isDefault: boolean) => unknown) => Disposable;
   runHandler: RunHandler;
   configureHandler: (() => void) | undefined;
-  loadDetailedCoverage: ((testRun: TestRunImpl, fileCoverage: FileCoverage, token: CancellationToken) => Thenable<(StatementCoverage | DeclarationCoverage)[]>) | undefined;
-  loadDetailedCoverageForTest: ((testRun: TestRunImpl, fileCoverage: FileCoverage, testItem: TestItemImpl, token: CancellationToken) => Thenable<(StatementCoverage | DeclarationCoverage)[]>) | undefined;
+  loadDetailedCoverage:
+    | ((testRun: TestRunImpl, fileCoverage: FileCoverage, token: CancellationToken) => Thenable<(StatementCoverage | DeclarationCoverage)[]>)
+    | undefined;
+  loadDetailedCoverageForTest:
+    | ((
+        testRun: TestRunImpl,
+        fileCoverage: FileCoverage,
+        testItem: TestItemImpl,
+        token: CancellationToken,
+      ) => Thenable<(StatementCoverage | DeclarationCoverage)[]>)
+    | undefined;
   readonly index: number;
   readonly #controller: ControllerImpl;
   readonly #changeDefault = new EventEmitter<boolean>();
@@ -387,7 +402,16 @@ export class TestRunProfileImpl {
   #tag: TestTag | undefined;
   #supportsContinuousRun: boolean;
 
-  constructor(controller: ControllerImpl, index: number, label: string, kind: number, runHandler: RunHandler, isDefault: boolean, tag: TestTag | undefined, supportsContinuousRun: boolean) {
+  constructor(
+    controller: ControllerImpl,
+    index: number,
+    label: string,
+    kind: number,
+    runHandler: RunHandler,
+    isDefault: boolean,
+    tag: TestTag | undefined,
+    supportsContinuousRun: boolean,
+  ) {
     this.#controller = controller;
     this.index = index;
     this.#label = label;
@@ -440,7 +464,14 @@ export class TestRunProfileImpl {
     this.#controller.removeProfile(this);
   }
   toWire(): TestWireProfile {
-    return { id: this.id, label: this.#label, kind: this.kind, isDefault: this.#isDefault, tag: this.#tag?.id, supportsContinuousRun: this.#supportsContinuousRun };
+    return {
+      id: this.id,
+      label: this.#label,
+      kind: this.kind,
+      isDefault: this.#isDefault,
+      tag: this.#tag?.id,
+      supportsContinuousRun: this.#supportsContinuousRun,
+    };
   }
 }
 
@@ -458,7 +489,15 @@ export class TestRunImpl {
   readonly #dispose = new EventEmitter<void>();
   #ended = false;
 
-  constructor(model: TestingModel, runId: string, controller: ControllerImpl, request: TestRunRequest, name: string | undefined, persist: boolean, token: CancellationToken) {
+  constructor(
+    model: TestingModel,
+    runId: string,
+    controller: ControllerImpl,
+    request: TestRunRequest,
+    name: string | undefined,
+    persist: boolean,
+    token: CancellationToken,
+  ) {
     this.#model = model;
     this.runId = runId;
     this.name = name;
@@ -871,9 +910,13 @@ export class TestingModel {
       const profile = this.findProfile(String(options.profileId));
       if (profile) profiles.push(profile);
     } else {
-      const wanted = options.controllerId ? [this.controllers.get(options.controllerId)].filter((controller): controller is ControllerImpl => !!controller) : [...this.controllers.values()];
+      const wanted = options.controllerId
+        ? [this.controllers.get(options.controllerId)].filter((controller): controller is ControllerImpl => !!controller)
+        : [...this.controllers.values()];
       for (const controller of wanted) {
-        const supporting = controller.profiles.filter((profile) => profile.supportsContinuousRun && (options.kind === undefined || profile.kind === options.kind));
+        const supporting = controller.profiles.filter(
+          (profile) => profile.supportsContinuousRun && (options.kind === undefined || profile.kind === options.kind),
+        );
         const defaults = supporting.filter((profile) => profile.isDefault);
         profiles.push(...(defaults.length ? defaults : supporting.slice(0, 1)));
       }
@@ -955,7 +998,13 @@ export class TestingModel {
     for (const profile of profiles) {
       const controller = profile.controller;
       const mine = include.filter((item) => item.controller === controller);
-      const request = new TestRunRequest(mine.length ? mine : undefined, exclude.filter((item) => item.controller === controller), profile, false, true);
+      const request = new TestRunRequest(
+        mine.length ? mine : undefined,
+        exclude.filter((item) => item.controller === controller),
+        profile,
+        false,
+        true,
+      );
       const sessionId = `session-${++this.#sessionCounter}`;
       const source = new CancellationTokenSource();
       this.#sessions.set(sessionId, source);

@@ -109,7 +109,15 @@ export function VariableNode({ sessionId, variable, depth, generation, defaultOp
       )}
       {open &&
         children?.map((child, i) => (
-          <VariableNode key={`${child.name}:${i}`} sessionId={sessionId} variable={child} depth={depth + 1} generation={generation} container={variable} watch={watch} />
+          <VariableNode
+            key={`${child.name}:${i}`}
+            sessionId={sessionId}
+            variable={child}
+            depth={depth + 1}
+            generation={generation}
+            container={variable}
+            watch={watch}
+          />
         ))}
     </>
   );

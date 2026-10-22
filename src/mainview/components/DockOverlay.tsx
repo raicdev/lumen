@@ -35,8 +35,7 @@ export function DockOverlay({ kind, panelPosition, onDrop }: Props) {
         ? ["editor"]
         : ["panel", "left", "right", "bottom"];
 
-  const accepts = (e: React.DragEvent) =>
-    [PANEL_DRAG_TYPE, TERMINAL_DRAG_TYPE, EDITOR_TERMINAL_DRAG_TYPE].some((type) => e.dataTransfer.types.includes(type));
+  const accepts = (e: React.DragEvent) => [PANEL_DRAG_TYPE, TERMINAL_DRAG_TYPE, EDITOR_TERMINAL_DRAG_TYPE].some((type) => e.dataTransfer.types.includes(type));
 
   return (
     <div className={`dock-overlay dock-${kind}`}>

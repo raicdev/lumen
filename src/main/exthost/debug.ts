@@ -511,7 +511,9 @@ export class DebugSessionManager {
   }
 
   setBreakpoints(path: string, desired: HostDebugSetBreakpoint[]): HostDebugBreakpoint[] {
-    const existing = this.#breakpoints.filter((breakpoint): breakpoint is T.SourceBreakpoint => breakpoint instanceof T.SourceBreakpoint && samePath(breakpoint.location.uri.fsPath, path));
+    const existing = this.#breakpoints.filter(
+      (breakpoint): breakpoint is T.SourceBreakpoint => breakpoint instanceof T.SourceBreakpoint && samePath(breakpoint.location.uri.fsPath, path),
+    );
     const removed: T.Breakpoint[] = [];
     const remaining = [...desired];
     for (const breakpoint of existing) {
@@ -528,7 +530,13 @@ export class DebugSessionManager {
     }
     const added = remaining.map((entry) => {
       const line = Math.max(0, entry.line - 1);
-      return new T.SourceBreakpoint(new T.Location(T.Uri.file(path), new T.Range(line, 0, line, 0)), entry.enabled !== false, entry.condition, entry.hitCondition, entry.logMessage);
+      return new T.SourceBreakpoint(
+        new T.Location(T.Uri.file(path), new T.Range(line, 0, line, 0)),
+        entry.enabled !== false,
+        entry.condition,
+        entry.hitCondition,
+        entry.logMessage,
+      );
     });
     this.#breakpoints = this.#breakpoints.filter((breakpoint) => !removed.includes(breakpoint)).concat(added);
     for (const breakpoint of removed) this.#dapByBreakpoint.delete(breakpoint.id);
@@ -539,7 +547,10 @@ export class DebugSessionManager {
   }
 
   toggleBreakpoint(path: string, line: number): HostDebugBreakpoint[] {
-    const index = this.#breakpoints.findIndex((breakpoint) => breakpoint instanceof T.SourceBreakpoint && samePath(breakpoint.location.uri.fsPath, path) && breakpoint.location.range.start.line + 1 === line);
+    const index = this.#breakpoints.findIndex(
+      (breakpoint) =>
+        breakpoint instanceof T.SourceBreakpoint && samePath(breakpoint.location.uri.fsPath, path) && breakpoint.location.range.start.line + 1 === line,
+    );
     if (index >= 0) this.removeBreakpoints([this.#breakpoints[index]!]);
     else this.addBreakpoints([new T.SourceBreakpoint(new T.Location(T.Uri.file(path), new T.Range(line - 1, 0, line - 1, 0)))]);
     return this.wireBreakpoints();
@@ -604,7 +615,10 @@ export class DebugSessionManager {
 
   #statePath(): string {
     const workspace = this.#host.workspace ?? "";
-    const hash = createHash("sha1").update(process.platform === "win32" ? workspace.toLowerCase() : workspace).digest("hex").slice(0, 20);
+    const hash = createHash("sha1")
+      .update(process.platform === "win32" ? workspace.toLowerCase() : workspace)
+      .digest("hex")
+      .slice(0, 20);
     return join(this.#host.init.userData, "debugState", `${hash}.json`);
   }
 
@@ -614,9 +628,20 @@ export class DebugSessionManager {
       for (const entry of data.breakpoints ?? []) {
         if (!entry || typeof entry !== "object") continue;
         if (entry.kind === "function" && typeof entry.functionName === "string") {
-          this.#breakpoints.push(new T.FunctionBreakpoint(entry.functionName, entry.enabled !== false, entry.condition, entry.hitCondition, entry.logMessage, entry.id));
+          this.#breakpoints.push(
+            new T.FunctionBreakpoint(entry.functionName, entry.enabled !== false, entry.condition, entry.hitCondition, entry.logMessage, entry.id),
+          );
         } else if (typeof entry.path === "string" && typeof entry.line === "number") {
-          this.#breakpoints.push(new T.SourceBreakpoint(new T.Location(T.Uri.file(entry.path), new T.Range(entry.line - 1, 0, entry.line - 1, 0)), entry.enabled !== false, entry.condition, entry.hitCondition, entry.logMessage, entry.id));
+          this.#breakpoints.push(
+            new T.SourceBreakpoint(
+              new T.Location(T.Uri.file(entry.path), new T.Range(entry.line - 1, 0, entry.line - 1, 0)),
+              entry.enabled !== false,
+              entry.condition,
+              entry.hitCondition,
+              entry.logMessage,
+              entry.id,
+            ),
+          );
         }
       }
     } catch {
@@ -637,13 +662,22 @@ export class DebugSessionManager {
   /* ── registration ──────────────────────────────────────────────────────── */
 
   registerProvider(runtime: ExtensionRuntime | null, type: string, provider: Record<string, (...args: any[]) => any>, triggerKind?: number): T.Disposable {
-    const entry: DebugConfigurationProvider = { extensionId: runtime?.id ?? "unknown", type, provider, triggerKind: triggerKind ?? T.DebugConfigurationProviderTriggerKind.Initial };
+    const entry: DebugConfigurationProvider = {
+      extensionId: runtime?.id ?? "unknown",
+      type,
+      provider,
+      triggerKind: triggerKind ?? T.DebugConfigurationProviderTriggerKind.Initial,
+    };
     const list = this.#providers.get(type) ?? [];
     list.push(entry);
     this.#providers.set(type, list);
     return new T.Disposable(() => {
       const current = this.#providers.get(type);
-      if (current) this.#providers.set(type, current.filter((candidate) => candidate !== entry));
+      if (current)
+        this.#providers.set(
+          type,
+          current.filter((candidate) => candidate !== entry),
+        );
     });
   }
 
@@ -661,7 +695,11 @@ export class DebugSessionManager {
     this.#trackerFactories.set(type, list);
     return new T.Disposable(() => {
       const current = this.#trackerFactories.get(type);
-      if (current) this.#trackerFactories.set(type, current.filter((candidate) => candidate !== entry));
+      if (current)
+        this.#trackerFactories.set(
+          type,
+          current.filter((candidate) => candidate !== entry),
+        );
     });
   }
 
@@ -694,7 +732,12 @@ export class DebugSessionManager {
       for (const configuration of list) {
         if (!configuration || typeof configuration !== "object" || typeof configuration.name !== "string" || known.has(configuration.name)) continue;
         known.add(configuration.name);
-        configurations.push({ ...(configuration as Record<string, unknown>), name: configuration.name, type: String(configuration.type ?? entry.type), folder: folder ?? undefined });
+        configurations.push({
+          ...(configuration as Record<string, unknown>),
+          name: configuration.name,
+          type: String(configuration.type ?? entry.type),
+          folder: folder ?? undefined,
+        });
       }
     }
     return { configurations, compounds, error: fromJson.error };
@@ -819,7 +862,7 @@ export class DebugSessionManager {
     const editorKey = this.#host.activeEditorKey;
     const document = editorKey ? this.#host.document(editorKey) : undefined;
     const file = document && !document.isUntitled ? document.key : undefined;
-    const selections = editorKey ? this.#host.editors.get(normalizeKey(editorKey))?.selections ?? [] : [];
+    const selections = editorKey ? (this.#host.editors.get(normalizeKey(editorKey))?.selections ?? []) : [];
     const primary = selections[0] as { start: { line: number; character: number }; end: { line: number; character: number } } | undefined;
     const text = document && !document.isUntitled ? document.getText() : "";
     const selectedText = primary ? sliceLines(text, primary) : undefined;
@@ -841,8 +884,10 @@ export class DebugSessionManager {
 
   async startDebugging(folderInput: string | null, nameOrConfiguration: string | Record<string, unknown>, parentSessionOrOptions?: unknown): Promise<boolean> {
     const folder = folderInput ?? this.#host.workspace;
-    const options = (parentSessionOrOptions && typeof parentSessionOrOptions === "object" && "id" in (parentSessionOrOptions as object) ? undefined : parentSessionOrOptions) as { parentSession?: { id: string }; noDebug?: boolean } | undefined;
-    const parent = options?.parentSession ? this.#sessions.get(options.parentSession.id) ?? null : null;
+    const options = (
+      parentSessionOrOptions && typeof parentSessionOrOptions === "object" && "id" in (parentSessionOrOptions as object) ? undefined : parentSessionOrOptions
+    ) as { parentSession?: { id: string }; noDebug?: boolean } | undefined;
+    const parent = options?.parentSession ? (this.#sessions.get(options.parentSession.id) ?? null) : null;
     try {
       const configuration = typeof nameOrConfiguration === "string" ? await this.#namedConfiguration(folder, nameOrConfiguration) : nameOrConfiguration;
       if (options?.noDebug) configuration.noDebug = true;
@@ -937,26 +982,34 @@ export class DebugSessionManager {
           }
         });
       }
-      const response = await this.#request(session, "initialize", {
-        clientID: CLIENT_ID,
-        clientName: "Lumen",
-        adapterID: type,
-        locale: "en",
-        linesStartAt1: true,
-        columnsStartAt1: true,
-        pathFormat: "path",
-        supportsVariableType: true,
-        supportsVariablePaging: false,
-        supportsRunInTerminalRequest: true,
-        supportsStartDebuggingRequest: true,
-        supportsProgressReporting: false,
-        supportsInvalidatedEvent: true,
-        supportsMemoryReferences: false,
-        supportsArgsCanBeInterpretedByShell: true,
-      }, REQUEST_TIMEOUT);
+      const response = await this.#request(
+        session,
+        "initialize",
+        {
+          clientID: CLIENT_ID,
+          clientName: "Lumen",
+          adapterID: type,
+          locale: "en",
+          linesStartAt1: true,
+          columnsStartAt1: true,
+          pathFormat: "path",
+          supportsVariableType: true,
+          supportsVariablePaging: false,
+          supportsRunInTerminalRequest: true,
+          supportsStartDebuggingRequest: true,
+          supportsProgressReporting: false,
+          supportsInvalidatedEvent: true,
+          supportsMemoryReferences: false,
+          supportsArgsCanBeInterpretedByShell: true,
+        },
+        REQUEST_TIMEOUT,
+      );
       session.capabilities = (response ?? {}) as Record<string, unknown>;
       session.exceptionFilters = normalizeExceptionFilters(session.capabilities);
-      this.#host.post({ type: "debugCapabilities", capabilities: { sessionId: id, capabilities: session.capabilities, exceptionBreakpointFilters: session.exceptionFilters } });
+      this.#host.post({
+        type: "debugCapabilities",
+        capabilities: { sessionId: id, capabilities: session.capabilities, exceptionBreakpointFilters: session.exceptionFilters },
+      });
       const request = String(resolved.request ?? "launch");
       session.launchSent = true;
       await this.#request(session, request === "attach" ? "attach" : "launch", resolved).catch((error: unknown) => {
@@ -978,7 +1031,11 @@ export class DebugSessionManager {
       this.#host.log("error", `could not start '${session.name}': ${error instanceof Error ? error.message : String(error)}`, type);
       this.#host.post({
         type: "debugOutput",
-        output: { sessionId: session.id, category: "stderr", text: `Could not start '${session.name}': ${error instanceof Error ? error.message : String(error)}\n` },
+        output: {
+          sessionId: session.id,
+          category: "stderr",
+          text: `Could not start '${session.name}': ${error instanceof Error ? error.message : String(error)}\n`,
+        },
       });
       for (const tracker of this.#trackers(session)) tracker.tracker?.onError?.(this.sessionFacade(session), error);
       await this.#terminated(session, error instanceof Error ? error : new Error(String(error)));
@@ -1015,13 +1072,27 @@ export class DebugSessionManager {
 
   #connect(session: ManagedSession, descriptor: unknown): DapConnection {
     if (descriptor instanceof T.DebugAdapterInlineImplementation) {
-      const implementation = descriptor.implementation as { handleMessage: (message: unknown) => void; onDidSendMessage: (...args: any[]) => { dispose(): unknown } };
+      const implementation = descriptor.implementation as {
+        handleMessage: (message: unknown) => void;
+        onDidSendMessage: (...args: any[]) => { dispose(): unknown };
+      };
       return new DapConnection(inlineTransport(implementation), session.name);
     }
-    if (descriptor instanceof T.DebugAdapterServer) return new DapConnection(socketTransport(descriptor.port, descriptor.host, (error) => this.#host.log("warning", `debug adapter: ${error.message}`)), session.name);
-    if (descriptor instanceof T.DebugAdapterNamedPipeServer) return new DapConnection(namedPipeTransport(descriptor.path, (error) => this.#host.log("warning", `debug adapter: ${error.message}`)), session.name);
+    if (descriptor instanceof T.DebugAdapterServer)
+      return new DapConnection(
+        socketTransport(descriptor.port, descriptor.host, (error) => this.#host.log("warning", `debug adapter: ${error.message}`)),
+        session.name,
+      );
+    if (descriptor instanceof T.DebugAdapterNamedPipeServer)
+      return new DapConnection(
+        namedPipeTransport(descriptor.path, (error) => this.#host.log("warning", `debug adapter: ${error.message}`)),
+        session.name,
+      );
     if (descriptor instanceof T.DebugAdapterExecutable) {
-      return new DapConnection(executableTransport(descriptor, (text) => this.#emitOutput(session, "stderr", text)), session.name);
+      return new DapConnection(
+        executableTransport(descriptor, (text) => this.#emitOutput(session, "stderr", text)),
+        session.name,
+      );
     }
     throw new Error("unsupported debug adapter descriptor");
   }
@@ -1074,7 +1145,8 @@ export class DebugSessionManager {
     const session = this.#sessions.get(this.#activeStackItem.sessionId);
     if (!session) return undefined;
     const item = this.#activeStackItem;
-    if (item.frameId !== undefined) return new T.DebugStackFrame(item.threadId ?? 0, item.frameId, String(item.frameId), undefined, 0, 0, this.sessionFacade(session));
+    if (item.frameId !== undefined)
+      return new T.DebugStackFrame(item.threadId ?? 0, item.frameId, String(item.frameId), undefined, 0, 0, this.sessionFacade(session));
     return new T.DebugThread(item.threadId ?? 0, `Thread ${item.threadId}`, this.sessionFacade(session));
   }
 
@@ -1087,7 +1159,10 @@ export class DebugSessionManager {
   }
 
   #postSessions(): void {
-    this.#host.post({ type: "debugSessions", sessions: [...this.#sessions.values()].filter((session) => !session.terminated).map((session) => sessionState(session)) });
+    this.#host.post({
+      type: "debugSessions",
+      sessions: [...this.#sessions.values()].filter((session) => !session.terminated).map((session) => sessionState(session)),
+    });
   }
 
   #setActiveSession(session: ManagedSession | null): void {
@@ -1101,7 +1176,13 @@ export class DebugSessionManager {
   setActiveStackItem(sessionId: string | null, threadId?: number, frameId?: number): void {
     this.#activeStackItem = sessionId ? { sessionId, threadId, frameId } : null;
     this.#host.post({ type: "debugActiveStackItem", sessionId, threadId, frameId });
-    this.onDidChangeActiveStackItem.fire(sessionId ? (frameId !== undefined ? { frame: this.activeStackItemApi as T.DebugStackFrame } : { thread: this.activeStackItemApi as T.DebugThread }) : undefined);
+    this.onDidChangeActiveStackItem.fire(
+      sessionId
+        ? frameId !== undefined
+          ? { frame: this.activeStackItemApi as T.DebugStackFrame }
+          : { thread: this.activeStackItemApi as T.DebugThread }
+        : undefined,
+    );
   }
 
   /** Close a session (the adapter stopped, the process exited, or the user asked). */
@@ -1166,7 +1247,9 @@ export class DebugSessionManager {
     if (session.capabilities.supportsFunctionBreakpoints) await step("setFunctionBreakpoints", () => this.#sendFunctionBreakpoints(session));
     await step("setExceptionBreakpoints", () => this.#sendExceptionBreakpoints(session, defaultFilters(session.exceptionFilters)));
     if (session.capabilities.supportsConfigurationDoneRequest !== false) {
-      await session.connection?.request("configurationDone", {}).catch((error: unknown) => this.#host.log("warning", `configurationDone failed: ${error instanceof Error ? error.message : String(error)}`));
+      await session.connection
+        ?.request("configurationDone", {})
+        .catch((error: unknown) => this.#host.log("warning", `configurationDone failed: ${error instanceof Error ? error.message : String(error)}`));
     }
     session.configurationDone = true;
   }
@@ -1202,7 +1285,11 @@ export class DebugSessionManager {
     }
   }
 
-  #applyBreakpointResponse(session: ManagedSession, hostBreakpoints: T.SourceBreakpoint[], dapBreakpoints: { id?: number; verified?: boolean; line?: number; message?: string; source?: HostDebugSource }[]): void {
+  #applyBreakpointResponse(
+    session: ManagedSession,
+    hostBreakpoints: T.SourceBreakpoint[],
+    dapBreakpoints: { id?: number; verified?: boolean; line?: number; message?: string; source?: HostDebugSource }[],
+  ): void {
     let changed = false;
     hostBreakpoints.forEach((breakpoint, index) => {
       const dap = dapBreakpoints[index];
@@ -1210,7 +1297,13 @@ export class DebugSessionManager {
       if (typeof dap.id === "number") session.dapBreakpoints.set(dap.id, breakpoint.id);
       const previous = this.#dapByBreakpoint.get(breakpoint.id);
       const next = { id: dap.id, verified: dap.verified, line: dap.line, message: dap.message, source: dap.source };
-      if (JSON.stringify(previous?.verified) !== JSON.stringify(next.verified) || previous?.line !== next.line || previous?.message !== next.message || (previous?.source as { path?: string } | undefined)?.path !== dap.source?.path) changed = true;
+      if (
+        JSON.stringify(previous?.verified) !== JSON.stringify(next.verified) ||
+        previous?.line !== next.line ||
+        previous?.message !== next.message ||
+        (previous?.source as { path?: string } | undefined)?.path !== dap.source?.path
+      )
+        changed = true;
       this.#dapByBreakpoint.set(breakpoint.id, next);
     });
     if (changed) {
@@ -1222,14 +1315,20 @@ export class DebugSessionManager {
   async #sendFunctionBreakpoints(session: ManagedSession): Promise<void> {
     if (!session.connection) return;
     const functions = this.#breakpoints.filter((breakpoint): breakpoint is T.FunctionBreakpoint => breakpoint instanceof T.FunctionBreakpoint);
-    await session.connection.request("setFunctionBreakpoints", {
-      breakpoints: functions.filter((breakpoint) => breakpoint.enabled).map((breakpoint) => ({ name: breakpoint.functionName, condition: breakpoint.condition, hitCondition: breakpoint.hitCondition })),
-    }).catch(() => undefined);
+    await session.connection
+      .request("setFunctionBreakpoints", {
+        breakpoints: functions
+          .filter((breakpoint) => breakpoint.enabled)
+          .map((breakpoint) => ({ name: breakpoint.functionName, condition: breakpoint.condition, hitCondition: breakpoint.hitCondition })),
+      })
+      .catch(() => undefined);
   }
 
   async #sendExceptionBreakpoints(session: ManagedSession, filters: string[]): Promise<void> {
     if (!session.connection) return;
-    await session.connection.request("setExceptionBreakpoints", { filters }).catch((error: unknown) => this.#host.log("warning", `setExceptionBreakpoints failed: ${error instanceof Error ? error.message : String(error)}`));
+    await session.connection
+      .request("setExceptionBreakpoints", { filters })
+      .catch((error: unknown) => this.#host.log("warning", `setExceptionBreakpoints failed: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   setExceptionBreakpoints(sessionId: string, filters: string[]): boolean {
@@ -1285,7 +1384,12 @@ export class DebugSessionManager {
         this.setActiveStackItem(session.id, body.threadId, undefined);
         return;
       case "output":
-        this.#emitOutput(session, String(body.category ?? "console"), String(body.output ?? ""), body.source && { ...body.source, line: body.line, column: body.column });
+        this.#emitOutput(
+          session,
+          String(body.category ?? "console"),
+          String(body.output ?? ""),
+          body.source && { ...body.source, line: body.line, column: body.column },
+        );
         return;
       case "breakpoint": {
         const id = typeof body.breakpoint?.id === "number" ? session.dapBreakpoints.get(body.breakpoint.id) : undefined;
@@ -1305,7 +1409,10 @@ export class DebugSessionManager {
         if (message.event === "capabilities") {
           session.capabilities = { ...session.capabilities, ...body.capabilities };
           session.exceptionFilters = normalizeExceptionFilters(session.capabilities);
-          this.#host.post({ type: "debugCapabilities", capabilities: { sessionId: session.id, capabilities: session.capabilities, exceptionBreakpointFilters: session.exceptionFilters } });
+          this.#host.post({
+            type: "debugCapabilities",
+            capabilities: { sessionId: session.id, capabilities: session.capabilities, exceptionBreakpointFilters: session.exceptionFilters },
+          });
         }
         return;
       case "invalidated":
@@ -1325,7 +1432,10 @@ export class DebugSessionManager {
   }
 
   /** The first stack frame of a stopped thread: where the editor should reveal. */
-  async #stopLocation(session: ManagedSession, threadId: number): Promise<{ frameId?: number; source?: HostDebugSource; line?: number; column?: number } | null> {
+  async #stopLocation(
+    session: ManagedSession,
+    threadId: number,
+  ): Promise<{ frameId?: number; source?: HostDebugSource; line?: number; column?: number } | null> {
     const frames = await this.#stackTrace(session, threadId, 0, 1);
     const frame = frames[0];
     if (!frame) return null;
@@ -1333,7 +1443,9 @@ export class DebugSessionManager {
   }
 
   #stackTrace(session: ManagedSession, threadId: number, startFrame: number, levels: number): Promise<HostDebugStackFrame[]> {
-    return this.#request(session, "stackTrace", { threadId, startFrame, levels }).then((body) => (body as { stackFrames?: HostDebugStackFrame[] }).stackFrames ?? []);
+    return this.#request(session, "stackTrace", { threadId, startFrame, levels }).then(
+      (body) => (body as { stackFrames?: HostDebugStackFrame[] }).stackFrames ?? [],
+    );
   }
 
   /** A DAP request from the client to the adapter (with trackers and error handling). */
@@ -1352,7 +1464,14 @@ export class DebugSessionManager {
   /* ── reverse requests (adapter → Lumen) ────────────────────────────────── */
 
   async #onReverseRequest(session: ManagedSession, message: { seq: number; command: string; arguments?: any }): Promise<void> {
-    const fail = (error: unknown) => session.connection?.send({ seq: message.seq, type: "response", request_seq: message.seq, success: false, message: error instanceof Error ? error.message : String(error) });
+    const fail = (error: unknown) =>
+      session.connection?.send({
+        seq: message.seq,
+        type: "response",
+        request_seq: message.seq,
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      });
     const ok = (body?: unknown) => session.connection?.send({ seq: message.seq, type: "response", request_seq: message.seq, success: true, body: body ?? {} });
     switch (message.command) {
       case "runInTerminal": {
@@ -1371,7 +1490,9 @@ export class DebugSessionManager {
         try {
           const args = message.arguments ?? {};
           const childConfiguration = { ...(args.configuration ?? {}), type: args.configuration?.type ?? session.type };
-          void this.start(childConfiguration, session.folder, session).catch((error: unknown) => this.#host.log("error", `child debug session failed: ${error instanceof Error ? error.message : String(error)}`));
+          void this.start(childConfiguration, session.folder, session).catch((error: unknown) =>
+            this.#host.log("error", `child debug session failed: ${error instanceof Error ? error.message : String(error)}`),
+          );
           ok({});
         } catch (error) {
           fail(error);
@@ -1407,13 +1528,21 @@ export class DebugSessionManager {
   }
 
   async setVariable(sessionId: string, variablesReference: number, name: string, value: string): Promise<HostDebugVariable | null> {
-    const body = (await this.#request(this.#live(sessionId), "setVariable", { variablesReference, name, value })) as { value: string; type?: string; variablesReference?: number };
+    const body = (await this.#request(this.#live(sessionId), "setVariable", { variablesReference, name, value })) as {
+      value: string;
+      type?: string;
+      variablesReference?: number;
+    };
     if (!body || typeof body.value !== "string") return null;
     return { name, value: body.value, type: body.type, variablesReference: body.variablesReference ?? 0 };
   }
 
   async evaluate(sessionId: string, expression: string, frameId: number | null, context: "repl" | "watch" | "hover"): Promise<HostDebugEvaluateResult | null> {
-    const body = (await this.#request(this.#live(sessionId), "evaluate", { expression, frameId: frameId ?? undefined, context })) as { result?: string; type?: string; variablesReference?: number };
+    const body = (await this.#request(this.#live(sessionId), "evaluate", { expression, frameId: frameId ?? undefined, context })) as {
+      result?: string;
+      type?: string;
+      variablesReference?: number;
+    };
     if (!body || typeof body.result !== "string") return null;
     return { result: body.result, type: body.type, variablesReference: body.variablesReference ?? 0 };
   }
@@ -1489,7 +1618,6 @@ export class DebugSessionManager {
 function samePath(a: string, b: string): boolean {
   return normalizeKey(a) === normalizeKey(b);
 }
-
 
 type DebuggerContribution = {
   type?: string;
@@ -1653,4 +1781,3 @@ function sliceLines(text: string, selection: { start: { line: number; character:
   const end = offsetAt(selection.end.line, selection.end.character);
   return text.slice(Math.min(start, end), Math.max(start, end));
 }
-

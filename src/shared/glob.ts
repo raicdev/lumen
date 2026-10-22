@@ -36,7 +36,10 @@ export function globToRegExp(glob: string): RegExp {
       const end = glob.indexOf("]", i + 1);
       if (end < 0) source += "\\[";
       else {
-        const body = glob.slice(i + 1, end).replace(/^!/, "^").replace(/\\/g, "\\\\");
+        const body = glob
+          .slice(i + 1, end)
+          .replace(/^!/, "^")
+          .replace(/\\/g, "\\\\");
         source += `[${body}]`;
         i = end;
       }

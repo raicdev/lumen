@@ -10,7 +10,9 @@ import type { ProcessExecution, ShellExecution, ShellQuotedString } from "./task
 export type ShellFlavor = "cmd" | "powershell" | "posix";
 
 export function shellFlavor(executable: string): ShellFlavor {
-  const name = basename(executable).toLowerCase().replace(/\.exe$/, "");
+  const name = basename(executable)
+    .toLowerCase()
+    .replace(/\.exe$/, "");
   if (name === "cmd") return "cmd";
   if (name === "powershell" || name === "pwsh") return "powershell";
   return "posix";
@@ -62,14 +64,21 @@ function quotedPart(part: string | ShellQuotedString, flavor: ShellFlavor, optio
 }
 
 /** The shell and the command line a ShellExecution runs. */
-export function shellInvocation(execution: ShellExecution, platform: string = process.platform, env: Record<string, string | undefined> = process.env): { executable: string; args: string[]; line: string; flavor: ShellFlavor } {
+export function shellInvocation(
+  execution: ShellExecution,
+  platform: string = process.platform,
+  env: Record<string, string | undefined> = process.env,
+): { executable: string; args: string[]; line: string; flavor: ShellFlavor } {
   const executable = execution.options?.executable || defaultShell(platform, env);
   const flavor = shellFlavor(executable);
   let line: string;
   if (execution.commandLine !== undefined) line = execution.commandLine;
   else {
     const command = execution.command ?? "";
-    const parts = [typeof command === "string" ? command : quoteWith(command.value, command.quoting, flavor, execution.options), ...(execution.args ?? []).map((arg) => quotedPart(arg, flavor, execution.options))];
+    const parts = [
+      typeof command === "string" ? command : quoteWith(command.value, command.quoting, flavor, execution.options),
+      ...(execution.args ?? []).map((arg) => quotedPart(arg, flavor, execution.options)),
+    ];
     line = parts.join(" ");
     // A quoted command in PowerShell needs the call operator.
     if (flavor === "powershell" && typeof command !== "string") line = `& ${line}`;
@@ -130,7 +139,14 @@ export function runProcess(spec: RunSpec, onOutput: (text: string) => void, onSt
   let settle!: (code: number | null) => void;
   const done = new Promise<number | null>((resolve) => (settle = resolve));
   try {
-    child = spawn(file, args, { cwd: spec.cwd, env, windowsHide: true, windowsVerbatimArguments: verbatim, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
+    child = spawn(file, args, {
+      cwd: spec.cwd,
+      env,
+      windowsHide: true,
+      windowsVerbatimArguments: verbatim,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } catch (error) {
     onOutput(`Failed to start '${file}': ${error instanceof Error ? error.message : String(error)}\r\n`);
     settle(null);

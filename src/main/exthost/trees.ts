@@ -168,7 +168,8 @@ export class TreeViewManager {
       set badge(value: { value: number; tooltip: string } | undefined) {
         update({ badge: value ?? null });
       },
-      reveal: (element: unknown, revealOptions?: { select?: boolean; focus?: boolean; expand?: boolean | number }) => manager.#reveal(tree, element, revealOptions ?? {}),
+      reveal: (element: unknown, revealOptions?: { select?: boolean; focus?: boolean; expand?: boolean | number }) =>
+        manager.#reveal(tree, element, revealOptions ?? {}),
       dispose: () => {
         if (manager.#trees.get(viewId) === tree) manager.#dispose(viewId);
       },
@@ -223,7 +224,10 @@ export class TreeViewManager {
       if (item.command) tree.commands.set(childHandle, item.command);
       items.push(this.#wireItem(item, childHandle, label));
     }
-    tree.children.set(key, items.map((item) => item.handle));
+    tree.children.set(
+      key,
+      items.map((item) => item.handle),
+    );
     return items;
   }
 

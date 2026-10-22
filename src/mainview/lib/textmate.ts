@@ -1,15 +1,6 @@
 import { StreamLanguage } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
-import {
-  INITIAL,
-  Registry,
-  parseRawGrammar,
-  type IGrammar,
-  type IOnigLib,
-  type IRawGrammar,
-  type IToken,
-  type StateStack,
-} from "vscode-textmate";
+import { INITIAL, Registry, parseRawGrammar, type IGrammar, type IOnigLib, type IRawGrammar, type IToken, type StateStack } from "vscode-textmate";
 import { createOnigScanner, createOnigString, loadWASM } from "vscode-oniguruma";
 import onigWasm from "vscode-oniguruma/release/onig.wasm";
 import type { ExtensionGrammar } from "../../shared/types";

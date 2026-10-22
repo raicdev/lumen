@@ -77,7 +77,8 @@ export const authenticationFeature: HostFeature = {
     };
     return {
       authentication: {
-        getSession: (providerId: string, scopes: unknown, options?: GetSessionOptions) => authenticationService(host).getSession(client, providerId, scopes, options),
+        getSession: (providerId: string, scopes: unknown, options?: GetSessionOptions) =>
+          authenticationService(host).getSession(client, providerId, scopes, options),
         getAccounts: (providerId: string) => authenticationService(host).getAccounts(providerId),
         registerAuthenticationProvider: (id: string, label: string, provider: AuthProvider, options?: { supportsMultipleAccounts?: boolean }) =>
           authenticationService(host).registerProvider(id, label, provider, options),

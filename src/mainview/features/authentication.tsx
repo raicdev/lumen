@@ -35,7 +35,9 @@ async function manageAccount(api: ViewFeatureApi, account: AuthenticationAccount
   const index = picked?.[0];
   if (index === undefined) return;
   if (index === 0) {
-    const answer = await api.showMessage("warning", `Sign out of ${account.accountLabel} (${account.providerLabel})? Extensions using it will lose access.`, ["Sign Out"]);
+    const answer = await api.showMessage("warning", `Sign out of ${account.accountLabel} (${account.providerLabel})? Extensions using it will lose access.`, [
+      "Sign Out",
+    ]);
     if (answer !== 0) return;
     await api.requestHost("signOut", [account.providerId, account.accountId]);
   } else {
@@ -46,10 +48,9 @@ async function manageAccount(api: ViewFeatureApi, account: AuthenticationAccount
 }
 
 async function answerPending(api: ViewFeatureApi, request: AuthenticationPendingRequest) {
-  const picked = await api.showQuickPick(
-    [{ label: "Sign In", description: request.providerLabel }, { label: "Dismiss" }],
-    { title: `${request.extensionName} wants to sign in using ${request.providerLabel}` },
-  );
+  const picked = await api.showQuickPick([{ label: "Sign In", description: request.providerLabel }, { label: "Dismiss" }], {
+    title: `${request.extensionName} wants to sign in using ${request.providerLabel}`,
+  });
   const index = picked?.[0];
   if (index === undefined) return;
   try {

@@ -61,7 +61,9 @@ kbd {
   height: 28px;
   padding: 0 10px;
   border-radius: 7px;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .menubar-btn:hover,
@@ -293,7 +295,9 @@ kbd {
 
 .icon-btn {
   border-radius: 6px;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .icon-btn:hover {
@@ -357,7 +361,9 @@ kbd {
   border-right: none;
   border-radius: 7px;
   background: transparent;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .tab:hover {
@@ -476,7 +482,9 @@ kbd {
   font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .panel-tab:hover {
@@ -567,7 +575,9 @@ kbd {
   border-radius: 7px;
   border-color: var(--vscode-input-border);
   background: var(--vscode-input-background);
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
 .search-field:focus-within,
@@ -595,7 +605,10 @@ kbd {
 .scm-commit-btn,
 .ext-install {
   border-radius: 7px;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .primary-btn,
@@ -662,9 +675,7 @@ kbd {
 .dialog {
   padding: 0;
   border-radius: 16px;
-  background:
-    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--dialog-tone) 9%, transparent), transparent 60%),
-    var(--bg-elevated);
+  background: radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--dialog-tone) 9%, transparent), transparent 60%), var(--bg-elevated);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--vscode-foreground) 6%, transparent),
     0 0 0 1px color-mix(in srgb, black 12%, transparent),
@@ -705,7 +716,9 @@ kbd {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .dialog-close:hover {
@@ -757,11 +770,15 @@ kbd {
 }
 
 .dialog .modal-btn.primary {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .dialog .modal-btn.primary:focus-visible {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--focus-ring);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    var(--focus-ring);
 }
 
 .dialog .modal-btn.danger {
@@ -785,11 +802,15 @@ kbd {
 }
 
 @keyframes dialog-backdrop-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes dialog-backdrop-out {
-  to { opacity: 0; }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes dialog-in {
@@ -807,9 +828,16 @@ kbd {
 }
 
 @keyframes dialog-nudge {
-  0%, 100% { transform: none; }
-  30% { transform: scale(1.015); }
-  60% { transform: scale(0.995); }
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: scale(1.015);
+  }
+  60% {
+    transform: scale(0.995);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

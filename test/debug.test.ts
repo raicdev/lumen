@@ -40,7 +40,18 @@ type Harness = {
 async function harness(dir: string, main: string, manifest: Record<string, unknown>, folder = "ext"): Promise<Harness> {
   const location = join(dir, folder);
   mkdirSync(location, { recursive: true });
-  writeFileSync(join(location, "package.json"), JSON.stringify({ name: "debugger-ext", publisher: "test", version: "1.0.0", main: "./main.js", engines: { lumen: "^0.1.0" }, activationEvents: ["*"], ...manifest }));
+  writeFileSync(
+    join(location, "package.json"),
+    JSON.stringify({
+      name: "debugger-ext",
+      publisher: "test",
+      version: "1.0.0",
+      main: "./main.js",
+      engines: { lumen: "^0.1.0" },
+      activationEvents: ["*"],
+      ...manifest,
+    }),
+  );
   writeFileSync(join(location, "main.js"), main);
   const host = new ExtensionHost();
   const posted: HostToView[] = [];
@@ -162,7 +173,10 @@ test("startDebugging reverse requests create child sessions with a parent", { ti
     const started = await host.methods.debugStartConfiguration(dir, { type: "fake", name: "Parent", request: "launch", program: app, startChild: true });
     assert.equal(started.error, undefined);
     const parentId = started.sessionId!;
-    const both = (await waitFor((message) => message.type === "debugSessions" && message.sessions.some((session) => session.id !== parentId))) as Extract<HostToView, { type: "debugSessions" }>;
+    const both = (await waitFor((message) => message.type === "debugSessions" && message.sessions.some((session) => session.id !== parentId))) as Extract<
+      HostToView,
+      { type: "debugSessions" }
+    >;
     const child = both.sessions.find((session) => session.id !== parentId)!;
     assert.equal(child.parentId, parentId);
     assert.equal(child.name, "Child Session");
@@ -180,7 +194,10 @@ test("breakpoints are persisted per workspace and restored", async () => {
     const app = join(dir, "app.js");
     writeFileSync(app, "// app\n");
     const first = await harness(dir, debuggerMain(), { contributes: { debuggers: [{ type: "fake", label: "Fake" }] } });
-    await first.host.methods.debugSetBreakpoints(app, [{ line: 3, condition: "x > 1" }, { line: 9, enabled: false, logMessage: "value is {x}" }]);
+    await first.host.methods.debugSetBreakpoints(app, [
+      { line: 3, condition: "x > 1" },
+      { line: 9, enabled: false, logMessage: "value is {x}" },
+    ]);
     const functionBreakpoint = new (first.host.apiFor(null) as { FunctionBreakpoint: new (name: string) => unknown }).FunctionBreakpoint("main");
     first.host.debug.addBreakpoints([functionBreakpoint as never]);
     assert.equal(first.host.debug.breakpoints.length, 3);
@@ -188,7 +205,14 @@ test("breakpoints are persisted per workspace and restored", async () => {
     const second = await harness(dir, debuggerMain(), { contributes: { debuggers: [{ type: "fake", label: "Fake" }] } }, "ext2");
     const restored = second.host.debug.wireBreakpoints();
     assert.deepEqual(
-      restored.map((breakpoint) => [breakpoint.kind, breakpoint.path ? norm(breakpoint.path) : breakpoint.functionName, breakpoint.line, breakpoint.enabled, breakpoint.condition, breakpoint.logMessage]),
+      restored.map((breakpoint) => [
+        breakpoint.kind,
+        breakpoint.path ? norm(breakpoint.path) : breakpoint.functionName,
+        breakpoint.line,
+        breakpoint.enabled,
+        breakpoint.condition,
+        breakpoint.logMessage,
+      ]),
       [
         ["source", norm(app), 3, true, "x > 1", undefined],
         ["source", norm(app), 9, false, undefined, "value is {x}"],
@@ -231,7 +255,10 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
 
     // Breakpoints are the host's, exposed to the UI and persisted.
     const breakpoints = await host.methods.debugSetBreakpoints(app, [{ line: 2 }]);
-    assert.deepEqual(breakpoints.map((breakpoint) => [norm(breakpoint.path ?? ""), breakpoint.line, breakpoint.enabled]), [[norm(app), 2, true]]);
+    assert.deepEqual(
+      breakpoints.map((breakpoint) => [norm(breakpoint.path ?? ""), breakpoint.line, breakpoint.enabled]),
+      [[norm(app), 2, true]],
+    );
     assert.equal(host.debug.breakpoints.length, 1);
 
     const started = await host.methods.debugStart(dir, "Fake Launch");
@@ -239,7 +266,10 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
     assert.ok(started.sessionId);
     const sessionId = started.sessionId!;
 
-    const sessions = (await waitFor((message) => message.type === "debugSessions" && message.sessions.length > 0)) as Extract<HostToView, { type: "debugSessions" }>;
+    const sessions = (await waitFor((message) => message.type === "debugSessions" && message.sessions.length > 0)) as Extract<
+      HostToView,
+      { type: "debugSessions" }
+    >;
     assert.equal(sessions.sessions[0]!.name, "Fake Launch");
     assert.equal(sessions.sessions[0]!.type, "fake");
 
@@ -250,9 +280,14 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
     assert.equal(stopped.stopped.line, 2);
     // \${workspaceFolder} and the resolved program from the provider reached the adapter.
     assert.equal(norm(stopped.stopped.path ?? ""), norm(app));
-    assert.ok((await waitFor((message) => message.type === "debugOutput" && message.output.category === "stdout")) as Extract<HostToView, { type: "debugOutput" }>);
+    assert.ok(
+      (await waitFor((message) => message.type === "debugOutput" && message.output.category === "stdout")) as Extract<HostToView, { type: "debugOutput" }>,
+    );
     // Variables were substituted before launch: workspaceFolder, command and config.
-    const launchOutput = (await waitFor((message) => message.type === "debugOutput" && message.output.category === "console")) as Extract<HostToView, { type: "debugOutput" }>;
+    const launchOutput = (await waitFor((message) => message.type === "debugOutput" && message.output.category === "console")) as Extract<
+      HostToView,
+      { type: "debugOutput" }
+    >;
     assert.match(launchOutput.output.text, /"program":"[^"]*app\.js"/);
     assert.match(launchOutput.output.text, /"echo":"workspace-command-result"/);
     assert.match(launchOutput.output.text, /"tab":"2"/);
@@ -261,7 +296,9 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
     await waitFor((message) => message.type === "debugCapabilities");
 
     // Adapter verification of the breakpoint reaches the UI.
-    const verified = (await waitFor((message) => message.type === "debugBreakpoints" && message.breakpoints.some((breakpoint) => breakpoint.verified))) as Extract<HostToView, { type: "debugBreakpoints" }>;
+    const verified = (await waitFor(
+      (message) => message.type === "debugBreakpoints" && message.breakpoints.some((breakpoint) => breakpoint.verified),
+    )) as Extract<HostToView, { type: "debugBreakpoints" }>;
     assert.equal(verified.breakpoints[0]!.verifiedLine, 2);
 
     // Threads, stack, scopes and variables.
@@ -273,7 +310,13 @@ test("starts a session from launch.json, hits a breakpoint and inspects the stac
     const scopes = await host.methods.debugScopes(sessionId, frames[0]!.id);
     assert.deepEqual(scopes, [{ name: "Locals", variablesReference: 1000, expensive: false }]);
     const variables = await host.methods.debugVariables(sessionId, 1000);
-    assert.deepEqual(variables.map((variable) => [variable.name, variable.value]), [["counter", "42"], ["greeting", '"hello"']]);
+    assert.deepEqual(
+      variables.map((variable) => [variable.name, variable.value]),
+      [
+        ["counter", "42"],
+        ["greeting", '"hello"'],
+      ],
+    );
     assert.equal((await host.methods.debugEvaluate(sessionId, "counter + 1", frames[0]!.id, "repl"))?.result, "42");
     await assert.rejects(async () => await host.methods.debugEvaluate(sessionId, "please fail", frames[0]!.id, "watch"));
 
@@ -326,18 +369,33 @@ test("resolution can change the type; removed breakpoints are cleared on the ada
   try {
     const app = join(dir, "app.js");
     writeFileSync(app, "a\nb\nc\n");
-    const { host, waitFor } = await harness(dir, aliasMain(), { contributes: { debuggers: [{ type: "alias", label: "Alias" }, { type: "recorded", label: "Recorded" }] } });
+    const { host, waitFor } = await harness(dir, aliasMain(), {
+      contributes: {
+        debuggers: [
+          { type: "alias", label: "Alias" },
+          { type: "recorded", label: "Recorded" },
+        ],
+      },
+    });
     await host.methods.debugToggleBreakpoint(app, 3);
     const started = await host.methods.debugStartConfiguration(dir, { type: "alias", name: "Alias Launch", request: "launch" });
     assert.equal(started.error, undefined);
-    const sessions = (await waitFor((message) => message.type === "debugSessions" && message.sessions.some((s) => s.state === "running"))) as Extract<HostToView, { type: "debugSessions" }>;
+    const sessions = (await waitFor((message) => message.type === "debugSessions" && message.sessions.some((s) => s.state === "running"))) as Extract<
+      HostToView,
+      { type: "debugSessions" }
+    >;
     assert.equal(sessions.sessions[0]!.type, "recorded");
 
-    const recorded = (globalThis as unknown as { __lumenRecordedDap: { command: string; arguments?: { breakpoints?: unknown[]; source?: { path?: string } } }[] }).__lumenRecordedDap;
+    const recorded = (
+      globalThis as unknown as { __lumenRecordedDap: { command: string; arguments?: { breakpoints?: unknown[]; source?: { path?: string } } }[] }
+    ).__lumenRecordedDap;
     const setBreakpoints = () => recorded.filter((request) => request.command === "setBreakpoints");
     assert.deepEqual(setBreakpoints().at(-1)!.arguments!.breakpoints, [{ line: 3 }]);
     // The adapter did not announce supportsFunctionBreakpoints.
-    assert.equal(recorded.some((request) => request.command === "setFunctionBreakpoints"), false);
+    assert.equal(
+      recorded.some((request) => request.command === "setFunctionBreakpoints"),
+      false,
+    );
 
     await host.methods.debugRemoveAllBreakpoints();
     for (let i = 0; i < 50 && !(setBreakpoints().at(-1)!.arguments!.breakpoints!.length === 0); i++) await new Promise((r) => setTimeout(r, 20));

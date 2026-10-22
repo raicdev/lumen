@@ -18,7 +18,18 @@ const ROOT = resolve(import.meta.dirname, "../..");
 
 function startedHost(workspace: string | null): { host: ExtensionHost; posted: HostToView[] } {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace, userData: mkdtempSync(join(tmpdir(), "lumen-tasks-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace,
+    userData: mkdtempSync(join(tmpdir(), "lumen-tasks-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.workspace = workspace;
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
@@ -39,11 +50,27 @@ function run(matcher: string, lines: string[]) {
 
 test("$tsc matches errors with file, position, code and severity", () => {
   const [problem] = run("$tsc", ["src/a.ts(3,7): error TS2304: Cannot find name 'x'.", "unrelated"]);
-  assert.deepEqual(problem, { file: "src/a.ts", line: 3, column: 7, endLine: undefined, endColumn: undefined, severity: "error", code: "2304", message: "Cannot find name 'x'." });
+  assert.deepEqual(problem, {
+    file: "src/a.ts",
+    line: 3,
+    column: 7,
+    endLine: undefined,
+    endColumn: undefined,
+    severity: "error",
+    code: "2304",
+    message: "Cannot find name 'x'.",
+  });
 });
 
 test("$eslint-stylish loops over the lines after a file header", () => {
-  const problems = run("$eslint-stylish", ["/work/a.js", "  1:5  error  Unexpected var  no-var", "  2:1  warning  Missing semicolon  semi", "", "/work/b.js", "  9:2  error  Boom"]);
+  const problems = run("$eslint-stylish", [
+    "/work/a.js",
+    "  1:5  error  Unexpected var  no-var",
+    "  2:1  warning  Missing semicolon  semi",
+    "",
+    "/work/b.js",
+    "  9:2  error  Boom",
+  ]);
   assert.deepEqual(
     problems.map((p) => [p.file, p.line, p.column, p.severity, p.message, p.code]),
     [
@@ -104,7 +131,11 @@ test("tasks.json: platform overrides, global command and dependencies", () => {
 });
 
 test("taskDefinitions required properties are errors and type mismatches are warnings", () => {
-  const definition = { type: "demo", required: ["script"], properties: { script: { type: "string" }, port: { type: ["number", "null"] }, watch: { type: "boolean" } } };
+  const definition = {
+    type: "demo",
+    required: ["script"],
+    properties: { script: { type: "string" }, port: { type: ["number", "null"] }, watch: { type: "boolean" } },
+  };
   assert.deepEqual(taskDefinitionIssues({ label: "x", type: "demo", port: "80", watch: false }, definition), [
     { severity: "error", message: "Required property 'script' is missing." },
     { severity: "warning", message: "Property 'port' should be of type 'number' or 'null' but is of type 'string'." },
@@ -160,7 +191,12 @@ test("runs tasks.json tasks, reports problems as diagnostics and fires events", 
   const script = `console.log("src/a.ts(2,3): error TS2322: Type bad."); console.error("done"); process.exit(3)`;
   writeFileSync(
     join(workspace, ".vscode", "tasks.json"),
-    JSON.stringify({ version: "2.0.0", tasks: [{ label: "fail", type: "process", command: process.execPath, args: ["-e", script], problemMatcher: "$tsc", options: { cwd: "${workspaceFolder}" } }] }),
+    JSON.stringify({
+      version: "2.0.0",
+      tasks: [
+        { label: "fail", type: "process", command: process.execPath, args: ["-e", script], problemMatcher: "$tsc", options: { cwd: "${workspaceFolder}" } },
+      ],
+    }),
   );
   const { host, posted } = startedHost(workspace);
   const api = host.apiFor(null) as { tasks: Record<string, any> };
@@ -181,7 +217,13 @@ test("runs tasks.json tasks, reports problems as diagnostics and fires events", 
   assert.deepEqual(events, ["start", "process:number", "exit:3", "end"]);
   const feature = posted.filter((m) => m.type === "feature").map((m) => m.payload as { kind: string; text?: string; exitCode?: number; errors?: number });
   assert.ok(feature.some((m) => m.kind === "reveal"));
-  assert.ok(feature.filter((m) => m.kind === "output").map((m) => m.text).join("").includes("error TS2322"));
+  assert.ok(
+    feature
+      .filter((m) => m.kind === "output")
+      .map((m) => m.text)
+      .join("")
+      .includes("error TS2322"),
+  );
   const end = feature.find((m) => m.kind === "end")!;
   assert.equal(end.exitCode, 3);
   assert.equal(end.errors, 1);
@@ -194,20 +236,36 @@ test("executeTask runs API tasks, custom executions and dependsOn chains", async
   const workspace = mkdtempSync(join(tmpdir(), "lumen-tasks-ws-"));
   mkdirSync(join(workspace, ".vscode"));
   const log = join(workspace, "order.txt").replace(/\\/g, "/");
-  const step = (name: string) => ({ label: name, type: "process", command: process.execPath, args: ["-e", `require("fs").appendFileSync(${JSON.stringify(log)}, ${JSON.stringify(name)})`] });
-  writeFileSync(join(workspace, ".vscode", "tasks.json"), JSON.stringify({ version: "2.0.0", tasks: [step("one"), step("two"), { label: "both", dependsOn: ["one", "two"], dependsOrder: "sequence" }] }));
+  const step = (name: string) => ({
+    label: name,
+    type: "process",
+    command: process.execPath,
+    args: ["-e", `require("fs").appendFileSync(${JSON.stringify(log)}, ${JSON.stringify(name)})`],
+  });
+  writeFileSync(
+    join(workspace, ".vscode", "tasks.json"),
+    JSON.stringify({ version: "2.0.0", tasks: [step("one"), step("two"), { label: "both", dependsOn: ["one", "two"], dependsOrder: "sequence" }] }),
+  );
   const { host } = startedHost(workspace);
   const vscode = host.apiFor(null) as Record<string, any>;
 
   // A provider's task with a custom execution.
   const outputs: string[] = [];
   vscode.tasks.registerTaskProvider("demo", {
-    provideTasks: () => [new vscode.Task({ type: "demo" }, vscode.TaskScope.Workspace, "hello", "demo", new vscode.CustomExecution(async () => ({
-      onDidWrite: (listener: (text: string) => void) => (setTimeout(() => listener("hi from pty\r\n"), 5), { dispose() {} }),
-      onDidClose: (listener: (code: number) => void) => (setTimeout(() => listener(0), 40), { dispose() {} }),
-      open() {},
-      close() {},
-    })))],
+    provideTasks: () => [
+      new vscode.Task(
+        { type: "demo" },
+        vscode.TaskScope.Workspace,
+        "hello",
+        "demo",
+        new vscode.CustomExecution(async () => ({
+          onDidWrite: (listener: (text: string) => void) => (setTimeout(() => listener("hi from pty\r\n"), 5), { dispose() {} }),
+          onDidClose: (listener: (code: number) => void) => (setTimeout(() => listener(0), 40), { dispose() {} }),
+          open() {},
+          close() {},
+        })),
+      ),
+    ],
     resolveTask: () => undefined,
   });
   const ended: unknown[] = [];
@@ -235,8 +293,22 @@ test("problemMatcher applyTo only reports problems of open / closed documents", 
     JSON.stringify({
       version: "2.0.0",
       tasks: [
-        { label: "open", type: "process", command: process.execPath, args: ["-e", script], options: { cwd: "${workspaceFolder}" }, problemMatcher: matcher("openOnly", "openDocuments") },
-        { label: "closed", type: "process", command: process.execPath, args: ["-e", script], options: { cwd: "${workspaceFolder}" }, problemMatcher: matcher("closedOnly", "closedDocuments") },
+        {
+          label: "open",
+          type: "process",
+          command: process.execPath,
+          args: ["-e", script],
+          options: { cwd: "${workspaceFolder}" },
+          problemMatcher: matcher("openOnly", "openDocuments"),
+        },
+        {
+          label: "closed",
+          type: "process",
+          command: process.execPath,
+          args: ["-e", script],
+          options: { cwd: "${workspaceFolder}" },
+          problemMatcher: matcher("closedOnly", "closedDocuments"),
+        },
       ],
     }),
   );
@@ -304,7 +376,12 @@ test("tasks.json tasks missing a required taskDefinitions property are reported 
 
   await host.executeCommand("workbench.action.tasks.runTask", ["bad"]);
   await waitFor(() => posted.some((m) => m.type === "feature" && (m.payload as { kind: string }).kind === "end"));
-  const output = posted.filter((m) => m.type === "feature").map((m) => m.payload as { kind: string; text?: string }).filter((m) => m.kind === "output").map((m) => m.text ?? "").join("");
+  const output = posted
+    .filter((m) => m.type === "feature")
+    .map((m) => m.payload as { kind: string; text?: string })
+    .filter((m) => m.kind === "output")
+    .map((m) => m.text ?? "")
+    .join("");
   assert.ok(output.includes("Required property 'script' is missing."));
   assert.equal(existsSync(marker), false);
 
@@ -315,11 +392,20 @@ test("tasks.json tasks missing a required taskDefinitions property are reported 
 test("terminate stops a running task", async () => {
   const { host, posted } = startedHost(null);
   const vscode = host.apiFor(null) as Record<string, any>;
-  const task = new vscode.Task({ type: "x" }, vscode.TaskScope.Global, "sleep", "t", new vscode.ProcessExecution(process.execPath, ["-e", "setTimeout(() => {}, 60000)"]));
+  const task = new vscode.Task(
+    { type: "x" },
+    vscode.TaskScope.Global,
+    "sleep",
+    "t",
+    new vscode.ProcessExecution(process.execPath, ["-e", "setTimeout(() => {}, 60000)"]),
+  );
   const execution = await vscode.tasks.executeTask(task);
   await new Promise((done) => setTimeout(done, 300));
   execution.terminate();
   await waitFor(() => posted.some((m) => m.type === "feature" && (m.payload as { kind: string }).kind === "end"));
-  const end = posted.filter((m) => m.type === "feature").map((m) => m.payload as { kind: string; terminated?: boolean }).find((m) => m.kind === "end")!;
+  const end = posted
+    .filter((m) => m.type === "feature")
+    .map((m) => m.payload as { kind: string; terminated?: boolean })
+    .find((m) => m.kind === "end")!;
   assert.equal(end.terminated, true);
 });

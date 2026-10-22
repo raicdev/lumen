@@ -203,7 +203,9 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--vscode-focusBorder) 6%, transparent);
   pointer-events: auto;
-  transition: background 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
 }
 
 .dock-zone.hover {

@@ -1,14 +1,7 @@
 import koffi from "koffi";
 import type { NativeHandle } from "./webview.ts";
 import { capture, launch } from "./process.ts";
-import type {
-  MenuGroup,
-  MessageBoxOptions,
-  OpenDialogOptions,
-  Platform,
-  SaveDialogOptions,
-  WindowHooks,
-} from "./platform.ts";
+import type { MenuGroup, MessageBoxOptions, OpenDialogOptions, Platform, SaveDialogOptions, WindowHooks } from "./platform.ts";
 
 /**
  * POSIX backends (macOS / Linux).
@@ -34,12 +27,8 @@ let coreFoundation: CoreFoundation | null = null;
 
 function loadCoreFoundation(): CoreFoundation {
   const lib = koffi.load("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
-  const CFRunLoopRunInMode = lib.func(
-    "int32_t CFRunLoopRunInMode(void *mode, double seconds, uint8_t returnAfterSourceHandled)",
-  );
-  const CFStringCreateWithCString = lib.func(
-    "void *CFStringCreateWithCString(void *alloc, const char *str, uint32_t encoding)",
-  );
+  const CFRunLoopRunInMode = lib.func("int32_t CFRunLoopRunInMode(void *mode, double seconds, uint8_t returnAfterSourceHandled)");
+  const CFStringCreateWithCString = lib.func("void *CFStringCreateWithCString(void *alloc, const char *str, uint32_t encoding)");
 
   // CFRunLoop compares modes by value, so an equal CFString works in place of
   // the exported `kCFRunLoopDefaultMode` constant.
@@ -112,32 +101,34 @@ async function showOpenDialog(options: OpenDialogOptions): Promise<string[]> {
     const prompt = options.title ?? (directory ? "Select a folder" : "Open file");
     const script = directory
       ? `POSIX path of (choose folder with prompt "${prompt}")`
-      : `set theFiles to (choose file with prompt "${prompt}"${
-          options.properties?.includes("multiSelections") ? " with multiple selections allowed" : ""
-        })
+      : `set theFiles to (choose file with prompt "${prompt}"${options.properties?.includes("multiSelections") ? " with multiple selections allowed" : ""})
 set theOutput to ""
 repeat with f in theFiles
   set theOutput to theOutput & POSIX path of f & linefeed
 end repeat
 return theOutput`;
     const stdout = await spawnCapture(["osascript", "-e", script]);
-    return stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    return stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
   }
 
   const args = ["zenity", "--file-selection", `--title=${options.title ?? "Open"}`];
   if (directory) args.push("--directory");
   if (options.properties?.includes("multiSelections")) args.push("--multiple", "--separator=\n");
   const stdout = await spawnCapture(args);
-  return stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 async function showSaveDialog(options: SaveDialogOptions): Promise<string | null> {
   const defaultPath = options.defaultPath ?? "";
   if (process.platform === "darwin") {
     const name = defaultPath.split("/").pop() ?? "";
-    const script = `POSIX path of (choose file name with prompt "${options.title ?? "Save As"}"${
-      name ? ` default name "${name.replace(/"/g, '\\"')}"` : ""
-    })`;
+    const script = `POSIX path of (choose file name with prompt "${options.title ?? "Save As"}"${name ? ` default name "${name.replace(/"/g, '\\"')}"` : ""})`;
     return (await spawnCapture(["osascript", "-e", script])) || null;
   }
   const args = ["zenity", "--file-selection", "--save", "--confirm-overwrite", `--title=${options.title ?? "Save As"}`];

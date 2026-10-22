@@ -24,7 +24,17 @@ type Props = {
 };
 
 /** A collapsible section of the Run and Debug view. */
-function Section({ title, actions, children, defaultOpen = true }: { title: string; actions?: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
+function Section({
+  title,
+  actions,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className={`dbg-section${open ? " open" : ""}`}>
@@ -248,7 +258,10 @@ function WatchSection() {
             onDoubleClick={() => setEditing(i)}
             onContextMenu={(e) => {
               const session = debug.sessions.find((candidate) => candidate.id === focused?.sessionId) ?? null;
-              const value = result && !("error" in result) ? { value: result.result, type: result.type, variablesReference: result.variablesReference } : { value: "", variablesReference: 0 };
+              const value =
+                result && !("error" in result)
+                  ? { value: result.result, type: result.type, variablesReference: result.variablesReference }
+                  : { value: "", variablesReference: 0 };
               showContributedMenu(e, "debug/watch/context", debugMenuLookup(session, { watchItemType: "expression", watchExpressionsFocused: true }), [
                 { sessionId: focused?.sessionId, variable: { name: expression, evaluateName: expression, ...value } },
               ]);
@@ -274,7 +287,13 @@ function WatchSection() {
             <div key={i} className="dbg-watch-tree" onDoubleClick={() => setEditing(i)}>
               <VariableNode
                 sessionId={focused.sessionId}
-                variable={{ name: expression, value: result.result, type: result.type, variablesReference: result.variablesReference, evaluateName: expression }}
+                variable={{
+                  name: expression,
+                  value: result.result,
+                  type: result.type,
+                  variablesReference: result.variablesReference,
+                  evaluateName: expression,
+                }}
                 depth={0}
                 generation={generation}
                 watch
@@ -319,14 +338,21 @@ function SessionNode({ session, depth, onReveal }: { session: HostDebugSession; 
     };
   }, [session.id, session.state, session.stoppedThreadId, generation]);
 
-  const label = session.state === "stopped" ? `Paused${session.stoppedReason ? ` on ${session.stoppedReason}` : ""}` : session.state === "starting" ? "Starting" : "Running";
+  const label =
+    session.state === "stopped"
+      ? `Paused${session.stoppedReason ? ` on ${session.stoppedReason}` : ""}`
+      : session.state === "starting"
+        ? "Starting"
+        : "Running";
   return (
     <>
       <div
         className="dbg-row dbg-session-row"
         style={{ paddingLeft: 8 + depth * 12 }}
         onClick={() => setOpen((v) => !v)}
-        onContextMenu={(e) => showContributedMenu(e, "debug/callstack/context", callStackLookup(session, "session", threads.length === 1), [{ sessionId: session.id }])}
+        onContextMenu={(e) =>
+          showContributedMenu(e, "debug/callstack/context", callStackLookup(session, "session", threads.length === 1), [{ sessionId: session.id }])
+        }
       >
         <ChevronRight size={14} className={`dbg-chevron${open ? " open" : ""}`} />
         <span className="dbg-name">{session.name}</span>
@@ -393,7 +419,11 @@ function ThreadNode({
           className="dbg-row dbg-thread-row"
           style={{ paddingLeft: 8 + depth * 12 }}
           onClick={() => setOpen((v) => !v)}
-          onContextMenu={(e) => showContributedMenu(e, "debug/callstack/context", callStackLookup(session, "thread", single, stopped), [{ sessionId: session.id, threadId: thread.id }])}
+          onContextMenu={(e) =>
+            showContributedMenu(e, "debug/callstack/context", callStackLookup(session, "thread", single, stopped), [
+              { sessionId: session.id, threadId: thread.id },
+            ])
+          }
         >
           <ChevronRight size={14} className={`dbg-chevron${open ? " open" : ""}${stopped ? "" : " hidden"}`} />
           <span className="dbg-name">{thread.name}</span>
@@ -411,7 +441,10 @@ function ThreadNode({
             threadId: thread.id,
             frameId: frame.id,
             frameName: frame.name,
-            frameLocation: { range: { startLineNumber: frame.line, startColumn: frame.column, endLineNumber: frame.line, endColumn: frame.column }, source: frame.source },
+            frameLocation: {
+              range: { startLineNumber: frame.line, startColumn: frame.column, endLineNumber: frame.line, endColumn: frame.column },
+              source: frame.source,
+            },
           };
           const lookup = callStackLookup(session, "stackFrame", single, stopped);
           return (
@@ -474,7 +507,9 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
     if (session) void debugService.setExceptionBreakpoints(session.id, [...next]);
   };
 
-  const sorted = [...breakpoints].sort((a, b) => (a.path ?? a.functionName ?? "").localeCompare(b.path ?? b.functionName ?? "") || (a.line ?? 0) - (b.line ?? 0));
+  const sorted = [...breakpoints].sort(
+    (a, b) => (a.path ?? a.functionName ?? "").localeCompare(b.path ?? b.functionName ?? "") || (a.line ?? 0) - (b.line ?? 0),
+  );
   if (!filters.length && !sorted.length) return <div className="dbg-placeholder">No breakpoints. Click left of a line number to add one.</div>;
   return (
     <>
@@ -492,7 +527,16 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
           <div
             key={bp.id}
             className={`dbg-row dbg-bp-row${unverified ? " unverified" : ""}`}
-            title={[bp.condition && `Condition: ${bp.condition}`, bp.hitCondition && `Hit count: ${bp.hitCondition}`, bp.logMessage && `Log: ${bp.logMessage}`, unverified && (bp.message ?? "Unverified breakpoint")].filter(Boolean).join("\n") || path}
+            title={
+              [
+                bp.condition && `Condition: ${bp.condition}`,
+                bp.hitCondition && `Hit count: ${bp.hitCondition}`,
+                bp.logMessage && `Log: ${bp.logMessage}`,
+                unverified && (bp.message ?? "Unverified breakpoint"),
+              ]
+                .filter(Boolean)
+                .join("\n") || path
+            }
             onClick={() => path && line && onReveal(path, line)}
           >
             <input

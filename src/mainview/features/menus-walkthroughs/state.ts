@@ -139,7 +139,9 @@ export function selectStepByKey(key: string): void {
 
 /** A step was selected: remembered, and completed when it has no completion events (or `onStepSelected`). */
 export function selectStep(walkthrough: Walkthrough, step: WalkthroughStep): void {
-  progressStore.set((progress) => (progress.selected[walkthrough.key] === step.id ? progress : { ...progress, selected: { ...progress.selected, [walkthrough.key]: step.id } }));
+  progressStore.set((progress) =>
+    progress.selected[walkthrough.key] === step.id ? progress : { ...progress, selected: { ...progress.selected, [walkthrough.key]: step.id } },
+  );
   if (!completesOnSelect(step)) return;
   const key = firedKey(walkthrough, step, "onStepSelected");
   if (!fired.has(key) && !isStepDone(progressStore.get(), walkthrough, step)) setStepDone(walkthrough, step, true);
@@ -181,7 +183,9 @@ export function useHiddenWalkthroughs(): Set<string> {
 /* ── the walkthroughs of the enabled extensions ──────────────────────────── */
 
 function sourcesOf(extensions: ExtensionDescription[]) {
-  return extensions.filter((extension) => extension.enabled).map((extension) => ({ id: extension.id, manifest: extension.manifest, commandIcons: extension.commandIcons, iconUrl: extension.iconUrl }));
+  return extensions
+    .filter((extension) => extension.enabled)
+    .map((extension) => ({ id: extension.id, manifest: extension.manifest, commandIcons: extension.commandIcons, iconUrl: extension.iconUrl }));
 }
 
 export function currentWalkthroughs(): Walkthrough[] {

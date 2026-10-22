@@ -50,7 +50,9 @@ export function globMatches(pattern: string, path: string): boolean {
  */
 export function matchingNotebooks(entries: NotebookContribution[], path: string, builtinType?: string): NotebookContribution[] {
   if (path.startsWith("untitled:")) return [];
-  return entries.filter((entry) => entry.type !== builtinType && entry.selector?.some((selector) => !!selector.filenamePattern && globMatches(selector.filenamePattern, path)));
+  return entries.filter(
+    (entry) => entry.type !== builtinType && entry.selector?.some((selector) => !!selector.filenamePattern && globMatches(selector.filenamePattern, path)),
+  );
 }
 
 /** Does a matching contribution make the file open in the notebook editor by default? */

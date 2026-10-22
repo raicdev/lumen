@@ -27,13 +27,21 @@ function splitLines(text: string): string[] {
 
 function decodeOutput(output: Json): NotebookCellOutput | undefined {
   const type = output.output_type;
-  const metadata = { outputType: type, ...(output.metadata && Object.keys(output.metadata as Json).length ? { metadata: output.metadata } : {}), ...(output.execution_count !== undefined ? { executionCount: output.execution_count } : {}) };
+  const metadata = {
+    outputType: type,
+    ...(output.metadata && Object.keys(output.metadata as Json).length ? { metadata: output.metadata } : {}),
+    ...(output.execution_count !== undefined ? { executionCount: output.execution_count } : {}),
+  };
   if (type === "stream") {
     const mime = output.name === "stderr" ? MIME_STDERR : MIME_STDOUT;
     return new NotebookCellOutput([NotebookCellOutputItem.text(lines(output.text), mime)], metadata);
   }
   if (type === "error") {
-    const error = { name: String(output.ename ?? "Error"), message: String(output.evalue ?? ""), stack: Array.isArray(output.traceback) ? output.traceback.join("\n") : "" };
+    const error = {
+      name: String(output.ename ?? "Error"),
+      message: String(output.evalue ?? ""),
+      stack: Array.isArray(output.traceback) ? output.traceback.join("\n") : "",
+    };
     return new NotebookCellOutput([NotebookCellOutputItem.json(error, MIME_ERROR)], metadata);
   }
   if (type === "display_data" || type === "execute_result") {
@@ -51,7 +59,9 @@ function decodeOutput(output: Json): NotebookCellOutput | undefined {
 export function parseIpynb(text: string): NotebookData {
   const json: Json = text.trim() ? JSON.parse(text) : {};
   const metadata = (json.metadata ?? {}) as Json;
-  const language = String(((metadata.language_info as Json | undefined)?.name ?? (metadata.kernelspec as Json | undefined)?.language ?? "python") as string).toLowerCase();
+  const language = String(
+    ((metadata.language_info as Json | undefined)?.name ?? (metadata.kernelspec as Json | undefined)?.language ?? "python") as string,
+  ).toLowerCase();
   const cells: NotebookCellData[] = [];
   for (const raw of (Array.isArray(json.cells) ? json.cells : []) as Json[]) {
     const cellMetadata: Json = { ...((raw.metadata ?? {}) as Json) };
@@ -60,7 +70,8 @@ export function parseIpynb(text: string): NotebookData {
       const cell = new NotebookCellData(NotebookCellKind.Code, lines(raw.source), language);
       cell.metadata = cellMetadata;
       cell.outputs = ((Array.isArray(raw.outputs) ? raw.outputs : []) as Json[]).map(decodeOutput).filter((output): output is NotebookCellOutput => !!output);
-      if (typeof raw.execution_count === "number") (cell as unknown as { executionSummary: unknown }).executionSummary = { executionOrder: raw.execution_count };
+      if (typeof raw.execution_count === "number")
+        (cell as unknown as { executionSummary: unknown }).executionSummary = { executionOrder: raw.execution_count };
       cells.push(cell);
     } else {
       if (raw.cell_type === "raw") cellMetadata.raw = true;
@@ -82,7 +93,11 @@ function encodeOutput(output: OutputLike): Json | undefined {
   const first = output.items[0];
   if (!first) return undefined;
   if (first.mime === MIME_STDOUT || first.mime === MIME_STDERR) {
-    return { output_type: "stream", name: first.mime === MIME_STDERR ? "stderr" : "stdout", text: splitLines(output.items.map((item) => decode(item.data)).join("")) };
+    return {
+      output_type: "stream",
+      name: first.mime === MIME_STDERR ? "stderr" : "stdout",
+      text: splitLines(output.items.map((item) => decode(item.data)).join("")),
+    };
   }
   if (first.mime === MIME_ERROR) {
     let error: Json = {};
@@ -91,7 +106,12 @@ function encodeOutput(output: OutputLike): Json | undefined {
     } catch {
       /* keep the empty error */
     }
-    return { output_type: "error", ename: String(error.name ?? "Error"), evalue: String(error.message ?? ""), traceback: String(error.stack ?? "").split("\n") };
+    return {
+      output_type: "error",
+      ename: String(error.name ?? "Error"),
+      evalue: String(error.message ?? ""),
+      traceback: String(error.stack ?? "").split("\n"),
+    };
   }
   const data: Json = {};
   for (const item of output.items) {

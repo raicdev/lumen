@@ -62,11 +62,7 @@ function augment(items: ContextMenuItem[]): ContextMenuItem[] {
  * Lightweight in-app context menu. Resolves with the chosen action, or null
  * when the menu is dismissed.
  */
-export function showContextMenu(
-  x: number,
-  y: number,
-  items: ContextMenuItem[],
-): Promise<string | null> {
+export function showContextMenu(x: number, y: number, items: ContextMenuItem[]): Promise<string | null> {
   return new Promise((resolve) => {
     const menu = document.createElement("div");
     menu.className = "ctx-menu";

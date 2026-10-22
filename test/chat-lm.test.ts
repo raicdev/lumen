@@ -20,7 +20,18 @@ type Api = Record<string, any>;
 
 function startedHost() {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-chat-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-chat-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const chat: ChatHostMessage[] = [];
   host.post = (message) => {
     if (message.type === "feature" && message.area === "chat-lm") chat.push(message.payload as ChatHostMessage);
@@ -29,7 +40,8 @@ function startedHost() {
   return { host, api, chat, state: chatLmState(host) };
 }
 
-const doneOf = (chat: ChatHostMessage[], id: number) => chat.find((message) => message.kind === "done" && message.id === id) as Extract<ChatHostMessage, { kind: "done" }>;
+const doneOf = (chat: ChatHostMessage[], id: number) =>
+  chat.find((message) => message.kind === "done" && message.id === id) as Extract<ChatHostMessage, { kind: "done" }>;
 const markdownOf = (chat: ChatHostMessage[], id: number) =>
   chat.flatMap((message) => (message.kind === "part" && message.id === id && message.part.type === "markdown" ? [message.part.value] : [])).join("");
 
@@ -79,7 +91,10 @@ test("a chat participant streams parts, history and followups", async () => {
   participant.onDidReceiveFeedback((event: unknown) => feedback.push(event));
   assert.throws(() => api.chat.createChatParticipant("test.echo", () => {}), /already registered/);
 
-  assert.deepEqual(state.listParticipants().map((p) => [p.id, p.name]), [["test.echo", "echo"]]);
+  assert.deepEqual(
+    state.listParticipants().map((p) => [p.id, p.name]),
+    [["test.echo", "echo"]],
+  );
   await state.run({ id: 1, text: "@echo hello" });
   assert.equal(markdownOf(chat, 1), "you said: hello (command none, history 0)!");
   const parts = chat.flatMap((message) => (message.kind === "part" && message.id === 1 ? [message.part.type] : []));
@@ -202,7 +217,9 @@ test("language model providers, sendRequest, tools and the direct chat loop", as
   const { api, chat, state } = startedHost();
   state.confirm = async () => 0;
   const provider = {
-    provideLanguageModelChatInformation: async () => [{ id: "m1", name: "Model One", family: "fam", version: "1", maxInputTokens: 1000, maxOutputTokens: 100, capabilities: { toolCalling: true } }],
+    provideLanguageModelChatInformation: async () => [
+      { id: "m1", name: "Model One", family: "fam", version: "1", maxInputTokens: 1000, maxOutputTokens: 100, capabilities: { toolCalling: true } },
+    ],
     provideLanguageModelChatResponse: async (_model: any, messages: any[], options: any, progress: any) => {
       const last = messages[messages.length - 1];
       const result = last.content.find((part: any) => part instanceof api.LanguageModelToolResultPart);
@@ -282,7 +299,10 @@ test("MCP servers from a definition provider contribute tools", async () => {
   });
   for (const reg of state.mcpProviders.values()) await reg.refreshing;
   const servers = state.wireMcpServers();
-  assert.deepEqual(servers.map((server) => [server.label, server.status, server.tools, server.error]), [["Fixture", "running", 1, undefined]]);
+  assert.deepEqual(
+    servers.map((server) => [server.label, server.status, server.tools, server.error]),
+    [["Fixture", "running", 1, undefined]],
+  );
   assert.match(asked[0]!, /Fixture/);
   const info = api.lm.tools.find((tool: any) => tool.tags.includes("mcp"));
   assert.equal(info.name, "mcp_Fixture_echo");

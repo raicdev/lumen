@@ -93,7 +93,8 @@ class DebugService {
         for (const listener of this.#stoppedListeners) listener(message.stopped);
         return;
       case "debugContinued":
-        if (this.#snapshot.stopped?.sessionId === message.sessionId && (message.threadId === undefined || message.threadId === this.#snapshot.stopped.threadId)) this.#update({ stopped: null });
+        if (this.#snapshot.stopped?.sessionId === message.sessionId && (message.threadId === undefined || message.threadId === this.#snapshot.stopped.threadId))
+          this.#update({ stopped: null });
         return;
       case "debugOutput": {
         const console_ = [...this.#snapshot.console, message.output];
@@ -166,7 +167,12 @@ class DebugService {
     return extensionService.call("debugVariables", sessionId, variablesReference, filter, start, count);
   }
 
-  evaluate(sessionId: string, expression: string, frameId: number | null, context: "repl" | "watch" | "hover" = "repl"): Promise<HostDebugEvaluateResult | null> {
+  evaluate(
+    sessionId: string,
+    expression: string,
+    frameId: number | null,
+    context: "repl" | "watch" | "hover" = "repl",
+  ): Promise<HostDebugEvaluateResult | null> {
     return extensionService.call("debugEvaluate", sessionId, expression, frameId, context);
   }
 

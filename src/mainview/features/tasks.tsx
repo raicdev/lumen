@@ -36,7 +36,20 @@ function handleHostMessage(message: TasksHostMessage, api: ViewFeatureApi): void
   switch (message.kind) {
     case "start":
       store.set((state) => ({
-        runs: [...state.runs.slice(-49), { id: message.id, name: message.name, source: message.source, background: message.background, status: "running", startedAt: message.startedAt, errors: 0, warnings: 0, output: "" }],
+        runs: [
+          ...state.runs.slice(-49),
+          {
+            id: message.id,
+            name: message.name,
+            source: message.source,
+            background: message.background,
+            status: "running",
+            startedAt: message.startedAt,
+            errors: 0,
+            warnings: 0,
+            output: "",
+          },
+        ],
         selected: message.id,
       }));
       break;
@@ -79,7 +92,9 @@ function duration(run: RunView): string {
 }
 
 function command(id: string): void {
-  void featureApi("tasks").requestHost("command", [id]).catch(() => undefined);
+  void featureApi("tasks")
+    .requestHost("command", [id])
+    .catch(() => undefined);
 }
 
 function TasksPanel() {
@@ -110,7 +125,12 @@ function TasksPanel() {
           <FileCog size={13} /> Configure
         </button>
         <span className="tasks-spacer" />
-        <button type="button" title="Remove finished tasks from the list" disabled={active.length === state.runs.length} onClick={() => store.set((s) => ({ runs: running(s), selected: running(s).some((run) => run.id === s.selected) ? s.selected : null }))}>
+        <button
+          type="button"
+          title="Remove finished tasks from the list"
+          disabled={active.length === state.runs.length}
+          onClick={() => store.set((s) => ({ runs: running(s), selected: running(s).some((run) => run.id === s.selected) ? s.selected : null }))}
+        >
           <Eraser size={13} /> Clear
         </button>
       </div>
@@ -124,14 +144,29 @@ function TasksPanel() {
         <div className="tasks-body">
           <div className="tasks-runs">
             {[...state.runs].reverse().map((run) => (
-              <button key={run.id} type="button" className={`tasks-run${run.id === selected?.id ? " selected" : ""}`} onClick={() => store.set((s) => ({ ...s, selected: run.id }))}>
+              <button
+                key={run.id}
+                type="button"
+                className={`tasks-run${run.id === selected?.id ? " selected" : ""}`}
+                onClick={() => store.set((s) => ({ ...s, selected: run.id }))}
+              >
                 <span className={`tasks-status-${run.status}`}>
                   <StatusIcon status={run.status} />
                 </span>
                 <span className="tasks-run-name" title={`${run.name} (${run.source})`}>
                   {run.name}
                 </span>
-                <span className="tasks-run-meta">{run.status === "ready" ? "ready" : run.status === "running" ? duration(run) : run.errors ? `${run.errors} err` : run.warnings ? `${run.warnings} warn` : duration(run)}</span>
+                <span className="tasks-run-meta">
+                  {run.status === "ready"
+                    ? "ready"
+                    : run.status === "running"
+                      ? duration(run)
+                      : run.errors
+                        ? `${run.errors} err`
+                        : run.warnings
+                          ? `${run.warnings} warn`
+                          : duration(run)}
+                </span>
               </button>
             ))}
           </div>
@@ -143,10 +178,20 @@ function TasksPanel() {
                   {selected.exitCode !== undefined && selected.exitCode !== null && selected.status !== "terminated" ? ` (exit code ${selected.exitCode})` : ""}
                   {selected.errors || selected.warnings ? ` - ${selected.errors} errors, ${selected.warnings} warnings` : ""}
                 </span>
-                <button type="button" title="Terminate" disabled={selected.status !== "running" && selected.status !== "ready"} onClick={() => void api.requestHost("terminate", [selected.id]).catch(() => undefined)}>
+                <button
+                  type="button"
+                  title="Terminate"
+                  disabled={selected.status !== "running" && selected.status !== "ready"}
+                  onClick={() => void api.requestHost("terminate", [selected.id]).catch(() => undefined)}
+                >
                   <Square size={13} /> Terminate
                 </button>
-                <button type="button" title="Run again" disabled={selected.status === "running" || selected.status === "ready"} onClick={() => void api.requestHost("rerun", [selected.id]).catch(() => undefined)}>
+                <button
+                  type="button"
+                  title="Run again"
+                  disabled={selected.status === "running" || selected.status === "ready"}
+                  onClick={() => void api.requestHost("rerun", [selected.id]).catch(() => undefined)}
+                >
                   <RotateCw size={13} /> Run again
                 </button>
               </div>
@@ -216,7 +261,10 @@ export const tasksView: ViewFeature = {
         const count = running(store.get()).length;
         return count ? `$(sync~spin) ${count} ${count === 1 ? "task" : "tasks"}` : "";
       },
-      tooltip: () => running(store.get()).map((run) => run.name).join("\n") || undefined,
+      tooltip: () =>
+        running(store.get())
+          .map((run) => run.name)
+          .join("\n") || undefined,
       command: TASK_COMMANDS.showTasks,
     },
   ],

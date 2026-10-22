@@ -45,5 +45,9 @@ export function resetSnapshot(): void {
 
 /** Status bar commands of all source controls, flattened (the status bar slots index into this). */
 export function statusCommands(): { handle: number; index: number; control: ScmControlData; title: string; tooltip?: string }[] {
-  return scmStore.get().controls.flatMap((control) => control.statusBarCommands.map((command, index) => ({ handle: control.handle, index, control, title: command.title, tooltip: command.tooltip })));
+  return scmStore
+    .get()
+    .controls.flatMap((control) =>
+      control.statusBarCommands.map((command, index) => ({ handle: control.handle, index, control, title: command.title, tooltip: command.tooltip })),
+    );
 }

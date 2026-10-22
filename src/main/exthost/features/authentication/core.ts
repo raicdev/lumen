@@ -59,7 +59,11 @@ export type AuthDeps = {
 type ProviderEntry = { label: string; provider: AuthProvider; supportsMultipleAccounts: boolean; subscription: { dispose(): unknown } };
 
 const scopesOf = (value: unknown): string[] => {
-  const list = Array.isArray(value) ? value : value && typeof value === "object" && Array.isArray((value as { scopes?: unknown }).scopes) ? (value as { scopes: unknown[] }).scopes : [];
+  const list = Array.isArray(value)
+    ? value
+    : value && typeof value === "object" && Array.isArray((value as { scopes?: unknown }).scopes)
+      ? (value as { scopes: unknown[] }).scopes
+      : [];
   return list.map(String);
 };
 const scopeKey = (scopes: readonly string[]) => [...scopes].sort().join(" ");
@@ -158,7 +162,8 @@ export class AuthenticationService {
 
   async getSession(client: AuthClient, providerId: string, scopesInput: unknown, options: GetSessionOptions = {}): Promise<AuthSession | undefined> {
     const interactive = !!(options.createIfNone || options.forceNewSession);
-    if (options.silent && interactive) throw new Error("Invalid combination of options. Please remove one of the following: silent, createIfNone, forceNewSession");
+    if (options.silent && interactive)
+      throw new Error("Invalid combination of options. Please remove one of the following: silent, createIfNone, forceNewSession");
     const scopes = scopesOf(scopesInput);
     const entry = await this.#provider(providerId);
     if (!interactive) return this.#resolve(client, providerId, entry, scopes, options);
@@ -201,7 +206,11 @@ export class AuthenticationService {
       }
       let chosen: AuthSession | "new" | undefined;
       if (candidates.length === 1 && !entry.supportsMultipleAccounts) {
-        const ok = await this.deps.confirm(`The extension '${client.name}' wants to sign in using ${entry.label}.`, `Account: ${candidates[0]!.account.label}`, "Allow");
+        const ok = await this.deps.confirm(
+          `The extension '${client.name}' wants to sign in using ${entry.label}.`,
+          `Account: ${candidates[0]!.account.label}`,
+          "Allow",
+        );
         chosen = ok ? candidates[0] : undefined;
       } else {
         chosen = await this.#chooseAccount(entry, `The extension '${client.name}' wants to sign in using ${entry.label}`, candidates, true);
@@ -230,7 +239,14 @@ export class AuthenticationService {
     return index >= sessions.length ? "new" : sessions[index];
   }
 
-  async #create(client: AuthClient, providerId: string, entry: ProviderEntry, scopes: string[], options: GetSessionOptions, accountOption: { account?: AuthAccount }): Promise<AuthSession> {
+  async #create(
+    client: AuthClient,
+    providerId: string,
+    entry: ProviderEntry,
+    scopes: string[],
+    options: GetSessionOptions,
+    accountOption: { account?: AuthAccount },
+  ): Promise<AuthSession> {
     const detail = options.forceNewSession ? detailOf(options.forceNewSession) : detailOf(options.createIfNone);
     const message = options.forceNewSession
       ? `The extension '${client.name}' wants you to sign in again using ${entry.label}.`

@@ -13,10 +13,7 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 const pending = new Set<string>();
 let gitTouched = false;
 
-export function watchWorkspace(
-  root: string | null,
-  onChange: (paths: string[], git: boolean) => void,
-): void {
+export function watchWorkspace(root: string | null, onChange: (paths: string[], git: boolean) => void): void {
   watcher?.close();
   watcher = null;
   if (timer) clearTimeout(timer);

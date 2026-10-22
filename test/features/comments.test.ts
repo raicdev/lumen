@@ -15,7 +15,18 @@ const ROOT = resolve(import.meta.dirname, "..", "..");
 function startedHost() {
   const host = new ExtensionHost();
   const userData = mkdtempSync(join(tmpdir(), "lumen-comments-test-"));
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData,
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   return { host, posted, userData };
@@ -47,7 +58,9 @@ test("threads are posted, updated and removed", async () => {
   const api = host.apiFor(null) as Record<string, any>;
   const controller = api.comments.createCommentController("demo", "Demo");
   const uri = api.Uri.file(join(tmpdir(), "demo.txt"));
-  const thread = controller.createCommentThread(uri, new api.Range(2, 0, 4, 0), [{ body: "hello **there**", author: { name: "Ann" }, mode: api.CommentMode.Preview }]);
+  const thread = controller.createCommentThread(uri, new api.Range(2, 0, 4, 0), [
+    { body: "hello **there**", author: { name: "Ann" }, mode: api.CommentMode.Preview },
+  ]);
   thread.label = "Review";
   thread.collapsibleState = api.CommentThreadCollapsibleState.Expanded;
   await Promise.resolve();
@@ -84,7 +97,9 @@ test("commenting ranges, a draft thread and the reply command", async () => {
   });
   const id = (await host.methods.feature("comments", "createDraft", ["demo", file, 1])) as string;
   await Promise.resolve();
-  const draft = feature(posted).filter((p) => p.t === "upsert").at(-1).thread as CommentThreadWire;
+  const draft = feature(posted)
+    .filter((p) => p.t === "upsert")
+    .at(-1).thread as CommentThreadWire;
   assert.equal(draft.id, id);
   assert.equal(draft.draft, true);
   assert.equal(draft.collapsed, false);
@@ -93,7 +108,9 @@ test("commenting ranges, a draft thread and the reply command", async () => {
   await host.methods.feature("comments", "action", [{ threadId: id, kind: "reply", command: "demo.reply", text: "first" }]);
   assert.equal(received[0].text, "first");
   await Promise.resolve();
-  const after = feature(posted).filter((p) => p.t === "upsert").at(-1).thread as CommentThreadWire;
+  const after = feature(posted)
+    .filter((p) => p.t === "upsert")
+    .at(-1).thread as CommentThreadWire;
   assert.equal(after.draft, false);
   assert.equal(after.comments.length, 1);
   assert.equal(after.comments[0]!.body, "first");

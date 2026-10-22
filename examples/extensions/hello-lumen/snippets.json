@@ -8,6 +8,6 @@
   "Arrow function": {
     "prefix": "afn",
     "body": "const ${1:name} = (${2:args}) => {\n\t$0\n};",
-    "description": "An arrow function",
+    "description": "An arrow function"
   }
 }

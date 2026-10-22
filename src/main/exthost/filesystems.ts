@@ -65,7 +65,10 @@ const statOf = (raw: unknown): FileStat => {
 
 /** `**`-globs of a files.include / files.exclude field, matched like the local search does. */
 function globMatcher(value: string | undefined, relative: string, name: string): boolean {
-  const globs = (value ?? "").split(",").map((glob) => glob.trim()).filter(Boolean);
+  const globs = (value ?? "")
+    .split(",")
+    .map((glob) => glob.trim())
+    .filter(Boolean);
   if (!globs.length) return false;
   return globs.some((glob) => matchGlob(glob, relative) || matchGlob(`**/${glob}`, relative) || (!glob.includes("/") && matchGlob(glob, name)));
 }
@@ -284,14 +287,19 @@ export class FileSystems {
     for (const root of roots) {
       const entry = await this.provider(uriOfKey(root).scheme).catch(() => null);
       if (!entry) continue;
-      await this.#walk(uriOfKey(root), entry.provider, async (child, isDirectory) => {
-        if (isDirectory) return;
-        const path = keyOfUri(child);
-        const key = normalizeKey(path);
-        if (seen.has(key)) return;
-        seen.add(key);
-        files.push(path);
-      }, () => files.length >= maxResults);
+      await this.#walk(
+        uriOfKey(root),
+        entry.provider,
+        async (child, isDirectory) => {
+          if (isDirectory) return;
+          const path = keyOfUri(child);
+          const key = normalizeKey(path);
+          if (seen.has(key)) return;
+          seen.add(key);
+          files.push(path);
+        },
+        () => files.length >= maxResults,
+      );
       if (files.length >= maxResults) break;
     }
     return files;
@@ -312,44 +320,55 @@ export class FileSystems {
       const rootUri = uriOfKey(root);
       const entry = await this.provider(rootUri.scheme).catch(() => null);
       if (!entry) continue;
-      await this.#walk(rootUri, entry.provider, async (child, isDirectory) => {
-        if (truncated || isDirectory) return;
-        const relative = relativeTo(rootUri, child);
-        const name = relative.split("/").pop() ?? relative;
-        if (globMatcher(options.exclude, relative, name)) return;
-        if ((options.include ?? "").trim() && !globMatcher(options.include, relative, name)) return;
-        let text: string;
-        try {
-          const content = await entry.provider.readFile(child);
-          if (content.byteLength > MAX_SEARCH_BYTES) return;
-          text = new TextDecoder().decode(content);
-        } catch {
-          return;
-        }
-        if (text.includes("\u0000")) return;
-        const lines = text.replace(/\r\n?/g, "\n").split("\n");
-        for (let line = 0; line < lines.length; line++) {
-          expression.lastIndex = 0;
-          for (let found = expression.exec(lines[line]!); found; found = expression.exec(lines[line]!)) {
-            if (!found[0]) {
-              expression.lastIndex++;
-              continue;
-            }
-            matches.push({ path: keyOfUri(child), relativePath: relative, line, column: found.index, length: found[0].length, preview: lines[line]! });
-            if (matches.length >= maxResults) {
-              truncated = true;
-              return;
+      await this.#walk(
+        rootUri,
+        entry.provider,
+        async (child, isDirectory) => {
+          if (truncated || isDirectory) return;
+          const relative = relativeTo(rootUri, child);
+          const name = relative.split("/").pop() ?? relative;
+          if (globMatcher(options.exclude, relative, name)) return;
+          if ((options.include ?? "").trim() && !globMatcher(options.include, relative, name)) return;
+          let text: string;
+          try {
+            const content = await entry.provider.readFile(child);
+            if (content.byteLength > MAX_SEARCH_BYTES) return;
+            text = new TextDecoder().decode(content);
+          } catch {
+            return;
+          }
+          if (text.includes("\u0000")) return;
+          const lines = text.replace(/\r\n?/g, "\n").split("\n");
+          for (let line = 0; line < lines.length; line++) {
+            expression.lastIndex = 0;
+            for (let found = expression.exec(lines[line]!); found; found = expression.exec(lines[line]!)) {
+              if (!found[0]) {
+                expression.lastIndex++;
+                continue;
+              }
+              matches.push({ path: keyOfUri(child), relativePath: relative, line, column: found.index, length: found[0].length, preview: lines[line]! });
+              if (matches.length >= maxResults) {
+                truncated = true;
+                return;
+              }
             }
           }
-        }
-      }, () => truncated);
+        },
+        () => truncated,
+      );
       if (truncated) break;
     }
     return { matches, truncated };
   }
 
   /** Replace in Files for provided roots (only the files in `paths`, when given). */
-  async replaceFiles(roots: readonly string[], query: string, replacement: string, options: FileSearchOptions = {}, paths?: readonly string[]): Promise<FileReplaceResult> {
+  async replaceFiles(
+    roots: readonly string[],
+    query: string,
+    replacement: string,
+    options: FileSearchOptions = {},
+    paths?: readonly string[],
+  ): Promise<FileReplaceResult> {
     const wanted = paths ? new Set(paths.map(normalizeKey)) : null;
     let replacements = 0;
     let files = 0;
@@ -365,42 +384,48 @@ export class FileSystems {
       const entry = await this.provider(rootUri.scheme).catch(() => null);
       if (!entry) continue;
       if (entry.isReadonly) {
-        if (!wanted || [...wanted].some((path) => uriOfKey(path).scheme === rootUri.scheme)) blocked ??= entry.readonlyMessage ?? `${rootUri.scheme} is read-only`;
+        if (!wanted || [...wanted].some((path) => uriOfKey(path).scheme === rootUri.scheme))
+          blocked ??= entry.readonlyMessage ?? `${rootUri.scheme} is read-only`;
         continue;
       }
-      await this.#walk(rootUri, entry.provider, async (child, isDirectory) => {
-        if (isDirectory) return;
-        if (wanted && !wanted.has(normalizeKey(keyOfUri(child)))) return;
-        const relative = relativeTo(rootUri, child);
-        const name = relative.split("/").pop() ?? relative;
-        if (globMatcher(options.exclude, relative, name)) return;
-        if ((options.include ?? "").trim() && !globMatcher(options.include, relative, name)) return;
-        let text: string;
-        try {
-          const content = await entry.provider.readFile(child);
-          if (content.byteLength > MAX_SEARCH_BYTES) return;
-          text = new TextDecoder().decode(content);
-        } catch {
-          return;
-        }
-        if (text.includes("\u0000")) return;
-        let count = 0;
-        const next = text.replace(expression, (match) => {
-          count++;
-          // Regular expressions expand $1, $&, … in the replacement (like the local search).
-          if (!options.regex) return replacement;
-          return match.replace(new RegExp(expression.source, expression.flags.replace("g", "")), replacement);
-        });
-        if (!count) return;
-        try {
-          await entry.provider.writeFile(child, new TextEncoder().encode(next), { create: false, overwrite: true });
-        } catch (error) {
-          return;
-        }
-        replacements += count;
-        files++;
-        this.#fire(child, T.FileChangeType.Changed);
-      }, () => false);
+      await this.#walk(
+        rootUri,
+        entry.provider,
+        async (child, isDirectory) => {
+          if (isDirectory) return;
+          if (wanted && !wanted.has(normalizeKey(keyOfUri(child)))) return;
+          const relative = relativeTo(rootUri, child);
+          const name = relative.split("/").pop() ?? relative;
+          if (globMatcher(options.exclude, relative, name)) return;
+          if ((options.include ?? "").trim() && !globMatcher(options.include, relative, name)) return;
+          let text: string;
+          try {
+            const content = await entry.provider.readFile(child);
+            if (content.byteLength > MAX_SEARCH_BYTES) return;
+            text = new TextDecoder().decode(content);
+          } catch {
+            return;
+          }
+          if (text.includes("\u0000")) return;
+          let count = 0;
+          const next = text.replace(expression, (match) => {
+            count++;
+            // Regular expressions expand $1, $&, … in the replacement (like the local search).
+            if (!options.regex) return replacement;
+            return match.replace(new RegExp(expression.source, expression.flags.replace("g", "")), replacement);
+          });
+          if (!count) return;
+          try {
+            await entry.provider.writeFile(child, new TextEncoder().encode(next), { create: false, overwrite: true });
+          } catch (error) {
+            return;
+          }
+          replacements += count;
+          files++;
+          this.#fire(child, T.FileChangeType.Changed);
+        },
+        () => false,
+      );
     }
     return { replacements, files, ...(blocked && !files ? { error: blocked } : {}) };
   }

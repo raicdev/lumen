@@ -184,7 +184,15 @@ export function QuickInput(props: Props) {
   const requestKey = request?.kind === "hostPick" ? `pick:${request.pick.id}` : request?.kind === "input" ? `input:${request.id}` : request;
   useEffect(() => {
     if (!request) return;
-    setValue(request.kind === "quick" ? request.value : request.kind === "hostPick" ? (request.pick.value ?? "") : request.kind === "input" ? (request.options.value ?? "") : "");
+    setValue(
+      request.kind === "quick"
+        ? request.value
+        : request.kind === "hostPick"
+          ? (request.pick.value ?? "")
+          : request.kind === "input"
+            ? (request.options.value ?? "")
+            : "",
+    );
     setFiles(null);
     setSymbols(null);
     setWorkspaceSymbols(null);
@@ -195,7 +203,12 @@ export function QuickInput(props: Props) {
     if (request.kind === "editors") {
       setActive(request.backwards ? Math.max(0, request.paths.length - 1) : Math.min(1, request.paths.length - 1));
     } else if (request.kind === "pick" && request.activeId) {
-      setActive(Math.max(0, request.items.findIndex((item) => item.id === request.activeId)));
+      setActive(
+        Math.max(
+          0,
+          request.items.findIndex((item) => item.id === request.activeId),
+        ),
+      );
     } else setActive(0);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -207,7 +220,20 @@ export function QuickInput(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestKey]);
 
-  const mode = request?.kind === "quick" ? (value[0] === ">" ? "commands" : value[0] === ":" ? "line" : value[0] === "@" ? "symbols" : value[0] === "#" ? "workspaceSymbols" : value[0] === "?" ? "help" : "files") : null;
+  const mode =
+    request?.kind === "quick"
+      ? value[0] === ">"
+        ? "commands"
+        : value[0] === ":"
+          ? "line"
+          : value[0] === "@"
+            ? "symbols"
+            : value[0] === "#"
+              ? "workspaceSymbols"
+              : value[0] === "?"
+                ? "help"
+                : "files"
+      : null;
 
   // Lazy data for the current mode.
   useEffect(() => {
@@ -252,7 +278,9 @@ export function QuickInput(props: Props) {
         }
         const inLabel = fuzzyMatch(query, item.label.replace(/\$\([\w-]+(~spin)?\)\s*/g, ""));
         const inOther =
-          !inLabel && ((pick.matchOnDescription && item.description && fuzzyMatch(query, item.description)) || (pick.matchOnDetail && item.detail && fuzzyMatch(query, item.detail)));
+          !inLabel &&
+          ((pick.matchOnDescription && item.description && fuzzyMatch(query, item.description)) ||
+            (pick.matchOnDetail && item.detail && fuzzyMatch(query, item.detail)));
         if (query && !pick.noFilter && !inLabel && !inOther && !item.alwaysShow) return;
         rows.push({
           id: `item:${index}`,
@@ -392,7 +420,12 @@ export function QuickInput(props: Props) {
         label,
         indices: match!.indices,
         hint: props.keys.get(command.id),
-        separator: !query && index === 0 && recent.includes(command.id) ? "recently used" : !query && recent.includes(scored[index - 1]?.command.id ?? "") && !recent.includes(command.id) ? "other commands" : undefined,
+        separator:
+          !query && index === 0 && recent.includes(command.id)
+            ? "recently used"
+            : !query && recent.includes(scored[index - 1]?.command.id ?? "") && !recent.includes(command.id)
+              ? "other commands"
+              : undefined,
         run: () => props.onRunCommand(command.id),
       }));
     }
@@ -575,7 +608,9 @@ export function QuickInput(props: Props) {
             </span>
           </div>
         )}
-        <div className={`palette-input-wrap${request.kind === "input" && request.validation ? ` ${decodeValidation(request.validation)!.severity === "error" ? "invalid" : `sev-${decodeValidation(request.validation)!.severity}`}` : ""}`}>
+        <div
+          className={`palette-input-wrap${request.kind === "input" && request.validation ? ` ${decodeValidation(request.validation)!.severity === "error" ? "invalid" : `sev-${decodeValidation(request.validation)!.severity}`}` : ""}`}
+        >
           {multi && (
             <input
               type="checkbox"

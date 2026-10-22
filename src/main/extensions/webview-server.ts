@@ -175,7 +175,12 @@ export class WebviewResourceServer {
       const host = (request.headers.host ?? "").toLowerCase();
       if (!page || page.html === null || host !== `${page.label}.localhost:${this.#port}`) return notFound();
       const body = Buffer.from(page.html, "utf8");
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Length": body.length, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+      response.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": body.length,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      });
       response.end(request.method === "HEAD" ? undefined : body);
       return;
     }

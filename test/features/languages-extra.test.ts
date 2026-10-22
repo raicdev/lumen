@@ -22,7 +22,18 @@ type Api = Record<string, any>;
 
 function startedHost(): { host: ExtensionHost; api: Api; posted: HostToView[] } {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-languages-extra-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-languages-extra-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   const document = new ExtHostDocument({ path: FILE, languageId: "typescript", version: 1, text: TEXT, eol: "LF", dirty: false }, true, async () => true);
@@ -75,11 +86,14 @@ test("call and type hierarchy providers: execute commands and the window request
   });
   const base = new api.TypeHierarchyItem(api.SymbolKind.Class, "Base", "", uri, range(0), range(0));
   const derived = new api.TypeHierarchyItem(api.SymbolKind.Class, "Derived", "", uri, range(1), range(1));
-  api.languages.registerTypeHierarchyProvider({ language: "typescript" }, {
-    prepareTypeHierarchy: () => [derived],
-    provideTypeHierarchySupertypes: () => [base],
-    provideTypeHierarchySubtypes: () => [],
-  });
+  api.languages.registerTypeHierarchyProvider(
+    { language: "typescript" },
+    {
+      prepareTypeHierarchy: () => [derived],
+      provideTypeHierarchySupertypes: () => [base],
+      provideTypeHierarchySubtypes: () => [],
+    },
+  );
 
   const items = await host.executeCommand("vscode.prepareCallHierarchy", [uri, new api.Position(0, 9)]);
   assert.deepEqual(items, [foo]);
@@ -265,7 +279,10 @@ test("paste edits: copy-time data, trigger kind, yieldTo and resolve", async () 
   assert.equal((await ask(host, "resolveEdit", edits[0].handle)).insertText, "resolved");
 
   const only = await ask(host, "pasteEdits", FILE, [range], [{ mime: "text/plain", value: "abc" }], { triggerKind: 1, only: "text" });
-  assert.deepEqual(only.map((e: any) => e.title), ["Plain"]);
+  assert.deepEqual(
+    only.map((e: any) => e.title),
+    ["Plain"],
+  );
   assert.equal(contexts[1].triggerKind, 1);
   assert.equal(contexts[1].only.value, "text");
   assert.deepEqual(await ask(host, "pasteEdits", FILE, [range], [{ mime: "image/png", file: { name: "a.png", base64: "AQ==" } }]), []);

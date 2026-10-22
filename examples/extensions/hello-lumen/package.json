@@ -5,44 +5,112 @@
   "publisher": "lumen",
   "version": "0.1.0",
   "license": "MIT",
-  "engines": { "lumen": "^0.1.0" },
+  "engines": {
+    "lumen": "^0.1.0"
+  },
   "main": "./extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:helloLumen.preview", "onFileSystem:hello-memfs"],
-  "categories": ["Other"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onWebviewPanel:helloLumen.preview",
+    "onFileSystem:hello-memfs"
+  ],
+  "categories": [
+    "Other"
+  ],
   "contributes": {
     "commands": [
-      { "command": "helloLumen.sayHello", "title": "Say Hello", "category": "Hello Lumen" },
-      { "command": "helloLumen.insertDate", "title": "Insert Date", "category": "Hello Lumen" },
-      { "command": "helloLumen.pickColor", "title": "Pick a Color", "category": "Hello Lumen" },
-      { "command": "helloLumen.showLog", "title": "Show Log", "category": "Hello Lumen" },
-      { "command": "helloLumen.openPanel", "title": "Open Webview Panel", "category": "Hello Lumen" },
-      { "command": "helloLumen.openScratch", "title": "Open Scratch File (in-memory file system)", "category": "Hello Lumen" }
+      {
+        "command": "helloLumen.sayHello",
+        "title": "Say Hello",
+        "category": "Hello Lumen"
+      },
+      {
+        "command": "helloLumen.insertDate",
+        "title": "Insert Date",
+        "category": "Hello Lumen"
+      },
+      {
+        "command": "helloLumen.pickColor",
+        "title": "Pick a Color",
+        "category": "Hello Lumen"
+      },
+      {
+        "command": "helloLumen.showLog",
+        "title": "Show Log",
+        "category": "Hello Lumen"
+      },
+      {
+        "command": "helloLumen.openPanel",
+        "title": "Open Webview Panel",
+        "category": "Hello Lumen"
+      },
+      {
+        "command": "helloLumen.openScratch",
+        "title": "Open Scratch File (in-memory file system)",
+        "category": "Hello Lumen"
+      }
     ],
     "viewsContainers": {
-      "activitybar": [{ "id": "helloLumen", "title": "Hello Lumen", "icon": "media/hello.svg" }]
+      "activitybar": [
+        {
+          "id": "helloLumen",
+          "title": "Hello Lumen",
+          "icon": "media/hello.svg"
+        }
+      ]
     },
     "views": {
-      "helloLumen": [{ "type": "webview", "id": "helloLumen.counter", "name": "Counter" }]
+      "helloLumen": [
+        {
+          "type": "webview",
+          "id": "helloLumen.counter",
+          "name": "Counter"
+        }
+      ]
     },
     "keybindings": [
-      { "command": "helloLumen.insertDate", "key": "ctrl+alt+d", "mac": "cmd+alt+d", "when": "editorTextFocus" }
+      {
+        "command": "helloLumen.insertDate",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus"
+      }
     ],
     "configuration": {
       "title": "Hello Lumen",
       "properties": {
-        "helloLumen.greeting": { "type": "string", "default": "Hello", "description": "The greeting used by “Say Hello”." },
-        "helloLumen.showWordCount": { "type": "boolean", "default": true, "description": "Show the word count of the active editor in the status bar." },
+        "helloLumen.greeting": {
+          "type": "string",
+          "default": "Hello",
+          "description": "The greeting used by “Say Hello”."
+        },
+        "helloLumen.showWordCount": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the word count of the active editor in the status bar."
+        },
         "helloLumen.todoSeverity": {
           "type": "string",
           "default": "information",
-          "enum": ["error", "warning", "information", "hint"],
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint"
+          ],
           "description": "Severity of the TODO diagnostics."
         }
       }
     },
     "snippets": [
-      { "language": "javascript", "path": "./snippets.json" },
-      { "language": "typescript", "path": "./snippets.json" }
+      {
+        "language": "javascript",
+        "path": "./snippets.json"
+      },
+      {
+        "language": "typescript",
+        "path": "./snippets.json"
+      }
     ]
   }
 }

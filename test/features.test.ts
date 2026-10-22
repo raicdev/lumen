@@ -20,7 +20,18 @@ const ROOT = resolve(import.meta.dirname, "..");
 
 function startedHost(): { host: ExtensionHost; posted: HostToView[] } {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-feature-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-feature-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   return { host, posted };
@@ -29,7 +40,21 @@ function startedHost(): { host: ExtensionHost; posted: HostToView[] } {
 test("every area has a host feature that is registered once", () => {
   const areas = hostFeatures.map((feature) => feature.area);
   assert.equal(new Set(areas).size, areas.length);
-  for (const area of ["tasks", "scm", "testing", "notebooks", "authentication", "comments", "chat-lm", "terminal", "languages-extra", "workspace-misc", "icon-themes", "theming-contribs", "menus-walkthroughs"]) {
+  for (const area of [
+    "tasks",
+    "scm",
+    "testing",
+    "notebooks",
+    "authentication",
+    "comments",
+    "chat-lm",
+    "terminal",
+    "languages-extra",
+    "workspace-misc",
+    "icon-themes",
+    "theming-contribs",
+    "menus-walkthroughs",
+  ]) {
     assert.ok(areas.includes(area), area);
   }
 });

@@ -52,7 +52,16 @@ type Thread = {
   draft: boolean;
   scheduled: boolean;
   disposed: boolean;
-  fields: { range: T.Range | undefined; comments: AnyRecord[]; collapsibleState: number; canReply: unknown; state: number; label?: string; contextValue?: string; applicability?: number };
+  fields: {
+    range: T.Range | undefined;
+    comments: AnyRecord[];
+    collapsibleState: number;
+    canReply: unknown;
+    state: number;
+    label?: string;
+    contextValue?: string;
+    applicability?: number;
+  };
 };
 
 type State = { controllers: Map<string, Controller>; threads: Map<string, Thread>; seq: number };
@@ -77,7 +86,8 @@ function arrayOf<V>(value: V | V[] | undefined): V[] {
 }
 
 function titleOf(value: unknown, fallback: string): string {
-  const text = typeof value === "string" ? value : value && typeof value === "object" && typeof (value as AnyRecord).value === "string" ? (value as AnyRecord).value : "";
+  const text =
+    typeof value === "string" ? value : value && typeof value === "object" && typeof (value as AnyRecord).value === "string" ? (value as AnyRecord).value : "";
   if (!text || /^%.*%$/.test(text)) return fallback;
   return text;
 }
@@ -152,7 +162,11 @@ function menuActions(host: ExtensionHost, menu: string[], context: Record<string
         if (!entry?.command || !evaluateWhen(entry.when, context)) continue;
         const contributed = commands.find((command) => command.command === entry.command);
         const [group, order] = (entry.group ?? "").split("@");
-        out.push({ action: { command: entry.command, title: titleOf(contributed?.shortTitle ?? contributed?.title, entry.command) }, group: group ?? "", order: Number(order) || 0 });
+        out.push({
+          action: { command: entry.command, title: titleOf(contributed?.shortTitle ?? contributed?.title, entry.command) },
+          group: group ?? "",
+          order: Number(order) || 0,
+        });
       }
     }
   }
@@ -199,7 +213,12 @@ function wireThread(host: ExtensionHost, thread: Thread): CommentThreadWire {
       label: typeof comment.label === "string" ? comment.label : undefined,
       timestamp,
       contextValue: typeof comment.contextValue === "string" ? comment.contextValue : undefined,
-      reactions: arrayOf<AnyRecord>(comment.reactions).map((reaction) => ({ label: String(reaction.label ?? ""), count: Number(reaction.count) || 0, authorHasReacted: !!reaction.authorHasReacted, icon: iconOf(reaction.iconPath) })),
+      reactions: arrayOf<AnyRecord>(comment.reactions).map((reaction) => ({
+        label: String(reaction.label ?? ""),
+        count: Number(reaction.count) || 0,
+        authorHasReacted: !!reaction.authorHasReacted,
+        icon: iconOf(reaction.iconPath),
+      })),
       actions: menuActions(host, ["comments/comment/title", "comments/comment/context"], threadContext(thread, comment)),
     };
   });

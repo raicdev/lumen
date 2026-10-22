@@ -216,7 +216,9 @@ if (Get-Module PSReadLine) {
 
 /** Which integration a shell executable gets (null: none). */
 export function shellKindOf(file: string): ShellKind | null {
-  const name = basename(file).toLowerCase().replace(/\.exe$/, "");
+  const name = basename(file)
+    .toLowerCase()
+    .replace(/\.exe$/, "");
   if (name === "bash") return "bash";
   if (name === "zsh") return "zsh";
   if (name === "fish") return "fish";
@@ -277,11 +279,7 @@ const fishQuote = (value: string) => `'${value.replace(/[\\']/g, (char) => `\\${
  * null when the shell is not supported. `args` are the shell's own arguments
  * (a login flag etc.).
  */
-export function injectShellIntegration(
-  file: string,
-  args: string[],
-  env: Record<string, string>,
-): { args: string[]; env: Record<string, string> } | null {
+export function injectShellIntegration(file: string, args: string[], env: Record<string, string>): { args: string[]; env: Record<string, string> } | null {
   const kind = shellKindOf(file);
   if (!kind) return null;
   let dir: string;

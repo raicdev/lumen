@@ -140,8 +140,8 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
             if (tab.path.startsWith("terminal:")) {
               void showContextMenu(e.clientX, e.clientY, [
                 { type: "item", label: "Move Terminal into Panel", action: "terminal-move-to-panel" },
-              { type: "item", label: "Split Right", action: "split-right" },
-              { type: "item", label: "Split Down", action: "split-down" },
+                { type: "item", label: "Split Right", action: "split-right" },
+                { type: "item", label: "Split Down", action: "split-down" },
                 { type: "item", label: "Rename…", action: "terminal-rename" },
                 { type: "separator" },
                 { type: "item", label: "Close (Kill Terminal)", action: "close" },

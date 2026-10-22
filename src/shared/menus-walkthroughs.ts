@@ -61,7 +61,12 @@ export function submenusOf(sources: ContributionSource[]): Map<string, SubmenuCo
  * `when` clause holds. Entries with `submenu` become nested items (hidden when
  * nothing in the submenu is visible); entries with `command` become commands.
  */
-export function resolveMenu(sources: ContributionSource[], menuId: string, when: (clause: string | undefined) => boolean, trail: string[] = []): ResolvedMenuItem[] {
+export function resolveMenu(
+  sources: ContributionSource[],
+  menuId: string,
+  when: (clause: string | undefined) => boolean,
+  trail: string[] = [],
+): ResolvedMenuItem[] {
   const submenus = submenusOf(sources);
   const out: ResolvedMenuItem[] = [];
   for (const source of sources) {
@@ -332,9 +337,7 @@ export function featuredFor(walkthrough: Walkthrough, relativePath: string): boo
 
 /** Marks the walkthroughs matching a workspace file and puts them first, as VS Code ranks featured categories. */
 export function orderWalkthroughs(walkthroughs: Walkthrough[], isFeatured: (walkthrough: Walkthrough) => boolean): Walkthrough[] {
-  return walkthroughs
-    .map((walkthrough) => ({ ...walkthrough, featured: isFeatured(walkthrough) }))
-    .sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+  return walkthroughs.map((walkthrough) => ({ ...walkthrough, featured: isFeatured(walkthrough) })).sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
 }
 
 export type MediaThemeKind = "dark" | "light" | "hcDark" | "hcLight";

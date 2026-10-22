@@ -75,7 +75,7 @@ export function sanitizeSvg(source: string): string {
     .replace(/<script\b[\s\S]*?<\/script>/gi, "")
     .replace(/<foreignObject\b[\s\S]*?<\/foreignObject>/gi, "")
     .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(?:href|xlink:href)\s*=\s*(?:"|')?\s*javascript:/gi, "href=\"#");
+    .replace(/(?:href|xlink:href)\s*=\s*(?:"|')?\s*javascript:/gi, 'href="#');
 }
 
 /** A Markdown block with links that open externally, run commands, or complete `onLink`. */
@@ -219,14 +219,19 @@ export function WalkthroughIcon({ extensionId, path, size = 24 }: { extensionId:
   }, [extensionId, path]);
   if (data.src) return <img className="walkthrough-icon" src={data.src} alt="" width={size} height={size} />;
   if (data.svg)
-    return <span className="walkthrough-icon" role="img" aria-hidden="true" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: data.svg }} />;
+    return (
+      <span className="walkthrough-icon" role="img" aria-hidden="true" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: data.svg }} />
+    );
   return null;
 }
 
 export function WalkthroughView({ walkthrough, onBack }: { walkthrough: Walkthrough; onBack?: () => void }) {
   const progress = useWalkthroughProgress();
   const selectedId = progress.selected[walkthrough.key];
-  const initial = walkthrough.steps.find((step) => step.id === selectedId) ?? walkthrough.steps.find((step) => !isStepDone(progress, walkthrough, step)) ?? walkthrough.steps[0];
+  const initial =
+    walkthrough.steps.find((step) => step.id === selectedId) ??
+    walkthrough.steps.find((step) => !isStepDone(progress, walkthrough, step)) ??
+    walkthrough.steps[0];
   const [openId, setOpenId] = useState<string | undefined>(initial?.id);
   const open = walkthrough.steps.find((step) => step.id === openId) ?? initial;
   const { done, total } = progressOf(progress, walkthrough);

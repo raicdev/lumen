@@ -74,20 +74,11 @@ export class CustomEditorManager {
 
   /* ── registration ──────────────────────────────────────────────────── */
 
-  register(
-    runtime: ExtensionRuntime | null,
-    viewType: string,
-    provider: Record<string, any>,
-    options: Registration["options"] = {},
-  ): T.Disposable {
+  register(runtime: ExtensionRuntime | null, viewType: string, provider: Record<string, any>, options: Registration["options"] = {}): T.Disposable {
     if (!viewType || typeof viewType !== "string") throw new Error("registerCustomEditorProvider: a view type is required");
     if (this.providers.has(viewType)) throw new Error(`a custom editor provider for '${viewType}' is already registered`);
     const kind: CustomEditorProviderKind =
-      typeof provider.resolveCustomTextEditor === "function"
-        ? "text"
-        : typeof provider.onDidChangeCustomDocument === "function"
-          ? "editable"
-          : "readonly";
+      typeof provider.resolveCustomTextEditor === "function" ? "text" : typeof provider.onDidChangeCustomDocument === "function" ? "editable" : "readonly";
     this.providers.set(viewType, { viewType, extensionId: runtime?.id ?? "unknown", runtime, kind, provider, options });
     return new T.Disposable(() => {
       if (this.providers.get(viewType)?.provider === provider) this.providers.delete(viewType);
@@ -124,7 +115,12 @@ export class CustomEditorManager {
    * Open `path` in the custom editor `viewType` (activating the contributing
    * extension). Returns the webview id, or null when no provider handles it.
    */
-  async open(path: string, viewType: string, showOptions?: number | { viewColumn?: number; preserveFocus?: boolean }, restoreId?: string): Promise<{ id: string; kind: CustomEditorProviderKind } | null> {
+  async open(
+    path: string,
+    viewType: string,
+    showOptions?: number | { viewColumn?: number; preserveFocus?: boolean },
+    restoreId?: string,
+  ): Promise<{ id: string; kind: CustomEditorProviderKind } | null> {
     await this.#host.activateByEvent(`onCustomEditor:${viewType}`);
     const registration = this.providers.get(viewType);
     if (!registration) return null;
@@ -175,7 +171,11 @@ export class CustomEditorManager {
       if (!existing) await this.#openDocument(instance, uri);
       await this.#resolveEditor(instance, panel);
     } catch (error) {
-      this.#host.log("error", `resolving the custom editor ${viewType} for ${path} failed: ${error instanceof Error ? (error.stack ?? error.message) : error}`, registration.extensionId);
+      this.#host.log(
+        "error",
+        `resolving the custom editor ${viewType} for ${path} failed: ${error instanceof Error ? (error.stack ?? error.message) : error}`,
+        registration.extensionId,
+      );
       (panel.dispose as () => void)();
       return null;
     }
@@ -403,7 +403,11 @@ export class CustomEditorManager {
     try {
       if (instance.customDocument && typeof instance.customDocument.dispose === "function") instance.customDocument.dispose();
     } catch (error) {
-      this.#host.log("warning", `disposing the custom document of ${instance.viewType} failed: ${error instanceof Error ? error.message : error}`, instance.extensionId);
+      this.#host.log(
+        "warning",
+        `disposing the custom document of ${instance.viewType} failed: ${error instanceof Error ? error.message : error}`,
+        instance.extensionId,
+      );
     }
   }
 }

@@ -26,7 +26,9 @@ const OSC = (body: string) => `\x1b]${body}\x07`;
 
 test("the parser turns OSC 633 sequences into events and keeps command output", () => {
   const parser = new ShellIntegrationParser();
-  const events = parser.feed(`${OSC("633;A")}$ ${OSC("633;B")}ls${OSC("633;E;ls")}${OSC("633;C")}file-a\r\nfile-b\r\n${OSC("633;D;0")}${OSC("633;P;Cwd=/tmp/x")}`);
+  const events = parser.feed(
+    `${OSC("633;A")}$ ${OSC("633;B")}ls${OSC("633;E;ls")}${OSC("633;C")}file-a\r\nfile-b\r\n${OSC("633;D;0")}${OSC("633;P;Cwd=/tmp/x")}`,
+  );
   assert.deepEqual(events, [
     { type: "prompt-start" },
     { type: "command-start" },
@@ -44,9 +46,15 @@ test("the parser handles sequences split across chunks, ST terminators and Final
   const all: ShellIntegrationEvent[] = [];
   const text = `${OSC("133;C")}out\x1b]633;D;3\x1b\\`;
   for (let at = 0; at < text.length; at += 3) all.push(...parser.feed(text.slice(at, at + 3)));
-  const output = all.filter((event) => event.type === "output").map((event) => (event as { data: string }).data).join("");
+  const output = all
+    .filter((event) => event.type === "output")
+    .map((event) => (event as { data: string }).data)
+    .join("");
   assert.equal(output, "out");
-  assert.deepEqual(all.filter((event) => event.type !== "output"), [{ type: "executing" }, { type: "finished", exitCode: 3 }]);
+  assert.deepEqual(
+    all.filter((event) => event.type !== "output"),
+    [{ type: "executing" }, { type: "finished", exitCode: 3 }],
+  );
   // Other OSC sequences and plain text pass through untouched outside a command.
   assert.deepEqual(new ShellIntegrationParser().feed("\x1b]0;title\x07hello"), []);
 });
@@ -54,7 +62,10 @@ test("the parser handles sequences split across chunks, ST terminators and Final
 test("a prompt while a command is 'running' ends it; values round-trip through the escaping", () => {
   const parser = new ShellIntegrationParser();
   const events = parser.feed(`${OSC("633;C")}x${OSC("633;A")}`);
-  assert.deepEqual(events.map((event) => event.type), ["executing", "output", "finished", "prompt-start"]);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["executing", "output", "finished", "prompt-start"],
+  );
   const line = "echo 'a;b' \\ \n";
   assert.equal(unescapeIntegrationValue(escapeIntegrationValue(line)), line);
   assert.equal(new ShellIntegrationParser().feed(OSC(`633;E;${escapeIntegrationValue(line)}`))[0]?.type, "command-line");
@@ -169,7 +180,18 @@ test("spawn specs travel in the profile string; the shells get their integration
 
 function startedHost(answer: (method: string, args: unknown[]) => unknown) {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-terminal-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-terminal-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   const requests: [string, unknown[]][] = [];
   host.post = (message) => {
@@ -275,7 +297,9 @@ test("terminal state, shell integration and executions reach the API", async () 
   const events: string[] = [];
   api.window.onDidChangeTerminalState((terminal: any) => events.push(`state:${terminal.state.isInteractedWith}:${terminal.state.shell}`));
   api.window.onDidChangeTerminalShellIntegration((event: any) => events.push(`integration:${event.shellIntegration.cwd?.path}`));
-  api.window.onDidStartTerminalShellExecution((event: any) => events.push(`start:${event.execution.commandLine.value}:${event.execution.commandLine.confidence}`));
+  api.window.onDidStartTerminalShellExecution((event: any) =>
+    events.push(`start:${event.execution.commandLine.value}:${event.execution.commandLine.confidence}`),
+  );
   api.window.onDidEndTerminalShellExecution((event: any) => events.push(`end:${event.exitCode}`));
 
   const terminal = api.window.createTerminal({ name: "sh" });
@@ -295,7 +319,9 @@ test("terminal state, shell integration and executions reach the API", async () 
 test("a nonce-verified command line reaches extensions as trusted / High", async () => {
   const { viewMessage, api } = startedHost((method, args) => (method === "feature" && args[1] === "create" ? { id: "3", cols: 80, rows: 24 } : true));
   const events: string[] = [];
-  api.window.onDidStartTerminalShellExecution((event: any) => events.push(`${event.execution.commandLine.value}:${event.execution.commandLine.isTrusted}:${event.execution.commandLine.confidence}`));
+  api.window.onDidStartTerminalShellExecution((event: any) =>
+    events.push(`${event.execution.commandLine.value}:${event.execution.commandLine.isTrusted}:${event.execution.commandLine.confidence}`),
+  );
   api.window.createTerminal({ name: "fish" });
   await tick();
   viewMessage({ kind: "started", id: "3", pid: 1, shell: "/usr/bin/fish" });
@@ -305,7 +331,9 @@ test("a nonce-verified command line reaches extensions as trusted / High", async
 });
 
 test("link providers are asked per line and activated by id", async () => {
-  const { host, features, viewMessage, api } = startedHost((method, args) => (method === "feature" && args[1] === "create" ? { id: "5", cols: 80, rows: 24 } : true));
+  const { host, features, viewMessage, api } = startedHost((method, args) =>
+    method === "feature" && args[1] === "create" ? { id: "5", cols: 80, rows: 24 } : true,
+  );
   const handled: { startIndex: number }[] = [];
   api.window.createTerminal({ name: "links" });
   await tick();
@@ -317,7 +345,12 @@ test("link providers are asked per line and activated by id", async () => {
     handleTerminalLink: (link: { startIndex: number }) => void handled.push(link),
   });
   assert.deepEqual(features().at(-1), { kind: "linkProviders", count: 1 });
-  const links = (await host.methods.feature("terminal", "links", ["5", "see TICKET-1 now"])) as { linkId: string; startIndex: number; length: number; tooltip: string }[];
+  const links = (await host.methods.feature("terminal", "links", ["5", "see TICKET-1 now"])) as {
+    linkId: string;
+    startIndex: number;
+    length: number;
+    tooltip: string;
+  }[];
   assert.equal(links.length, 1);
   assert.deepEqual([links[0]!.startIndex, links[0]!.length, links[0]!.tooltip], [4, 8, "Open ticket"]);
   assert.deepEqual(await host.methods.feature("terminal", "links", ["5", "nothing"]), []);
@@ -331,7 +364,14 @@ test("link providers are asked per line and activated by id", async () => {
 test("profile providers resolve a contributed profile to spawn options or a pseudo-terminal", async () => {
   const { host, api } = startedHost((method, args) => (method === "feature" && args[1] === "create" ? { id: "5", cols: 80, rows: 24 } : true));
   api.window.registerTerminalProfileProvider("demo.shell", {
-    provideTerminalProfile: () => new api.TerminalProfile({ name: "Demo", shellPath: "/bin/sh", shellArgs: ["-i"], env: { A: "1", B: null }, color: new api.ThemeColor("terminal.ansiRed") }),
+    provideTerminalProfile: () =>
+      new api.TerminalProfile({
+        name: "Demo",
+        shellPath: "/bin/sh",
+        shellArgs: ["-i"],
+        env: { A: "1", B: null },
+        color: new api.ThemeColor("terminal.ansiRed"),
+      }),
   });
   const resolved = (await host.methods.feature("terminal", "resolveProfile", ["ext:demo.shell", "9", null])) as any;
   assert.equal(resolved.title, "Demo");
@@ -350,7 +390,9 @@ test("profile providers resolve a contributed profile to spawn options or a pseu
 });
 
 test("contributes.terminal.quickFixes call the provider and run the picked fix", async () => {
-  const { host, features, requests, viewMessage, api } = startedHost((method, args) => (method === "feature" && args[1] === "create" ? { id: "3", cols: 80, rows: 24 } : true));
+  const { host, features, requests, viewMessage, api } = startedHost((method, args) =>
+    method === "feature" && args[1] === "create" ? { id: "3", cols: 80, rows: 24 } : true,
+  );
   const description = {
     id: "demo.quickfix",
     location: ROOT,
@@ -427,7 +469,9 @@ test("contributes.terminal.quickFixes call the provider and run the picked fix",
 });
 
 test("quick fix actions: opener, Command and shouldExecuteInShell", async () => {
-  const { host, features, requests, viewMessage, api } = startedHost((method, args) => (method === "feature" && args[1] === "create" ? { id: "3", cols: 80, rows: 24 } : true));
+  const { host, features, requests, viewMessage, api } = startedHost((method, args) =>
+    method === "feature" && args[1] === "create" ? { id: "3", cols: 80, rows: 24 } : true,
+  );
   const description = {
     id: "demo.actions",
     location: ROOT,
@@ -456,7 +500,11 @@ test("quick fix actions: opener, Command and shouldExecuteInShell", async () => 
   viewMessage({ kind: "shell", id: "3", event: { type: "executing" } });
   viewMessage({ kind: "shell", id: "3", event: { type: "finished", exitCode: 0 } });
   await tick();
-  const fixes = (features().filter((payload: any) => payload.kind === "quickFixes").at(-1) as any).fixes;
+  const fixes = (
+    features()
+      .filter((payload: any) => payload.kind === "quickFixes")
+      .at(-1) as any
+  ).fixes;
   assert.deepEqual(
     fixes.map((fix: any) => fix.label).map((label: string) => label.replace(/\\/g, "/")),
     ["make -k", "/tmp/report.html", "Explain"],
@@ -477,6 +525,13 @@ test("exported terminal classes", () => {
   assert.equal(new api.TerminalProfile({ name: "x" }).options.name, "x");
   const link = new api.TerminalLink(1, 2, "t");
   assert.deepEqual([link.startIndex, link.length, link.tooltip], [1, 2, "t"]);
-  assert.deepEqual([api.TerminalShellExecutionCommandLineConfidence.Low, api.TerminalShellExecutionCommandLineConfidence.Medium, api.TerminalShellExecutionCommandLineConfidence.High], [0, 1, 2]);
+  assert.deepEqual(
+    [
+      api.TerminalShellExecutionCommandLineConfidence.Low,
+      api.TerminalShellExecutionCommandLineConfidence.Medium,
+      api.TerminalShellExecutionCommandLineConfidence.High,
+    ],
+    [0, 1, 2],
+  );
   assert.equal(typeof api.window.onDidChangeTextEditorViewColumn, "function");
 });

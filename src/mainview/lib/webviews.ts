@@ -51,7 +51,13 @@ export type WebviewEvent =
   | { type: "reveal"; id: string; kind: "panel" | "view"; viewType: string; preserveFocus: boolean };
 
 /** What a saved webview panel needs to come back. */
-export type SavedWebview = { viewType: string; title: string; state: unknown; options: HostWebviewOptions | null; /** Custom editor panels also remember the file. */ uri?: string };
+export type SavedWebview = {
+  viewType: string;
+  title: string;
+  state: unknown;
+  options: HostWebviewOptions | null;
+  /** Custom editor panels also remember the file. */ uri?: string;
+};
 
 type Record_ = WebviewInfo & {
   options: HostWebviewOptions;
@@ -82,7 +88,9 @@ export const webviewIdOf = (path: string) => path.slice(TAB_PREFIX.length);
  * the window's: same-origin there gives it real storage without reaching the window.
  */
 function sandboxFor(options: HostWebviewOptions): string {
-  return ["allow-same-origin", "allow-popups", "allow-downloads", options.enableScripts ? "allow-scripts" : "", options.enableForms ? "allow-forms" : ""].filter(Boolean).join(" ");
+  return ["allow-same-origin", "allow-popups", "allow-downloads", options.enableScripts ? "allow-scripts" : "", options.enableForms ? "allow-forms" : ""]
+    .filter(Boolean)
+    .join(" ");
 }
 
 class WebviewService {
@@ -264,7 +272,15 @@ class WebviewService {
   createRestoring(saved: SavedWebview): string {
     const id = `r${Math.random().toString(36).slice(2, 10)}`;
     const record = this.#create(
-      { id, kind: "panel", extensionId: "", viewType: saved.viewType, title: saved.title, options: saved.options ?? { enableScripts: true, enableForms: true, enableCommandUris: false, retainContextWhenHidden: false }, uri: saved.uri },
+      {
+        id,
+        kind: "panel",
+        extensionId: "",
+        viewType: saved.viewType,
+        title: saved.title,
+        options: saved.options ?? { enableScripts: true, enableForms: true, enableCommandUris: false, retainContextWhenHidden: false },
+        uri: saved.uri,
+      },
       true,
     );
     record.state = saved.state;
@@ -440,7 +456,8 @@ class WebviewService {
           existing.iframe.setAttribute("sandbox", sandboxFor(message.webview.options));
         } else this.#create(message.webview);
         this.#emit();
-        if (message.webview.kind === "panel") for (const listener of this.#panelListeners) listener({ type: "created", id: message.webview.id, reveal: message.reveal });
+        if (message.webview.kind === "panel")
+          for (const listener of this.#panelListeners) listener({ type: "created", id: message.webview.id, reveal: message.reveal });
         return;
       }
       case "webviewHtml": {
@@ -479,7 +496,8 @@ class WebviewService {
       case "webviewReveal": {
         const record = this.#records.get(message.id);
         if (!record) return;
-        for (const listener of this.#panelListeners) listener({ type: "reveal", id: record.id, kind: record.kind, viewType: record.viewType, preserveFocus: message.preserveFocus });
+        for (const listener of this.#panelListeners)
+          listener({ type: "reveal", id: record.id, kind: record.kind, viewType: record.viewType, preserveFocus: message.preserveFocus });
         return;
       }
       case "webviewDispose":
@@ -495,7 +513,10 @@ class WebviewService {
    * extensions' webview/context entries. The context's keys are context keys
    * (webviewSection, …) next to webviewId; commands get the context with `webview`.
    */
-  #contextMenu(record: { iframe: HTMLIFrameElement; viewType: string }, menu: { x: number; y: number; context: Record<string, unknown>; selection: boolean; editable: boolean }) {
+  #contextMenu(
+    record: { iframe: HTMLIFrameElement; viewType: string },
+    menu: { x: number; y: number; context: Record<string, unknown>; selection: boolean; editable: boolean },
+  ) {
     const context = menu.context && typeof menu.context === "object" ? menu.context : {};
     const lookup = (key: string): unknown => (key === "webviewId" ? record.viewType : key in context ? context[key] : undefined);
     const contributed = contributedMenuItems("webview/context", lookup, [{ ...context, webview: record.viewType }]);
@@ -506,11 +527,25 @@ class WebviewService {
       : [
           { type: "item", label: "Cut", action: "cut", disabled: !menu.editable || !menu.selection, run: () => edit("cut") },
           { type: "item", label: "Copy", action: "copy", disabled: !menu.selection, run: () => edit("copy") },
-          { type: "item", label: "Paste", action: "paste", disabled: !menu.editable, run: () => void navigator.clipboard.readText().then((text) => edit("paste", text), () => {}) },
+          {
+            type: "item",
+            label: "Paste",
+            action: "paste",
+            disabled: !menu.editable,
+            run: () =>
+              void navigator.clipboard.readText().then(
+                (text) => edit("paste", text),
+                () => {},
+              ),
+          },
         ];
     if (!own.length && !contributed.length) return;
     const rect = record.iframe.getBoundingClientRect();
-    void showContextMenu(rect.left + menu.x, rect.top + menu.y, own.length && contributed.length ? [...contributed, { type: "separator" }, ...own] : [...contributed, ...own]);
+    void showContextMenu(
+      rect.left + menu.x,
+      rect.top + menu.y,
+      own.length && contributed.length ? [...contributed, { type: "separator" }, ...own] : [...contributed, ...own],
+    );
   }
 
   #find(record: Record_, action: WebviewFindAction) {
@@ -524,7 +559,9 @@ class WebviewService {
    * panel's find bar, when it was created with enableFindWidget. False when there is none.
    */
   find(action: WebviewFindAction): boolean {
-    const record = [...this.#records.values()].find((candidate) => candidate.kind === "panel" && candidate.shown && this.#activePanels.has(candidate.id) && candidate.options.enableFindWidget);
+    const record = [...this.#records.values()].find(
+      (candidate) => candidate.kind === "panel" && candidate.shown && this.#activePanels.has(candidate.id) && candidate.options.enableFindWidget,
+    );
     if (!record) return false;
     this.#find(record, action);
     return true;
@@ -583,7 +620,9 @@ class WebviewService {
         this.#contextMenu(record, data.data as { x: number; y: number; context: Record<string, unknown>; selection: boolean; editable: boolean });
         return;
       case "focus":
-        if (record.kind === "panel") for (const listener of this.#panelListeners) listener({ type: "reveal", id: record.id, kind: "panel", viewType: record.viewType, preserveFocus: true });
+        if (record.kind === "panel")
+          for (const listener of this.#panelListeners)
+            listener({ type: "reveal", id: record.id, kind: "panel", viewType: record.viewType, preserveFocus: true });
         return;
     }
   }

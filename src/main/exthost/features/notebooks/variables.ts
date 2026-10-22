@@ -16,7 +16,15 @@ const MAX_NAMED = 1000;
 const MAX_KEPT = 5000;
 
 type Variable = { name: string; value: string; expression?: string; type?: string; interfaces?: string[]; language?: string };
-type Kept = { variable: Variable; parent: string | undefined; path: string; controllerId: string; extensionId: string; hasNamedChildren: boolean; indexedChildrenCount: number };
+type Kept = {
+  variable: Variable;
+  parent: string | undefined;
+  path: string;
+  controllerId: string;
+  extensionId: string;
+  hasNamedChildren: boolean;
+  indexedChildrenCount: number;
+};
 
 const kept = new WeakMap<NotebookService, { seq: number; variables: Map<string, Kept> }>();
 
@@ -27,7 +35,13 @@ function keptOf(service: NotebookService) {
 }
 
 /** One level of variables: the globals (`parent` undefined) or a variable's named / indexed children from `start`. */
-export async function notebookVariables(service: NotebookService, path: string, parent: string | undefined, kind: number, start: number): Promise<NbVariableWire[]> {
+export async function notebookVariables(
+  service: NotebookService,
+  path: string,
+  parent: string | undefined,
+  kind: number,
+  start: number,
+): Promise<NbVariableWire[]> {
   const doc = service.find(path);
   const controller = doc?.controllerId ? service.controllers.get(doc.controllerId) : undefined;
   const provider = controller?.variableProvider;

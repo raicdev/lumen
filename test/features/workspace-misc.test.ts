@@ -18,7 +18,18 @@ const ROOT = resolve(import.meta.dirname, "..", "..");
 
 function startedHost(workspace: string | null = null) {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace, userData: mkdtempSync(join(tmpdir(), "lumen-wm-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace,
+    userData: mkdtempSync(join(tmpdir(), "lumen-wm-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.workspace = workspace;
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
@@ -55,7 +66,10 @@ test("workspace folders: add, remove, replace and events", () => {
   assert.equal(folders.update(1, 0, [{ uri: uri("/b") }, { uri: uri("/b") }]).ok, false, "duplicates");
   assert.equal(folders.update(1, 0, [{ uri: uri("/a/root") }]).ok, false, "already present");
   assert.deepEqual(folders.update(1, 0, [{ uri: uri("/b"), name: "Bee" }]), { ok: true, wantedRoot: undefined });
-  assert.deepEqual(folders.folders.map((f) => f.name), ["root", "Bee"]);
+  assert.deepEqual(
+    folders.folders.map((f) => f.name),
+    ["root", "Bee"],
+  );
   assert.equal(folders.folderOf(T.Uri.file(resolve("/b/x/y")))?.name, "Bee");
   assert.equal(folders.folderOf(T.Uri.file(resolve("/c"))), undefined);
   // replacing the first folder asks the window to open the new one
@@ -65,7 +79,10 @@ test("workspace folders: add, remove, replace and events", () => {
   const count = events.length;
   folders.syncRoot(resolve("/c"));
   assert.equal(events.length, count);
-  assert.deepEqual(folders.folders.map((f) => f.name), ["c", "Bee"]);
+  assert.deepEqual(
+    folders.folders.map((f) => f.name),
+    ["c", "Bee"],
+  );
   assert.deepEqual(events[0], { added: ["1:Bee"], removed: [] });
   // removing all closes the window's folder
   assert.equal(folders.update(0, undefined, []).wantedRoot, null);
@@ -78,7 +95,10 @@ test("window root changes reach the folder list", () => {
   folders.onDidChange((e) => seen.push(e.added.length - e.removed.length));
   folders.syncRoot(resolve("/p"));
   folders.syncRoot(resolve("/q"));
-  assert.deepEqual(folders.folders.map((f) => f.name), ["q"]);
+  assert.deepEqual(
+    folders.folders.map((f) => f.name),
+    ["q"],
+  );
   assert.deepEqual(seen, [1, 0]);
 });
 
@@ -178,7 +198,10 @@ test("the API: types, saveAs, decode/encode, updateWorkspaceFolders, URI handler
   }) as any;
   const saved = await api.workspace.saveAs(T.Uri.file(join(dir, "in.txt")));
   assert.equal(saved.fsPath.toLowerCase(), join(dir, "out.txt").toLowerCase());
-  assert.deepEqual(calls[0]!.map((v) => String(v).toLowerCase()), ["savedocumentas", join(dir, "in.txt").toLowerCase(), join(dir, "out.txt").toLowerCase()]);
+  assert.deepEqual(
+    calls[0]!.map((v) => String(v).toLowerCase()),
+    ["savedocumentas", join(dir, "in.txt").toLowerCase(), join(dir, "out.txt").toLowerCase()],
+  );
 
   // updateWorkspaceFolders
   const changes: any[] = [];

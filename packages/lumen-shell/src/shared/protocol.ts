@@ -57,9 +57,7 @@ type ResponseOf<T> = T extends { response: infer R } ? R : never;
 /** Caller side: `api().request.foo({...})` / `api().send.bar({...})`. */
 export type RpcApi<S extends RPCSchema, NS extends Namespace> = {
   request: {
-    [K in keyof RequestsOf<S, NS>]: (
-      params: ParamsOf<RequestsOf<S, NS>[K]>,
-    ) => Promise<ResponseOf<RequestsOf<S, NS>[K]>>;
+    [K in keyof RequestsOf<S, NS>]: (params: ParamsOf<RequestsOf<S, NS>[K]>) => Promise<ResponseOf<RequestsOf<S, NS>[K]>>;
   };
   send: {
     [K in keyof MessagesOf<S, NS>]: (payload: MessagesOf<S, NS>[K]) => void;
@@ -69,13 +67,9 @@ export type RpcApi<S extends RPCSchema, NS extends Namespace> = {
 /** Handler side: `{ requests: { foo: (params) => ... }, messages: { bar: (p) => ... } }`. */
 export type RpcHandlersOf<S extends RPCSchema, NS extends Namespace> = {
   requests: {
-    [K in keyof RequestsOf<S, NS>]: (
-      params: ParamsOf<RequestsOf<S, NS>[K]>,
-    ) => ResponseOf<RequestsOf<S, NS>[K]> | Promise<ResponseOf<RequestsOf<S, NS>[K]>>;
+    [K in keyof RequestsOf<S, NS>]: (params: ParamsOf<RequestsOf<S, NS>[K]>) => ResponseOf<RequestsOf<S, NS>[K]> | Promise<ResponseOf<RequestsOf<S, NS>[K]>>;
   };
   messages: {
-    [K in keyof MessagesOf<S, NS>]: (
-      payload: MessagesOf<S, NS>[K],
-    ) => void | Promise<void>;
+    [K in keyof MessagesOf<S, NS>]: (payload: MessagesOf<S, NS>[K]) => void | Promise<void>;
   };
 };

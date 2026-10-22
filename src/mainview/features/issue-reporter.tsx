@@ -41,12 +41,21 @@ function IssueReporter({ path, api }: { path: string; api: ViewFeatureApi }) {
   const [includeSystem, setIncludeSystem] = useState(true);
 
   useEffect(() => {
-    if (!system) void api.requestHost<IssueSystemInfo>("systemInfo").then((info) => systemStore.set(info), () => {});
+    if (!system)
+      void api.requestHost<IssueSystemInfo>("systemInfo").then(
+        (info) => systemStore.set(info),
+        () => {},
+      );
   }, [api, system]);
 
   const extension = extensions.find((candidate) => candidate.id.toLowerCase() === target.toLowerCase()) ?? null;
   const where = extension ? issueTarget(extension.manifest as Parameters<typeof issueTarget>[0]) : null;
-  const body = issueBody(description, includeSystem ? system : null, extension ? { id: extension.id, version: extension.manifest.version } : null, request?.extensionData);
+  const body = issueBody(
+    description,
+    includeSystem ? system : null,
+    extension ? { id: extension.id, version: extension.manifest.version } : null,
+    request?.extensionData,
+  );
   // issue/reporter: the selected extension's own ways to report an issue.
   const own = extension
     ? flattenMenu(resolveContributedMenu("issue/reporter", (key) => (key === "extension" ? extension.id : undefined))).filter(
@@ -83,7 +92,12 @@ function IssueReporter({ path, api }: { path: string; api: ViewFeatureApi }) {
         <div className="issue-own">
           <span>This extension reports issues itself:</span>
           {own.map((item) => (
-            <MenuActionButton key={item.command} item={{ ...item, icon: undefined }} onRun={() => runMenuCommand(item.command, [])} className="issue-own-button" />
+            <MenuActionButton
+              key={item.command}
+              item={{ ...item, icon: undefined }}
+              onRun={() => runMenuCommand(item.command, [])}
+              className="issue-own-button"
+            />
           ))}
         </div>
       )}
@@ -93,7 +107,12 @@ function IssueReporter({ path, api }: { path: string; api: ViewFeatureApi }) {
       </label>
       <label className="issue-field">
         <span>Description</span>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={8} placeholder="Steps to reproduce, what you expected, what happened" />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={8}
+          placeholder="Steps to reproduce, what you expected, what happened"
+        />
       </label>
       <label className="issue-check">
         <input type="checkbox" checked={includeSystem} onChange={(e) => setIncludeSystem(e.target.checked)} /> Include system information
@@ -108,7 +127,11 @@ function IssueReporter({ path, api }: { path: string; api: ViewFeatureApi }) {
             Copy to Clipboard
           </button>
         )}
-        {!where && <span className="muted">{extension ? "This extension has no repository or bug page." : "Lumen has no issue tracker configured: the report is copied."}</span>}
+        {!where && (
+          <span className="muted">
+            {extension ? "This extension has no repository or bug page." : "Lumen has no issue tracker configured: the report is copied."}
+          </span>
+        )}
       </div>
     </div>
   );

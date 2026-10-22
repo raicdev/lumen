@@ -130,7 +130,9 @@ export function jsonSchemaAssociations(extension: ExtensionDescription): { fileM
   const entries = extension.manifest.contributes?.jsonValidation;
   if (!Array.isArray(entries)) return [];
   return entries.flatMap((entry: { fileMatch?: unknown; url?: unknown }) => {
-    const fileMatch = (Array.isArray(entry?.fileMatch) ? entry.fileMatch : [entry?.fileMatch]).filter((pattern): pattern is string => typeof pattern === "string" && !!pattern);
+    const fileMatch = (Array.isArray(entry?.fileMatch) ? entry.fileMatch : [entry?.fileMatch]).filter(
+      (pattern): pattern is string => typeof pattern === "string" && !!pattern,
+    );
     if (!fileMatch.length || typeof entry.url !== "string" || !entry.url) return [];
     const url = /^[a-z][\w+.-]+:/i.test(entry.url) ? entry.url : pathToFileURL(resolve(extension.location, entry.url)).toString();
     return [{ fileMatch: fileMatch.map((pattern) => (/^(\w+:\/\/|\/|!)/.test(pattern) ? pattern : `/${pattern}`)), url }];

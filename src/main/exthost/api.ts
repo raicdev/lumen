@@ -3,7 +3,15 @@ import { existsSync, readFileSync, statSync } from "fs";
 import { dirname, extname, relative } from "path";
 import { API_VERSION } from "../../shared/extension-api.ts";
 import { cssVariable } from "../../shared/color-theme.ts";
-import type { HostDecoration, HostDecorationType, HostQuickInputButton, HostQuickPick, HostQuickPickItem, HostStatusBarItem, ProviderKind } from "../../shared/extensions.ts";
+import type {
+  HostDecoration,
+  HostDecorationType,
+  HostQuickInputButton,
+  HostQuickPick,
+  HostQuickPickItem,
+  HostStatusBarItem,
+  ProviderKind,
+} from "../../shared/extensions.ts";
 import { wireLanguageConfiguration } from "../../shared/extensions.ts";
 import { matchGlob, matchesSelector } from "../../shared/glob.ts";
 import { isCaseInsensitiveFileSystem } from "../../shared/file-systems.ts";
@@ -48,9 +56,9 @@ const THEME_COLORS: Record<string, string> = {
   "editorGhostText.foreground": "rgba(255, 255, 255, 0.34)",
   "editorInlayHint.foreground": "#969696",
   "editorInlayHint.background": "rgba(97, 97, 97, 0.1)",
-  "errorForeground": "#f48771",
-  "descriptionForeground": "rgba(204, 204, 204, 0.7)",
-  "foreground": "#cccccc",
+  errorForeground: "#f48771",
+  descriptionForeground: "rgba(204, 204, 204, 0.7)",
+  foreground: "#cccccc",
   "statusBarItem.errorBackground": "#c72e0f",
   "statusBarItem.warningBackground": "#7a6400",
   "statusBarItem.prominentBackground": "rgba(0, 0, 0, 0.5)",
@@ -75,7 +83,13 @@ function colorOf(value: unknown): string | undefined {
   return undefined;
 }
 
-const BUTTON_IMAGE_TYPES: Record<string, string> = { ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif" };
+const BUTTON_IMAGE_TYPES: Record<string, string> = {
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+};
 const buttonImages = new Map<string, string | null>();
 
 /** An icon file as a data URL (cached; small images only), like tree item icons. */
@@ -123,7 +137,12 @@ const decorationConverters: DecorationConverters = {
 
 /** A QuickInputButton as the view's `{ icon, image, tooltip, index }` (iconPath like a tree item's). */
 function quickInputButton(button: unknown, index: number): HostQuickInputButton | null {
-  const icon = (button as { iconPath?: unknown } | null)?.iconPath as T.ThemeIcon | T.Uri | string | { light?: T.Uri | string; dark?: T.Uri | string } | undefined;
+  const icon = (button as { iconPath?: unknown } | null)?.iconPath as
+    | T.ThemeIcon
+    | T.Uri
+    | string
+    | { light?: T.Uri | string; dark?: T.Uri | string }
+    | undefined;
   const tooltip = (button as { tooltip?: unknown } | null)?.tooltip;
   const label = typeof tooltip === "string" ? tooltip : undefined;
   if (icon instanceof T.ThemeIcon || (icon && typeof icon === "object" && "id" in icon && typeof icon.id === "string")) {
@@ -201,7 +220,12 @@ export function createEditorFacade(host: ExtensionHost, state: EditorState): Rec
       void host.requestView(
         "setSelections",
         state.key,
-        state.selections.map((s) => ({ anchorLine: s.anchor.line, anchorCharacter: s.anchor.character, activeLine: s.active.line, activeCharacter: s.active.character })),
+        state.selections.map((s) => ({
+          anchorLine: s.anchor.line,
+          anchorCharacter: s.anchor.character,
+          activeLine: s.active.line,
+          activeCharacter: s.active.character,
+        })),
       );
     },
     get visibleRanges() {
@@ -225,8 +249,14 @@ export function createEditorFacade(host: ExtensionHost, state: EditorState): Rec
     set options(value: unknown) {
       if (!value || typeof value !== "object") return;
       const next = value as { tabSize?: number; insertSpaces?: boolean };
-      const tabSize = typeof next.tabSize === "number" && next.tabSize > 0 ? Math.round(next.tabSize) : (state.options?.tabSize ?? (host.configValue("editor.tabSize") as number | undefined) ?? 4);
-      const insertSpaces = typeof next.insertSpaces === "boolean" ? next.insertSpaces : (state.options?.insertSpaces ?? (host.configValue("editor.insertSpaces") as boolean | undefined) ?? true);
+      const tabSize =
+        typeof next.tabSize === "number" && next.tabSize > 0
+          ? Math.round(next.tabSize)
+          : (state.options?.tabSize ?? (host.configValue("editor.tabSize") as number | undefined) ?? 4);
+      const insertSpaces =
+        typeof next.insertSpaces === "boolean"
+          ? next.insertSpaces
+          : (state.options?.insertSpaces ?? (host.configValue("editor.insertSpaces") as boolean | undefined) ?? true);
       state.options = { tabSize, insertSpaces };
       // Lumen keeps indentation in its settings: apply the change there.
       if (next.tabSize !== undefined) void host.requestView("updateConfiguration", "editor.tabSize", tabSize);
@@ -249,7 +279,10 @@ export function createEditorFacade(host: ExtensionHost, state: EditorState): Rec
     setDecorations: (type: { key: string }, items: readonly (T.Range | { range: T.Range; hoverMessage?: unknown; renderOptions?: any })[]) => {
       const ranges: HostDecoration[] = items.map((item) => {
         if (T.Range.isRange(item)) return wireRange(item);
-        const hover = [item.hoverMessage ?? []].flat().map((part) => (typeof part === "string" ? part : ((part as { value?: string })?.value ?? ""))).join("\n\n");
+        const hover = [item.hoverMessage ?? []]
+          .flat()
+          .map((part) => (typeof part === "string" ? part : ((part as { value?: string })?.value ?? "")))
+          .join("\n\n");
         return {
           ...wireRange(item.range),
           hover: hover || undefined,
@@ -354,7 +387,8 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     executeCommand: (command: string, ...args: unknown[]) => host.executeCommand(command, args),
     getCommands: async (filterInternal = false) => {
       const ids = new Set(host.commands.keys());
-      for (const other of host.runtimes.values()) for (const command of [other.description.manifest.contributes?.commands ?? []].flat()) ids.add(command.command);
+      for (const other of host.runtimes.values())
+        for (const command of [other.description.manifest.contributes?.commands ?? []].flat()) ids.add(command.command);
       return [...ids].filter((id) => !filterInternal || !id.startsWith("_"));
     },
   };
@@ -570,7 +604,12 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
 
   function createInputBox() {
     const id = host.nextId();
-    const emit = { value: new T.EventEmitter<string>(), accept: new T.EventEmitter<void>(), hide: new T.EventEmitter<void>(), button: new T.EventEmitter<unknown>() };
+    const emit = {
+      value: new T.EventEmitter<string>(),
+      accept: new T.EventEmitter<void>(),
+      hide: new T.EventEmitter<void>(),
+      button: new T.EventEmitter<unknown>(),
+    };
     const state = {
       value: "",
       placeholder: undefined as string | undefined,
@@ -605,7 +644,17 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
         if (visible) return;
         visible = true;
         void host
-          .requestView("showInputBox", { title: state.title, prompt: state.prompt, value: state.value, placeholder: state.placeholder, password: state.password, validationMessage: state.validationMessage, buttons: quickInputButtons(state.buttons), id, live: true })
+          .requestView("showInputBox", {
+            title: state.title,
+            prompt: state.prompt,
+            value: state.value,
+            placeholder: state.placeholder,
+            password: state.password,
+            validationMessage: state.validationMessage,
+            buttons: quickInputButtons(state.buttons),
+            id,
+            live: true,
+          })
           .then((value) => {
             visible = false;
             if (value === null || value === undefined) emit.hide.fire();
@@ -666,7 +715,12 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
       queueMicrotask(() => {
         scheduled = false;
         if (disposed) return;
-        const command = typeof state.command === "string" ? { command: state.command } : state.command ? { command: state.command.command, arguments: toWire(state.command.arguments) as unknown[] } : undefined;
+        const command =
+          typeof state.command === "string"
+            ? { command: state.command }
+            : state.command
+              ? { command: state.command.command, arguments: toWire(state.command.arguments) as unknown[] }
+              : undefined;
         const item: HostStatusBarItem = {
           id,
           extensionId,
@@ -717,7 +771,11 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     item.text = text;
     item.show();
     if (typeof hide === "number") setTimeout(() => item.dispose(), hide);
-    else if (hide && typeof hide.then === "function") hide.then(() => item.dispose(), () => item.dispose());
+    else if (hide && typeof hide.then === "function")
+      hide.then(
+        () => item.dispose(),
+        () => item.dispose(),
+      );
     return new T.Disposable(() => item.dispose());
   }
 
@@ -739,7 +797,8 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
       appendLine: (value: string) => host.appendOutput(name, `${value}\n`, extensionId, log),
       replace: (value: string) => post("replace", String(value)),
       clear: () => post("clear"),
-      show: (columnOrPreserveFocus?: unknown, preserveFocus?: boolean) => post("show", undefined, typeof columnOrPreserveFocus === "boolean" ? columnOrPreserveFocus : preserveFocus),
+      show: (columnOrPreserveFocus?: unknown, preserveFocus?: boolean) =>
+        post("show", undefined, typeof columnOrPreserveFocus === "boolean" ? columnOrPreserveFocus : preserveFocus),
       hide: () => {},
       dispose: () => post("dispose"),
       ...(log
@@ -756,7 +815,10 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     };
   }
 
-  async function withProgress<R>(options: { location: number | { viewId: string }; title?: string; cancellable?: boolean }, task: (progress: { report(value: { message?: string; increment?: number }): void }, token: T.CancellationToken) => Thenable<R>): Promise<R> {
+  async function withProgress<R>(
+    options: { location: number | { viewId: string }; title?: string; cancellable?: boolean },
+    task: (progress: { report(value: { message?: string; increment?: number }): void }, token: T.CancellationToken) => Thenable<R>,
+  ): Promise<R> {
     const id = host.nextId();
     const notification = options.location === T.ProgressLocation.Notification;
     let percent = 0;
@@ -767,7 +829,14 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
         {
           report: (value) => {
             if (value.increment) percent = Math.min(100, percent + value.increment);
-            host.post({ type: "progress", id, title: options.title, message: value.message, percent: value.increment !== undefined ? percent : undefined, notification });
+            host.post({
+              type: "progress",
+              id,
+              title: options.title,
+              message: value.message,
+              percent: value.increment !== undefined ? percent : undefined,
+              notification,
+            });
           },
         },
         source.token,
@@ -796,7 +865,10 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     return host.editorFacade(host.editors.get(normalizeKey(document.key)) ?? { key: document.key, selections: [new T.Selection(0, 0, 0, 0)], facade: null });
   }
 
-  function createTerminal(nameOrOptions?: string | { name?: string; cwd?: string | T.Uri; shellPath?: string; shellArgs?: string[] | string; pty?: unknown }, shellPath?: string) {
+  function createTerminal(
+    nameOrOptions?: string | { name?: string; cwd?: string | T.Uri; shellPath?: string; shellArgs?: string[] | string; pty?: unknown },
+    shellPath?: string,
+  ) {
     const options = typeof nameOrOptions === "object" && nameOrOptions ? nameOrOptions : { name: nameOrOptions, shellPath };
     if (options.pty) notSupported("window.createTerminal (pseudo-terminal)");
     const cwd = options.cwd === undefined ? undefined : typeof options.cwd === "string" ? options.cwd : options.cwd.fsPath;
@@ -857,7 +929,10 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
       return paths.length ? paths.map((path) => T.Uri.file(path)) : undefined;
     },
     showSaveDialog: async (options: any = {}) => {
-      const path = await host.requestMain("showSaveDialog", { title: options.title ?? options.saveLabel, defaultPath: options.defaultUri ? T.Uri.revive(options.defaultUri)!.fsPath : undefined });
+      const path = await host.requestMain("showSaveDialog", {
+        title: options.title ?? options.saveLabel,
+        defaultPath: options.defaultUri ? T.Uri.revive(options.defaultUri)!.fsPath : undefined,
+      });
       return path ? T.Uri.file(path) : undefined;
     },
     showWorkspaceFolderPick: async () => {
@@ -907,10 +982,17 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     tabGroups: host.tabGroups.api(),
     activeNotebookEditor: undefined,
     visibleNotebookEditors: [],
-    createWebviewPanel: (viewType: string, title: string, showOptions: number | { viewColumn?: number; preserveFocus?: boolean }, options?: Record<string, unknown>) =>
-      host.webviews.createPanel(runtime, viewType, title, showOptions, options),
-    registerWebviewViewProvider: (viewId: string, provider: { resolveWebviewView: (view: unknown, context: unknown, token: unknown) => unknown }, options?: { webviewOptions?: { retainContextWhenHidden?: boolean } }) =>
-      host.webviews.registerViewProvider(runtime, viewId, provider, options),
+    createWebviewPanel: (
+      viewType: string,
+      title: string,
+      showOptions: number | { viewColumn?: number; preserveFocus?: boolean },
+      options?: Record<string, unknown>,
+    ) => host.webviews.createPanel(runtime, viewType, title, showOptions, options),
+    registerWebviewViewProvider: (
+      viewId: string,
+      provider: { resolveWebviewView: (view: unknown, context: unknown, token: unknown) => unknown },
+      options?: { webviewOptions?: { retainContextWhenHidden?: boolean } },
+    ) => host.webviews.registerViewProvider(runtime, viewId, provider, options),
     registerWebviewPanelSerializer: (viewType: string, serializer: { deserializeWebviewPanel: (panel: unknown, state: unknown) => unknown }) =>
       host.webviews.registerSerializer(runtime, viewType, serializer),
     registerCustomEditorProvider: (
@@ -926,7 +1008,8 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
 
   /* workspace */
 
-  const folder = () => (host.workspace ? { uri: T.Uri.file(host.workspace), name: host.workspace.split(/[/\\]/).filter(Boolean).pop() ?? host.workspace, index: 0 } : undefined);
+  const folder = () =>
+    host.workspace ? { uri: T.Uri.file(host.workspace), name: host.workspace.split(/[/\\]/).filter(Boolean).pop() ?? host.workspace, index: 0 } : undefined;
 
   /** Every setting as one tree (what `getConfiguration()` without a section shows as properties, like VS Code). */
   function configurationRoot(): Record<string, unknown> {
@@ -1000,7 +1083,8 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     readDirectory: (uri: T.Uri) =>
       guard(uri, async (path) =>
         (await readdir(path, { withFileTypes: true })).map(
-          (entry) => [entry.name, entry.isDirectory() ? T.FileType.Directory : entry.isSymbolicLink() ? T.FileType.SymbolicLink : T.FileType.File] as [string, number],
+          (entry) =>
+            [entry.name, entry.isDirectory() ? T.FileType.Directory : entry.isSymbolicLink() ? T.FileType.SymbolicLink : T.FileType.File] as [string, number],
         ),
       ),
     createDirectory: (uri: T.Uri) => guard(uri, async (path) => void (await mkdir(path, { recursive: true }))),
@@ -1159,8 +1243,11 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     onWillRenameFiles: host.onWillRenameFiles.event,
     registerTextDocumentContentProvider: (scheme: string, provider: Parameters<ExtensionHost["contentProviders"]["register"]>[2]) =>
       host.contentProviders.register(runtime, scheme, provider),
-    registerFileSystemProvider: (scheme: string, provider: FileSystemProvider, options?: { isCaseSensitive?: boolean; isReadonly?: boolean | { value: string } }) =>
-      host.fileSystems.register(runtime, scheme, provider, options),
+    registerFileSystemProvider: (
+      scheme: string,
+      provider: FileSystemProvider,
+      options?: { isCaseSensitive?: boolean; isReadonly?: boolean | { value: string } },
+    ) => host.fileSystems.register(runtime, scheme, provider, options),
     notebookDocuments: [],
   });
 

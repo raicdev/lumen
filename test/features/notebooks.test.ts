@@ -46,7 +46,18 @@ const SAMPLE = {
 function startedHost(): { host: ExtensionHost; posted: HostToView[]; dir: string } {
   const dir = mkdtempSync(join(tmpdir(), "lumen-notebook-test-"));
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: dir, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: dir,
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   return { host, posted, dir };
@@ -83,7 +94,7 @@ test("filename patterns of contributed notebooks", () => {
   assert.ok(!globMatches("*.ipynb", "/a/b/c.txt"));
 });
 
-test("a notebook contribution with priority \"option\" does not open files by default", () => {
+test('a notebook contribution with priority "option" does not open files by default', () => {
   const entries = [
     { type: "option-nb", displayName: "Option Notebook", priority: "option", selector: [{ filenamePattern: "*.mine" }] },
     { type: "default-nb", priority: "default", selector: [{ filenamePattern: "*.def" }] },
@@ -92,7 +103,10 @@ test("a notebook contribution with priority \"option\" does not open files by de
   ];
   // "option": Open With lists the notebook editor, but the file opens as text.
   assert.equal(opensAsNotebook(entries, "/a/x.mine", "jupyter-notebook"), false);
-  assert.deepEqual(matchingNotebooks(entries, "/a/x.mine", "jupyter-notebook").map((entry) => entry.type), ["option-nb"]);
+  assert.deepEqual(
+    matchingNotebooks(entries, "/a/x.mine", "jupyter-notebook").map((entry) => entry.type),
+    ["option-nb"],
+  );
   // "default" and a missing priority open it.
   assert.equal(opensAsNotebook(entries, "/a/x.def", "jupyter-notebook"), true);
   assert.equal(opensAsNotebook(entries, "C:\\a\\x.plain", "jupyter-notebook"), true);
@@ -133,20 +147,48 @@ test("showNotebookDocument sends the view column and preserveFocus to the window
   assert.equal(shown?.options.beside, true);
 });
 
-test("\"Open in Notebook Editor\" opens the active text file as a notebook", async () => {
+test('"Open in Notebook Editor" opens the active text file as a notebook', async () => {
   const { host, dir } = startedHost();
   const api = host.apiFor(null) as Api;
   const file = join(dir, "active.txtnb");
   writeFileSync(file, "one\ntwo");
   api.workspace.registerNotebookSerializer("jupyter-notebook", {
-    deserializeNotebook: (bytes: Uint8Array) => new api.NotebookData(new TextDecoder().decode(bytes).split("\n").map((line: string) => new api.NotebookCellData(2, line, "plaintext"))),
+    deserializeNotebook: (bytes: Uint8Array) =>
+      new api.NotebookData(
+        new TextDecoder()
+          .decode(bytes)
+          .split("\n")
+          .map((line: string) => new api.NotebookCellData(2, line, "plaintext")),
+      ),
     serializeNotebook: () => new Uint8Array(),
   });
   // A contribution claims the files, so "Open in Notebook Editor" offers the notebook here.
-  host.runtimes.set("test.notebooks", { id: "test.notebooks", description: { manifest: { contributes: { notebooks: [{ type: "jupyter-notebook", selector: [{ filenamePattern: "*.txtnb" }] }] } } }, activated: true, activationEvents: [] } as never);
+  host.runtimes.set("test.notebooks", {
+    id: "test.notebooks",
+    description: { manifest: { contributes: { notebooks: [{ type: "jupyter-notebook", selector: [{ filenamePattern: "*.txtnb" }] }] } } },
+    activated: true,
+    activationEvents: [],
+  } as never);
   const tabs = (path: string, kind: "text" | "feature" = "text") => ({
     type: "tabs",
-    groups: [{ viewColumn: 1, isActive: true, tabs: [{ path, label: "active.txtnb", kind, isActive: true, isDirty: false, isPinned: false, isPreview: false, ...(kind === "feature" ? { uri: file, viewType: "notebooks.editor" } : {}) }] }],
+    groups: [
+      {
+        viewColumn: 1,
+        isActive: true,
+        tabs: [
+          {
+            path,
+            label: "active.txtnb",
+            kind,
+            isActive: true,
+            isDirty: false,
+            isPinned: false,
+            isPreview: false,
+            ...(kind === "feature" ? { uri: file, viewType: "notebooks.editor" } : {}),
+          },
+        ],
+      },
+    ],
   });
   host.handleView(tabs(file) as never);
   host.post = (message) => {
@@ -280,7 +322,10 @@ test("editors follow the window, and notebook edits of a notebook that cannot op
   assert.equal(editor.notebook.uri.fsPath.toLowerCase(), file.toLowerCase());
   assert.equal(api.window.visibleNotebookEditors.length, 1);
   host.handleView({ type: "feature", area: "notebooks", payload: { t: "selection", path: file, selections: [[1, 2]] } });
-  assert.deepEqual(editor.selections.map((range: any) => [range.start, range.end]), [[1, 2]]);
+  assert.deepEqual(
+    editor.selections.map((range: any) => [range.start, range.end]),
+    [[1, 2]],
+  );
   host.handleView({ type: "feature", area: "notebooks", payload: { t: "visible", path: file, visible: false } });
   assert.equal(api.window.activeNotebookEditor, undefined);
   assert.deepEqual(log, ["visible:1", "active:yes", "selection:1-2", "visible:0", "active:no"]);
@@ -296,7 +341,13 @@ test("serializers and status bar item providers of extensions are used", async (
   const file = join(dir, "custom.txtnb");
   writeFileSync(file, "one\ntwo");
   api.workspace.registerNotebookSerializer("jupyter-notebook", {
-    deserializeNotebook: (bytes: Uint8Array) => new api.NotebookData(new TextDecoder().decode(bytes).split("\n").map((line) => new api.NotebookCellData(2, line, "plaintext"))),
+    deserializeNotebook: (bytes: Uint8Array) =>
+      new api.NotebookData(
+        new TextDecoder()
+          .decode(bytes)
+          .split("\n")
+          .map((line) => new api.NotebookCellData(2, line, "plaintext")),
+      ),
     serializeNotebook: (data: any) => new TextEncoder().encode(data.cells.map((cell: any) => cell.value).join("|")),
   });
   api.notebooks.registerNotebookCellStatusBarItemProvider("jupyter-notebook", {
@@ -307,7 +358,10 @@ test("serializers and status bar item providers of extensions are used", async (
     },
   });
   const wire = (await request(host, "open", file)) as NbWireDoc;
-  assert.deepEqual(wire.cells.map((cell) => cell.value), ["one", "two"]);
+  assert.deepEqual(
+    wire.cells.map((cell) => cell.value),
+    ["one", "two"],
+  );
   await tick(300);
   const again = (await request(host, "open", file)) as NbWireDoc;
   assert.deepEqual(again.cells[0]!.status, [{ text: "len 3", alignment: "right", priority: 0, tooltip: undefined, command: { command: "test.cellCommand" } }]);
@@ -362,7 +416,10 @@ test("Interactive Windows: interactive.open shows an in-memory notebook, its inp
   assert.equal(doc.cellCount, 1);
   assert.equal(doc.isDirty, false);
   // interactive/* menus get VS Code's arguments.
-  assert.equal(reviveMenuArg({ $ref: { area: "notebooks", path: viewPath, cell: (await request(host, "open", viewPath) as NbWireDoc).cells[0]!.id } }, host), doc.cellAt(0));
+  assert.equal(
+    reviveMenuArg({ $ref: { area: "notebooks", path: viewPath, cell: ((await request(host, "open", viewPath)) as NbWireDoc).cells[0]!.id } }, host),
+    doc.cellAt(0),
+  );
 });
 
 test("the Notebook Variables panel lists the controller's variables and their children", async () => {
@@ -386,12 +443,21 @@ test("the Notebook Variables panel lists the controller's variables and their ch
   };
   await request(host, "open", file);
   const globals = (await request(host, "variables", file, undefined, 1, 0)) as any[];
-  assert.deepEqual(globals.map((variable) => variable.name), ["x", "items"]);
+  assert.deepEqual(
+    globals.map((variable) => variable.name),
+    ["x", "items"],
+  );
   assert.equal(globals[1].indexedChildrenCount, 3);
   const named = (await request(host, "variables", file, globals[1].handle, 1, 0)) as any[];
-  assert.deepEqual(named.map((variable) => variable.name), ["length"]);
+  assert.deepEqual(
+    named.map((variable) => variable.name),
+    ["length"],
+  );
   const indexed = (await request(host, "variables", file, globals[1].handle, 2, 1)) as any[];
-  assert.deepEqual(indexed.map((variable) => variable.value), ["v1", "v2"]);
+  assert.deepEqual(
+    indexed.map((variable) => variable.value),
+    ["v1", "v2"],
+  );
   // notebook/variables/context gets VS Code's variable element.
   const element = reviveMenuArg({ $ref: { area: "notebooks", path: file, variable: globals[0].handle } }, host) as any;
   assert.equal(element.name, "x");

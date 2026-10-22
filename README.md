@@ -37,7 +37,7 @@ frameless windows, native dialogs and a close guard.
 
 **Extensions**
 
-- **Extensions view** (`Ctrl+Shift+X`): installed extensions (enable / disable / uninstall, details with README, contributed features and runtime status), search and install from [Open VSX](https://open-vsx.org), *Install from VSIX…*, *Install Extension from Location…* for development
+- **Extensions view** (`Ctrl+Shift+X`): installed extensions (enable / disable / uninstall, details with README, contributed features and runtime status), search and install from [Open VSX](https://open-vsx.org), _Install from VSIX…_, _Install Extension from Location…_ for development
 - Extensions run in an **extension host** (a worker thread, so a busy extension never freezes the window) and use the `lumen` module — an API modelled on VS Code's `vscode` module
 - **VS Code extensions** are converted by the **transpiler** when they are installed: `require("vscode")` → `require("lumen")` (also inside bundled libraries such as vscode-languageclient), a Lumen engine in the manifest, and a **compatibility report** (Details → Compatibility) listing every API the code uses and whether Lumen supports it
 - Contributions: commands (palette), keybindings with `when` clauses, settings (Settings editor), snippets, language file associations; runtime: status bar items, output channels (Output panel, `Ctrl+Shift+U`), notifications, quick picks / input boxes, diagnostics, decorations, completions, hovers, signature help, go to definition / type definition / implementation / declaration, references, rename, document highlights, code actions (`Ctrl+.`), code lenses, inlay hints, semantic tokens, folding and selection ranges, document links, colors, on-type formatting, inline completions, linked editing, workspace symbols (`Ctrl+T`), language configurations, formatting, document symbols, terminals, file decorations, virtual documents, `window.tabGroups`, file operation and will-save events
@@ -47,9 +47,9 @@ frameless windows, native dialogs and a close guard.
 **Shell**
 
 - Native desktop window through **Lumen Shell** + the system WebView, close guard for unsaved changes
-- **Auto update** (Windows setup installs): checks [GitHub Releases](https://github.com/raicdev/lumen/releases) at startup and every 6 hours, downloads the new setup in the background, verifies its SHA-256 digest and installs it on *Restart to Update*; *Help → Check for Updates…* checks now; `update.mode` (`default` / `manual` / `none`) controls it. Portable copies are pointed to the release page
+- **Auto update** (Windows setup installs): checks [GitHub Releases](https://github.com/raicdev/lumen/releases) at startup and every 6 hours, downloads the new setup in the background, verifies its SHA-256 digest and installs it on _Restart to Update_; _Help → Check for Updates…_ checks now; `update.mode` (`default` / `manual` / `none`) controls it. Portable copies are pointed to the release page
 - Integrated terminals (`node-pty` → ConPTY on Windows): multiple terminals, split groups (`Ctrl+Shift+5`), shell profiles (PowerShell 7 / Windows PowerShell / cmd / Git Bash / WSL …), rename, relaunch, terminals as editor tabs
-- Movable panel: dock it bottom / left / right by dragging its header (or *View: Move Panel …*), drag terminals into the editor area and back
+- Movable panel: dock it bottom / left / right by dragging its header (or _View: Move Panel …_), drag terminals into the editor area and back
 - Split editor groups: drag a tab, an explorer file or a terminal to an edge of any editor group to dock it there (center = move into that group, Ctrl = copy); `Ctrl+\` splits, `Ctrl+1…4` focuses groups, `Ctrl+Alt+←/→` moves editors between groups; the same file open twice stays in sync
 
 ## Requirements
@@ -65,53 +65,53 @@ pnpm install
 pnpm start          # or: pnpm dev   (rebuild + reload on change)
 ```
 
-| Script | Description |
-| --- | --- |
-| `pnpm start` | Build the view, launch the app |
-| `pnpm dev` | Dev with view watching (`src/`, `packages/`) and live reload |
-| `pnpm build` | Production bundles into `.lumen/build` |
-| `pnpm package` | Standalone app (`dist/Lumen/Lumen.exe`, a Node single executable) |
-| `pnpm installer` | Windows setup (`dist/Lumen-<version>-win32-x64-setup.exe`, per-user, needs [NSIS](https://nsis.sourceforge.io): `winget install NSIS.NSIS`). Publish it as an asset of a GitHub release tagged `v<version>` for auto update |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | Extension tests (transpiler, VSIX reader, API surface, extension host end to end) |
-| `pnpm ext:transpile <file.vsix \| folder> [--out dir]` | Convert a VS Code extension to a Lumen extension and print its compatibility report |
+| Script                                                 | Description                                                                                                                                                                                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm start`                                           | Build the view, launch the app                                                                                                                                                                                              |
+| `pnpm dev`                                             | Dev with view watching (`src/`, `packages/`) and live reload                                                                                                                                                                |
+| `pnpm build`                                           | Production bundles into `.lumen/build`                                                                                                                                                                                      |
+| `pnpm package`                                         | Standalone app (`dist/Lumen/Lumen.exe`, a Node single executable)                                                                                                                                                           |
+| `pnpm installer`                                       | Windows setup (`dist/Lumen-<version>-win32-x64-setup.exe`, per-user, needs [NSIS](https://nsis.sourceforge.io): `winget install NSIS.NSIS`). Publish it as an asset of a GitHub release tagged `v<version>` for auto update |
+| `pnpm typecheck`                                       | `tsc --noEmit`                                                                                                                                                                                                              |
+| `pnpm test`                                            | Extension tests (transpiler, VSIX reader, API surface, extension host end to end)                                                                                                                                           |
+| `pnpm ext:transpile <file.vsix \| folder> [--out dir]` | Convert a VS Code extension to a Lumen extension and print its compatibility report                                                                                                                                         |
 
 ## Keyboard shortcuts
 
-Defaults follow VS Code; change them in *Preferences: Keyboard Shortcuts* (`Ctrl+K Ctrl+S`).
+Defaults follow VS Code; change them in _Preferences: Keyboard Shortcuts_ (`Ctrl+K Ctrl+S`).
 
-| Shortcut | Action |
-| --- | --- |
-| `Ctrl+Shift+P` / `F1` | Command palette |
-| `Ctrl+P` | Quick Open (go to file) |
-| `Ctrl+G` / `Ctrl+Shift+O` | Go to line / symbol |
-| `Ctrl+O` / `Ctrl+K Ctrl+O` | Open file / folder |
-| `Ctrl+R` | Open recent folder |
-| `Ctrl+N` | New untitled file |
-| `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+K S` | Save / Save As / Save All |
-| `Ctrl+W` / `Ctrl+Shift+T` | Close editor / reopen closed editor |
-| `Ctrl+Tab`, `Ctrl+PageUp/PageDown`, `Alt+1…9` | Switch editors |
-| `Ctrl+B` / `Ctrl+J` / ``Ctrl+` `` | Toggle sidebar / panel / terminal |
-| ``Ctrl+Shift+` `` / `Ctrl+Shift+5` | New terminal / split terminal |
-| `Ctrl+Shift+E` / `F` / `H` / `G` / `M` | Explorer / Search / Replace / Source Control / Problems |
-| `Ctrl+F` / `Ctrl+H` | Find / replace in file |
-| `F12` / `Shift+F12` / `F2` | Go to definition / references / rename symbol |
-| `Shift+Alt+F` | Format document |
-| `Alt+Left` / `Alt+Right` | Go back / forward |
-| `Alt+Z` | Toggle word wrap |
-| `Ctrl+Shift+X` / `Ctrl+Shift+U` | Extensions / Output panel |
-| `Ctrl+,` | Settings |
-| `Ctrl+K Z` | Zen mode (`Esc Esc` to leave) |
+| Shortcut                                      | Action                                                  |
+| --------------------------------------------- | ------------------------------------------------------- |
+| `Ctrl+Shift+P` / `F1`                         | Command palette                                         |
+| `Ctrl+P`                                      | Quick Open (go to file)                                 |
+| `Ctrl+G` / `Ctrl+Shift+O`                     | Go to line / symbol                                     |
+| `Ctrl+O` / `Ctrl+K Ctrl+O`                    | Open file / folder                                      |
+| `Ctrl+R`                                      | Open recent folder                                      |
+| `Ctrl+N`                                      | New untitled file                                       |
+| `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+K S`        | Save / Save As / Save All                               |
+| `Ctrl+W` / `Ctrl+Shift+T`                     | Close editor / reopen closed editor                     |
+| `Ctrl+Tab`, `Ctrl+PageUp/PageDown`, `Alt+1…9` | Switch editors                                          |
+| `Ctrl+B` / `Ctrl+J` / ``Ctrl+` ``             | Toggle sidebar / panel / terminal                       |
+| ``Ctrl+Shift+` `` / `Ctrl+Shift+5`            | New terminal / split terminal                           |
+| `Ctrl+Shift+E` / `F` / `H` / `G` / `M`        | Explorer / Search / Replace / Source Control / Problems |
+| `Ctrl+F` / `Ctrl+H`                           | Find / replace in file                                  |
+| `F12` / `Shift+F12` / `F2`                    | Go to definition / references / rename symbol           |
+| `Shift+Alt+F`                                 | Format document                                         |
+| `Alt+Left` / `Alt+Right`                      | Go back / forward                                       |
+| `Alt+Z`                                       | Toggle word wrap                                        |
+| `Ctrl+Shift+X` / `Ctrl+Shift+U`               | Extensions / Output panel                               |
+| `Ctrl+,`                                      | Settings                                                |
+| `Ctrl+K Z`                                    | Zen mode (`Esc Esc` to leave)                           |
 
 ## Extensions
 
 ### Installing
 
-- **Open VSX**: search in the Extensions view and click *Install*. VS Code extensions are transpiled on the way in; check *Details → Compatibility* afterwards.
-- **VSIX**: *Extensions: Install from VSIX…* (or the ⋯ menu of the Extensions view).
-- **Development**: *Developer: Install Extension from Location…* registers a folder in place. VS Code extension folders are not modified: they run through the compatibility layer (`require("vscode")` resolves to the Lumen API).
+- **Open VSX**: search in the Extensions view and click _Install_. VS Code extensions are transpiled on the way in; check _Details → Compatibility_ afterwards.
+- **VSIX**: _Extensions: Install from VSIX…_ (or the ⋯ menu of the Extensions view).
+- **Development**: _Developer: Install Extension from Location…_ registers a folder in place. VS Code extension folders are not modified: they run through the compatibility layer (`require("vscode")` resolves to the Lumen API).
 
-Extensions live in `~/.lumen/extensions` (override with `LUMEN_EXTENSIONS_DIR`); their storage (`globalState`, `workspaceState`, `globalStorageUri`, `secrets`, logs) in the app data folder (`%APPDATA%\Lumen\…`). Installing, enabling or disabling an extension restarts the extension host. Its log is the *Extension Host* channel of the Output panel.
+Extensions live in `~/.lumen/extensions` (override with `LUMEN_EXTENSIONS_DIR`); their storage (`globalState`, `workspaceState`, `globalStorageUri`, `secrets`, logs) in the app data folder (`%APPDATA%\Lumen\…`). Installing, enabling or disabling an extension restarts the extension host. Its log is the _Extension Host_ channel of the Output panel.
 
 > Extensions run with the same rights as Lumen — like in VS Code. Install only extensions you trust. `context.secrets` is stored unencrypted in the app data folder.
 
@@ -123,9 +123,7 @@ A Lumen extension is a folder with a VS Code style `package.json` (`engines.lume
 const lumen = require("lumen"); // or: import * as lumen from "lumen"
 
 exports.activate = (context) => {
-  context.subscriptions.push(
-    lumen.commands.registerCommand("hello.sayHello", () => lumen.window.showInformationMessage("Hello!")),
-  );
+  context.subscriptions.push(lumen.commands.registerCommand("hello.sayHello", () => lumen.window.showInformationMessage("Hello!")));
 };
 ```
 
@@ -133,8 +131,8 @@ See [`examples/extensions/hello-lumen`](./examples/extensions/hello-lumen) (comm
 
 ### VS Code compatibility
 
-| Works | Accepted but inactive / limited | Not available |
-| --- | --- | --- |
+| Works                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Accepted but inactive / limited                                                                                                                                             | Not available                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | commands, messages, quick picks, input boxes, status bar, output channels, progress, configuration, text documents & editors, edits, workspace files (`fs`, `findFiles`, watchers), diagnostics, decorations, completion / hover / definition / references / formatting / symbol providers, snippets, terminals (`sendText`), clipboard, `openExternal`, `globalState` / `workspaceState` / `secrets`, webview panels & views, panel serializers, file system providers | code actions, code lenses, signature help, rename, inlay hints, semantic tokens and other providers (registered, never called); notebook / task / debug classes (data only) | tree views, custom editors, webviews of custom editors / notebooks, debugging, tasks, SCM, notebooks, color / icon themes, TextMate grammars |
 
 Webviews are sandboxed iframes served from their extension's own origin (`http://<id>.localhost:<port>`): isolated from the window, its bridge and other extensions, with working `localStorage` / IndexedDB that persist across restarts (the port is stable). Pages and local files are served only with a per-session token, and files only below the webview's `localResourceRoots` (by default the extension's folder and the workspace). Their pages stay loaded while hidden. Documents of extension file systems are not shown in the Explorer.

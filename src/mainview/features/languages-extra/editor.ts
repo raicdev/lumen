@@ -159,7 +159,12 @@ function evaluateHover(path: string, api: ViewFeatureApi): Extension {
       const line = view.state.doc.lineAt(pos);
       let result: WireEvaluatable | null;
       try {
-        result = await api.requestHost<WireEvaluatable | null>("evaluatable", [path, line.number - 1, pos - line.from, { sessionId: focused.sessionId, frameId: focused.frameId }]);
+        result = await api.requestHost<WireEvaluatable | null>("evaluatable", [
+          path,
+          line.number - 1,
+          pos - line.from,
+          { sessionId: focused.sessionId, frameId: focused.frameId },
+        ]);
       } catch {
         return null;
       }
@@ -268,7 +273,10 @@ export function applyDocumentEdit(view: EditorView, ranges: Span[], edit: WireDo
       const set = view.state.changes(changes);
       const tr = view.state.update({
         changes: set,
-        selection: EditorSelection.create(ranges.map((range) => EditorSelection.cursor(set.mapPos(range.to, 1))), ranges.length - 1),
+        selection: EditorSelection.create(
+          ranges.map((range) => EditorSelection.cursor(set.mapPos(range.to, 1))),
+          ranges.length - 1,
+        ),
         scrollIntoView: true,
         userEvent,
       });
@@ -352,7 +360,10 @@ const dropPasteWidgetField = StateField.define<DropPasteWidgetState | null>({
     // An edit or a moved cursor makes the offer stale.
     return tr.docChanged || tr.selection ? null : value;
   },
-  provide: (field) => EditorView.decorations.from(field, (value) => (value ? Decoration.set([Decoration.widget({ widget: new DropPasteWidget(value), side: 1 }).range(Math.max(0, value.pos))]) : Decoration.none)),
+  provide: (field) =>
+    EditorView.decorations.from(field, (value) =>
+      value ? Decoration.set([Decoration.widget({ widget: new DropPasteWidget(value), side: 1 }).range(Math.max(0, value.pos))]) : Decoration.none,
+    ),
 });
 
 /** The edit's own host-side leftovers (files it creates, edits of other documents) run once the window applied it. */
@@ -381,7 +392,13 @@ async function fileItem(file: File): Promise<WireTransferItem> {
   return { mime: file.type || "application/octet-stream", file: { name: file.name, path, base64 } };
 }
 
-const fileUri = (path: string) => `file:///${path.replace(/\\/g, "/").split("/").filter((part) => part.length > 0).map((part) => encodeURIComponent(part)).join("/")}`;
+const fileUri = (path: string) =>
+  `file:///${path
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((part) => part.length > 0)
+    .map((part) => encodeURIComponent(part))
+    .join("/")}`;
 
 /** Strings are read synchronously (the data store is only readable during the event); files are read later. */
 function stringItems(data: DataTransfer): WireTransferItem[] {
@@ -403,7 +420,10 @@ async function transferItems(data: DataTransfer): Promise<WireTransferItem[]> {
   const items = stringItems(data);
   const files = Array.from(data.files);
   if (!files.length) return items;
-  const uris = files.map(pathOf).filter((path): path is string => !!path).map(fileUri);
+  const uris = files
+    .map(pathOf)
+    .filter((path): path is string => !!path)
+    .map(fileUri);
   if (uris.length && !items.some((item) => item.mime === "text/uri-list")) items.push({ mime: "text/uri-list", value: uris.join("\r\n") });
   items.push(...(await Promise.all(files.map(fileItem))));
   return items;
@@ -421,7 +441,16 @@ function transferTypes(data: DataTransfer): string[] {
 /* ── drop and paste ─────────────────────────────────────────────────────── */
 
 /** More than one edit: show the widget that lets the user replace the applied one (VS Code's drop / paste widget). */
-function offerEdits(api: ViewFeatureApi, view: EditorView, ranges: Span[], edits: WireDocumentEdit[], active: number, userEvent: string, appliedEdit: AppliedDocumentEdit, label: string): void {
+function offerEdits(
+  api: ViewFeatureApi,
+  view: EditorView,
+  ranges: Span[],
+  edits: WireDocumentEdit[],
+  active: number,
+  userEvent: string,
+  appliedEdit: AppliedDocumentEdit,
+  label: string,
+): void {
   if (edits.length < 2) return;
   const switchTo = (index: number) => {
     if (index === active) return;
@@ -471,7 +500,8 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
     },
     dragover(event) {
       const accepted = availabilityFor(api, path, languageId)?.drop;
-      if (!internalDrag && accepted && event.dataTransfer && mimeAccepted(accepted, transferTypes(event.dataTransfer), event.dataTransfer.files.length > 0)) event.preventDefault();
+      if (!internalDrag && accepted && event.dataTransfer && mimeAccepted(accepted, transferTypes(event.dataTransfer), event.dataTransfer.files.length > 0))
+        event.preventDefault();
       return false;
     },
     drop(event, view) {
@@ -526,7 +556,15 @@ function dropAndPaste(path: string, languageId: string, api: ViewFeatureApi): Ex
         try {
           const items = await transferItems(data);
           const copyId = lastCopy && lastCopy.text === text ? await lastCopy.id : null;
-          edits = await withTimeout(api.requestHost<WireDocumentEdit[]>("pasteEdits", [path, ranges.map((range) => toRange(doc, range.from, range.to)), items, { copyId, triggerKind: 0 }]), HOST_TIMEOUT);
+          edits = await withTimeout(
+            api.requestHost<WireDocumentEdit[]>("pasteEdits", [
+              path,
+              ranges.map((range) => toRange(doc, range.from, range.to)),
+              items,
+              { copyId, triggerKind: 0 },
+            ]),
+            HOST_TIMEOUT,
+          );
         } catch {
           edits = [];
         }
@@ -620,5 +658,12 @@ function trackEditor(path: string, languageId: string): Extension {
 export function languagesExtraEditorExtensions(path: string, languageId: string, api: ViewFeatureApi): Extension[] {
   // Prefetch what the providers can do for this document.
   availabilityFor(api, path, languageId);
-  return [trackEditor(path, languageId), inlineValueField, inlineValuesPlugin(path, languageId, api), evaluateHover(path, api), dropAndPaste(path, languageId, api), dropPasteWidgetField];
+  return [
+    trackEditor(path, languageId),
+    inlineValueField,
+    inlineValuesPlugin(path, languageId, api),
+    evaluateHover(path, api),
+    dropAndPaste(path, languageId, api),
+    dropPasteWidgetField,
+  ];
 }

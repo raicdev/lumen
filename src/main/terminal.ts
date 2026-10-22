@@ -47,7 +47,9 @@ export type TerminalProfile = { id: string; name: string; file: string; args: st
 function isStorePackageDir(dir: string): boolean {
   if (process.platform !== "win32") return false;
   const packages = join(process.env.ProgramW6432 ?? process.env.ProgramFiles ?? "C:\\Program Files", "WindowsApps").toLowerCase();
-  return join(dir).toLowerCase().startsWith(packages + "\\");
+  return join(dir)
+    .toLowerCase()
+    .startsWith(packages + "\\");
 }
 
 /** Like existsSync, but true for app execution aliases too (reparse points that stat cannot follow). */

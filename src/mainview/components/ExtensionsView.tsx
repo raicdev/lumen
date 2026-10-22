@@ -45,7 +45,10 @@ export function ExtensionIcon({ url, name, size = 36 }: { url?: string; name: st
 export function CompatBadge({ extension }: { extension: ExtensionDescription }) {
   if (extension.kind !== "vscode") return null;
   return (
-    <span className={`ext-badge ${compatClass(extension.compat)}`} title="Converted from a VS Code extension by the transpiler — open the details for the compatibility report">
+    <span
+      className={`ext-badge ${compatClass(extension.compat)}`}
+      title="Converted from a VS Code extension by the transpiler — open the details for the compatibility report"
+    >
       VS Code · {COMPAT_GRADES[compatGrade(extension.compat)].badge}
     </span>
   );
@@ -79,7 +82,8 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
   const info = COMPAT_GRADES[compatGrade(report)];
   const unsupportedApis = report?.apis.filter((api) => api.status === "unsupported").map((api) => api.name) ?? [];
   const partialApis = report?.apis.filter((api) => api.status === "partial").map((api) => api.name) ?? [];
-  const contributions = report?.contributions.filter((c) => c.status !== "supported").map((c) => (c.status === "partial" ? `${c.name} (partial)` : c.name)) ?? [];
+  const contributions =
+    report?.contributions.filter((c) => c.status !== "supported").map((c) => (c.status === "partial" ? `${c.name} (partial)` : c.name)) ?? [];
 
   const card = anchor && (
     <div
@@ -224,7 +228,8 @@ export function ExtensionsView(props: Props) {
     if (scope === "vscode" && extension.kind !== "vscode") return false;
     if (scope === "dev" && !extension.development) return false;
     if (!text) return true;
-    const haystack = `${extension.id} ${extension.manifest.displayName ?? ""} ${extension.manifest.description ?? ""} ${(extension.manifest.keywords ?? []).join(" ")}`.toLowerCase();
+    const haystack =
+      `${extension.id} ${extension.manifest.displayName ?? ""} ${extension.manifest.description ?? ""} ${(extension.manifest.keywords ?? []).join(" ")}`.toLowerCase();
     return text.split(/\s+/).every((word) => haystack.includes(word));
   });
   const marketplace = scope ? [] : ((text ? results : popular) ?? []);
@@ -251,7 +256,12 @@ export function ExtensionsView(props: Props) {
     const contributed = contributedMenuItems("extension/context", extensionLookup(extension.id, extension), [extension.id]);
     const update = updateFor(extension);
     void showContextMenu(x, y, [
-      ...(update ? [{ type: "item" as const, label: `Update to ${update.version}`, action: "update", run: () => props.onInstall(update) }, { type: "separator" as const }] : []),
+      ...(update
+        ? [
+            { type: "item" as const, label: `Update to ${update.version}`, action: "update", run: () => props.onInstall(update) },
+            { type: "separator" as const },
+          ]
+        : []),
       extension.enabled ? { type: "item", label: "Disable", action: "disable" } : { type: "item", label: "Enable", action: "enable" },
       { type: "item", label: "Uninstall", action: "uninstall", danger: true },
       { type: "separator" },
@@ -419,7 +429,11 @@ export function ExtensionsView(props: Props) {
           {installedShown.length ? (
             installedShown.map(installedRow)
           ) : (
-            <div className="ext-empty">{props.installed.length ? "No installed extension matches." : "No extensions installed yet. Search Open VSX above, or use “Install from VSIX…” in the ⋯ menu."}</div>
+            <div className="ext-empty">
+              {props.installed.length
+                ? "No installed extension matches."
+                : "No extensions installed yet. Search Open VSX above, or use “Install from VSIX…” in the ⋯ menu."}
+            </div>
           )}
         </Section>
         {!scope && (

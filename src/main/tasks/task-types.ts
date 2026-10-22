@@ -64,7 +64,11 @@ export class ShellExecution {
   options?: ShellExecutionOptions;
   constructor(commandLine: string, options?: ShellExecutionOptions);
   constructor(command: string | ShellQuotedString, args: (string | ShellQuotedString)[], options?: ShellExecutionOptions);
-  constructor(commandOrLine: string | ShellQuotedString, argsOrOptions?: (string | ShellQuotedString)[] | ShellExecutionOptions, options?: ShellExecutionOptions) {
+  constructor(
+    commandOrLine: string | ShellQuotedString,
+    argsOrOptions?: (string | ShellQuotedString)[] | ShellExecutionOptions,
+    options?: ShellExecutionOptions,
+  ) {
     if (Array.isArray(argsOrOptions)) {
       this.command = commandOrLine;
       this.args = argsOrOptions;
@@ -119,9 +123,22 @@ export class Task {
   presentationOptions: Record<string, unknown> = {};
   runOptions: { reevaluateOnRerun?: boolean } = {};
 
-  constructor(definition: Record<string, unknown> & { type: string }, scope: Task["scope"], name: string, source: string, execution?: TaskExecutionKind, problemMatchers?: string | string[]);
+  constructor(
+    definition: Record<string, unknown> & { type: string },
+    scope: Task["scope"],
+    name: string,
+    source: string,
+    execution?: TaskExecutionKind,
+    problemMatchers?: string | string[],
+  );
   /** Deprecated form without a scope. */
-  constructor(definition: Record<string, unknown> & { type: string }, name: string, source: string, execution?: TaskExecutionKind, problemMatchers?: string | string[]);
+  constructor(
+    definition: Record<string, unknown> & { type: string },
+    name: string,
+    source: string,
+    execution?: TaskExecutionKind,
+    problemMatchers?: string | string[],
+  );
   constructor(definition: Record<string, unknown> & { type: string }, ...rest: unknown[]) {
     this.definition = definition;
     let matchers: string | string[] | undefined;

@@ -12,15 +12,10 @@ type GitResult = { code: number; stdout: string; stderr: string };
 
 function git(cwd: string, args: string[]): Promise<GitResult> {
   return new Promise((resolve) => {
-    execFile(
-      "git",
-      args,
-      { cwd, windowsHide: true, maxBuffer: 32 * 1024 * 1024, encoding: "utf8" },
-      (error, stdout, stderr) => {
-        const code = error ? (typeof error.code === "number" ? error.code : 1) : 0;
-        resolve({ code, stdout, stderr: stderr || (error && !stdout ? error.message : "") });
-      },
-    );
+    execFile("git", args, { cwd, windowsHide: true, maxBuffer: 32 * 1024 * 1024, encoding: "utf8" }, (error, stdout, stderr) => {
+      const code = error ? (typeof error.code === "number" ? error.code : 1) : 0;
+      resolve({ code, stdout, stderr: stderr || (error && !stdout ? error.message : "") });
+    });
   });
 }
 
@@ -95,10 +90,7 @@ export async function gitUnstage(root: string, paths: string[]): Promise<{ ok: b
   return result.code === 0 ? { ok: true } : { ok: false, error: failure(result) };
 }
 
-export async function gitDiscard(
-  root: string,
-  files: { path: string; untracked: boolean }[],
-): Promise<{ ok: boolean; error?: string }> {
+export async function gitDiscard(root: string, files: { path: string; untracked: boolean }[]): Promise<{ ok: boolean; error?: string }> {
   for (const file of files.filter((entry) => entry.untracked)) {
     try {
       await rm(file.path, { force: true, recursive: true });
@@ -112,11 +104,7 @@ export async function gitDiscard(
   return result.code === 0 ? { ok: true } : { ok: false, error: failure(result) };
 }
 
-export async function gitCommit(
-  root: string,
-  message: string,
-  stageAll = false,
-): Promise<{ ok: boolean; error?: string }> {
+export async function gitCommit(root: string, message: string, stageAll = false): Promise<{ ok: boolean; error?: string }> {
   if (stageAll) {
     const staged = await git(root, ["add", "-A"]);
     if (staged.code !== 0) return { ok: false, error: failure(staged) };

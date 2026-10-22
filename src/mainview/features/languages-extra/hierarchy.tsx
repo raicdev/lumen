@@ -35,9 +35,21 @@ const DIRECTION_LABEL: Record<HierarchyDirection, string> = { incoming: "Callers
 const KIND_LABEL = ["F", "M", "N", "P", "C", "m", "p", "f", "c", "E", "I", "ƒ", "v", "K", "s", "n", "b", "[]", "{}", "e", "ev", "o", "T"];
 
 let seq = 0;
-const store = createStore<State>({ kind: "call", direction: "incoming", roots: [], message: "No hierarchy to show. Run Show Call Hierarchy or Show Type Hierarchy in an editor." });
+const store = createStore<State>({
+  kind: "call",
+  direction: "incoming",
+  roots: [],
+  message: "No hierarchy to show. Run Show Call Hierarchy or Show Type Hierarchy in an editor.",
+});
 
-const makeNode = (item: WireHierarchyItem, fromRanges: TextRange[] = []): Node => ({ key: `n${++seq}`, item, fromRanges, children: null, expanded: false, loading: false });
+const makeNode = (item: WireHierarchyItem, fromRanges: TextRange[] = []): Node => ({
+  key: `n${++seq}`,
+  item,
+  fromRanges,
+  children: null,
+  expanded: false,
+  loading: false,
+});
 
 /** Replace a node anywhere in the tree (immutably). */
 function update(nodes: Node[], key: string, change: (node: Node) => Node): Node[] {
@@ -52,10 +64,16 @@ async function load(api: ViewFeatureApi, node: Node): Promise<void> {
     store.set((state) => ({
       ...state,
       // The user switched direction while loading: drop the answer.
-      roots: state.direction === direction ? update(state.roots, node.key, (n) => ({ ...n, loading: false, children: children.map((child) => makeNode(child.item, child.fromRanges)) })) : state.roots,
+      roots:
+        state.direction === direction
+          ? update(state.roots, node.key, (n) => ({ ...n, loading: false, children: children.map((child) => makeNode(child.item, child.fromRanges)) }))
+          : state.roots,
     }));
   } catch (error) {
-    store.set((state) => ({ ...state, roots: update(state.roots, node.key, (n) => ({ ...n, loading: false, children: [], error: error instanceof Error ? error.message : String(error) })) }));
+    store.set((state) => ({
+      ...state,
+      roots: update(state.roots, node.key, (n) => ({ ...n, loading: false, children: [], error: error instanceof Error ? error.message : String(error) })),
+    }));
   }
 }
 
@@ -88,7 +106,10 @@ export async function showHierarchy(kind: HierarchyKind, api: ViewFeatureApi): P
   }
   let chosen = items;
   if (items.length > 1) {
-    const picked = await api.showQuickPick(items.map((item) => ({ label: item.name, description: item.detail, detail: basename(item.path) })), { title: `Show ${kind === "call" ? "Call" : "Type"} Hierarchy`, placeholder: "Select a symbol" });
+    const picked = await api.showQuickPick(
+      items.map((item) => ({ label: item.name, description: item.detail, detail: basename(item.path) })),
+      { title: `Show ${kind === "call" ? "Call" : "Type"} Hierarchy`, placeholder: "Select a symbol" },
+    );
     if (!picked?.length) return;
     chosen = picked.map((index) => items[index]!);
   }
@@ -111,7 +132,10 @@ function switchDirection(api: ViewFeatureApi, direction: HierarchyDirection): vo
 
 function open(api: ViewFeatureApi, node: Node, parent: Node | null): void {
   // Calls open where the parent calls the item; everything else at the symbol.
-  const target = store.get().kind === "call" && parent && node.fromRanges[0] ? { path: parent.item.path, range: node.fromRanges[0] } : { path: node.item.path, range: node.item.selectionRange };
+  const target =
+    store.get().kind === "call" && parent && node.fromRanges[0]
+      ? { path: parent.item.path, range: node.fromRanges[0] }
+      : { path: node.item.path, range: node.item.selectionRange };
   void api.openFile(target.path, { line: target.range.startLine, character: target.range.startCharacter, preview: true, focus: true });
 }
 
@@ -123,11 +147,22 @@ function Row({ node, parent, depth, api }: { node: Node; parent: Node | null; de
   };
   return (
     <>
-      <div className="lx-row" style={{ paddingLeft: 8 + depth * 14 }} role="treeitem" aria-expanded={hasChildren ? node.expanded : undefined} onDoubleClick={toggle}>
+      <div
+        className="lx-row"
+        style={{ paddingLeft: 8 + depth * 14 }}
+        role="treeitem"
+        aria-expanded={hasChildren ? node.expanded : undefined}
+        onDoubleClick={toggle}
+      >
         <button type="button" className="lx-twisty" onClick={toggle} disabled={!hasChildren} aria-label={node.expanded ? "Collapse" : "Expand"}>
           {hasChildren ? node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} /> : null}
         </button>
-        <button type="button" className="lx-label" onClick={() => open(api, node, parent)} title={`${node.item.path}:${node.item.selectionRange.startLine + 1}`}>
+        <button
+          type="button"
+          className="lx-label"
+          onClick={() => open(api, node, parent)}
+          title={`${node.item.path}:${node.item.selectionRange.startLine + 1}`}
+        >
           <span className="lx-kind" aria-hidden>
             {KIND_LABEL[node.item.kind] ?? "?"}
           </span>
@@ -166,7 +201,12 @@ export function HierarchyPanel({ api }: { api: ViewFeatureApi }): ReactNode {
         {state.roots.length ? (
           <>
             {[first, second].map((direction) => (
-              <button key={direction} type="button" className={`lx-toggle${state.direction === direction ? " active" : ""}`} onClick={() => switchDirection(api, direction)}>
+              <button
+                key={direction}
+                type="button"
+                className={`lx-toggle${state.direction === direction ? " active" : ""}`}
+                onClick={() => switchDirection(api, direction)}
+              >
                 {DIRECTION_LABEL[direction]}
               </button>
             ))}

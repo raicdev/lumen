@@ -138,7 +138,9 @@ function fontSource(font: IconFont, key: string, assets: Record<string, string>)
   }
   return { uri, format: best.format ?? "woff" };
   function rank(source: { path: string; format?: string }): number {
-    const index = FONT_FORMATS.indexOf((source.format ?? source.path.split(".").pop() ?? "").toLowerCase().replace("ttf", "truetype").replace("otf", "opentype"));
+    const index = FONT_FORMATS.indexOf(
+      (source.format ?? source.path.split(".").pop() ?? "").toLowerCase().replace("ttf", "truetype").replace("otf", "opentype"),
+    );
     return index < 0 ? FONT_FORMATS.length : index;
   }
 }
@@ -164,7 +166,9 @@ function syncFontFaces(state: State): void {
       if (!family || !/^[\w-]+$/.test(family) || !/^[\w-]+$/.test(source.format)) continue;
       const weight = font.weight && /^(normal|bold|bolder|lighter|[1-9]00)$/.test(font.weight) ? font.weight : "normal";
       const style = font.style && /^(normal|italic|oblique)$/.test(font.style) ? font.style : "normal";
-      rules.push(`@font-face{font-family:"${family}";src:url("${source.uri}") format("${source.format}");font-weight:${weight};font-style:${style};font-display:block}`);
+      rules.push(
+        `@font-face{font-family:"${family}";src:url("${source.uri}") format("${source.format}");font-weight:${weight};font-style:${style};font-display:block}`,
+      );
     }
   }
   for (const [path, family] of contributedFamilies) {
@@ -203,7 +207,8 @@ export async function applyFileIconTheme(api: ViewFeatureApi, force = false): Pr
     if (mine !== sequence.file) return;
     store.set((state) => ({ ...state, file: loaded, version: state.version + 1 }));
   } catch (error) {
-    if (mine === sequence.file) api.showMessage("error", `Cannot load file icon theme "${contributed.label}": ${error instanceof Error ? error.message : String(error)}`);
+    if (mine === sequence.file)
+      api.showMessage("error", `Cannot load file icon theme "${contributed.label}": ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -222,7 +227,8 @@ export async function applyProductIconTheme(api: ViewFeatureApi, force = false):
     store.set((state) => ({ ...state, product: loaded, version: state.version + 1 }));
     refreshFeatures();
   } catch (error) {
-    if (mine === sequence.product) api.showMessage("error", `Cannot load product icon theme "${contributed.label}": ${error instanceof Error ? error.message : String(error)}`);
+    if (mine === sequence.product)
+      api.showMessage("error", `Cannot load product icon theme "${contributed.label}": ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -276,10 +282,45 @@ export function contributedIcon(id: string, state: State = store.get()): { char:
 /* ── lookup ─────────────────────────────────────────────────────────────── */
 
 const BUILT_IN_EXTENSIONS: Record<string, string> = {
-  ts: "typescript", mts: "typescript", cts: "typescript", tsx: "typescriptreact", js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascriptreact",
-  json: "json", jsonc: "jsonc", html: "html", htm: "html", css: "css", scss: "scss", less: "less", md: "markdown", py: "python", rs: "rust", go: "go",
-  java: "java", c: "c", h: "c", cpp: "cpp", cs: "csharp", php: "php", rb: "ruby", sh: "shellscript", bash: "shellscript", ps1: "powershell",
-  yml: "yaml", yaml: "yaml", toml: "toml", sql: "sql", xml: "xml", vue: "vue", svelte: "svelte", kt: "kotlin", lua: "lua", swift: "swift",
+  ts: "typescript",
+  mts: "typescript",
+  cts: "typescript",
+  tsx: "typescriptreact",
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  jsx: "javascriptreact",
+  json: "json",
+  jsonc: "jsonc",
+  html: "html",
+  htm: "html",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  md: "markdown",
+  py: "python",
+  rs: "rust",
+  go: "go",
+  java: "java",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cs: "csharp",
+  php: "php",
+  rb: "ruby",
+  sh: "shellscript",
+  bash: "shellscript",
+  ps1: "powershell",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "toml",
+  sql: "sql",
+  xml: "xml",
+  vue: "vue",
+  svelte: "svelte",
+  kt: "kotlin",
+  lua: "lua",
+  swift: "swift",
 };
 const BUILT_IN_NAMES: Record<string, string> = { dockerfile: "dockerfile", makefile: "makefile" };
 

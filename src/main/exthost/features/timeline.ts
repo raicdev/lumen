@@ -98,7 +98,9 @@ function register(host: ExtensionHost, registration: Registration): T.Disposable
 export function timelineSources(host: ExtensionHost, path: string | null): TimelineSourceWire[] {
   const scheme = path ? uriOfKey(path).scheme : null;
   return stateOf(host)
-    .registrations.filter((registration) => (scheme === null ? "workspace" in registration : !("workspace" in registration) && (!registration.schemes || registration.schemes.includes(scheme))))
+    .registrations.filter((registration) =>
+      scheme === null ? "workspace" in registration : !("workspace" in registration) && (!registration.schemes || registration.schemes.includes(scheme)),
+    )
     .map((registration) => ({ id: idOf(registration), label: labelOf(registration) }));
 }
 
@@ -124,7 +126,13 @@ function remember(state: State, item: TimelineItem, source: string, uri: string 
 }
 
 /** One page of a source's timeline for `path` (null: the workspace). */
-export async function provideTimeline(host: ExtensionHost, path: string | null, source: string, cursor: string | undefined, trigger: number): Promise<TimelinePage> {
+export async function provideTimeline(
+  host: ExtensionHost,
+  path: string | null,
+  source: string,
+  cursor: string | undefined,
+  trigger: number,
+): Promise<TimelinePage> {
   const state = stateOf(host);
   const registration = state.registrations.find((candidate) => idOf(candidate) === source);
   if (!registration) return { items: [] };
@@ -144,8 +152,9 @@ export async function provideTimeline(host: ExtensionHost, path: string | null, 
   } finally {
     token.dispose();
   }
-  const items = (timeline?.items ?? []).filter((item) => item && typeof item.label === "string").map(
-    (item): TimelineItemWire => ({
+  const items = (timeline?.items ?? [])
+    .filter((item) => item && typeof item.label === "string")
+    .map((item): TimelineItemWire => ({
       handle: remember(state, item, source, path),
       source,
       label: item.label,
@@ -155,8 +164,7 @@ export async function provideTimeline(host: ExtensionHost, path: string | null, 
       icon: iconOf(item.iconPath),
       contextValue: item.contextValue,
       hasCommand: !!item.command?.command,
-    }),
-  );
+    }));
   return { items, cursor: timeline?.paging?.cursor };
 }
 
@@ -201,7 +209,11 @@ export function gitHistoryProvider(): Provider {
         item.iconPath = new T.ThemeIcon("git-commit");
         item.contextValue = "git:file:commit";
         if (root) {
-          const revision = T.Uri.from({ scheme: REVISION_SCHEME, path: `/${relative(root, file).replace(/\\/g, "/")}`, query: `${sha}&root=${encodeURIComponent(root)}` });
+          const revision = T.Uri.from({
+            scheme: REVISION_SCHEME,
+            path: `/${relative(root, file).replace(/\\/g, "/")}`,
+            query: `${sha}&root=${encodeURIComponent(root)}`,
+          });
           item.command = { command: "vscode.open", title: "Open Revision", arguments: [revision] };
         }
         return item;
@@ -230,7 +242,8 @@ export const timelineFeature: HostFeature = {
         return register(host, { provider, schemes: schemes && schemes.length ? schemes : null, extensionId });
       },
       registerWorkspaceTimelineProvider: (provider: WorkspaceProvider) => {
-        if (!provider || typeof provider.provideWorkspaceTimeline !== "function") throw new Error("registerWorkspaceTimelineProvider: provideWorkspaceTimeline is required");
+        if (!provider || typeof provider.provideWorkspaceTimeline !== "function")
+          throw new Error("registerWorkspaceTimelineProvider: provideWorkspaceTimeline is required");
         return register(host, { workspace: provider, extensionId });
       },
     },
@@ -253,7 +266,8 @@ export const timelineFeature: HostFeature = {
 
   onViewRequest: async (host, method, args) => {
     if (method === "sources") return timelineSources(host, (args[0] as string | null) ?? null);
-    if (method === "provide") return provideTimeline(host, (args[0] as string | null) ?? null, String(args[1]), (args[2] as string | undefined) ?? undefined, Number(args[3]) || 2);
+    if (method === "provide")
+      return provideTimeline(host, (args[0] as string | null) ?? null, String(args[1]), (args[2] as string | undefined) ?? undefined, Number(args[3]) || 2);
     throw new Error(`timeline: unknown request '${method}'`);
   },
 };

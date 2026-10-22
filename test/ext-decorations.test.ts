@@ -30,7 +30,10 @@ test("gutterIconSize becomes the image CSS", () => {
 
 test("a gutter icon's rules switch light / dark images with the theme", () => {
   const both = gutterIconRules("icon-1", { light: "light.png", dark: "dark.png" });
-  assert.equal(both, '.icon-1{background-image:url("dark.png")}:root.vscode-light .icon-1,:root.vscode-high-contrast-light .icon-1{background-image:url("light.png")}');
+  assert.equal(
+    both,
+    '.icon-1{background-image:url("dark.png")}:root.vscode-light .icon-1,:root.vscode-high-contrast-light .icon-1{background-image:url("light.png")}',
+  );
   // Only one variant: it is used for both themes.
   assert.equal(gutterIconRules("icon-2", { dark: "dark.png" }), '.icon-2{background-image:url("dark.png")}');
   assert.equal(gutterIconRules("icon-3", {}), "");

@@ -35,7 +35,10 @@ async function pick(api: ViewFeatureApi, kind: "file" | "product"): Promise<void
     { label: none, description: kind === "file" ? "Built-in file icons" : "Built-in icons", picked: !current },
     ...themes.map((theme) => ({ label: theme.label, description: theme.extensionId, picked: theme.id === current || theme.label === current })),
   ];
-  const picked = await api.showQuickPick(items, { title: kind === "file" ? "Select File Icon Theme" : "Select Product Icon Theme", placeholder: kind === "file" ? "Select File Icon Theme" : "Select Product Icon Theme" });
+  const picked = await api.showQuickPick(items, {
+    title: kind === "file" ? "Select File Icon Theme" : "Select Product Icon Theme",
+    placeholder: kind === "file" ? "Select File Icon Theme" : "Select Product Icon Theme",
+  });
   const index = picked?.[0];
   if (index === undefined) return;
   // The Settings type has no icon theme keys; the store keeps any key.

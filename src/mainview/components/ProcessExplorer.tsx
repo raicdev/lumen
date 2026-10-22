@@ -66,8 +66,7 @@ function treeOrder(rows: ProcessRow[], isCollapsed: (row: ProcessRow) => boolean
     // Threads first: they are part of the parent process, not children of it.
     list.sort((a, b) => Number(b.kind === "thread") - Number(a.kind === "thread") || totalOf(b).memory - totalOf(a).memory);
   }
-  const countDescendants = (row: ProcessRow): number =>
-    (children.get(row.id) ?? []).reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+  const countDescendants = (row: ProcessRow): number => (children.get(row.id) ?? []).reduce((sum, child) => sum + 1 + countDescendants(child), 0);
   const out: TreeEntry[] = [];
   const visit = (row: ProcessRow, depth: number) => {
     const descendants = countDescendants(row);
@@ -230,12 +229,7 @@ export function ProcessExplorer({ open, onClose }: Props) {
           <button type="button" className="icon-btn" title="Collapse All" onClick={() => setAll(true)}>
             <ChevronsDownUp size={16} />
           </button>
-          <button
-            type="button"
-            className="icon-btn"
-            title={paused ? "Resume Updates" : "Pause Updates"}
-            onClick={() => setPaused((value) => !value)}
-          >
+          <button type="button" className="icon-btn" title={paused ? "Resume Updates" : "Pause Updates"} onClick={() => setPaused((value) => !value)}>
             {paused ? <Play size={16} /> : <Pause size={16} />}
           </button>
           <button type="button" className="icon-btn" title="Close (Esc)" onClick={onClose}>
@@ -260,11 +254,7 @@ export function ProcessExplorer({ open, onClose }: Props) {
                 // A parent shows itself with the processes nested in it; its own share is the muted value.
                 const nested = row.kind !== "thread" && total.memory !== row.memory;
                 return (
-                  <tr
-                    key={row.id}
-                    className={`process-kind-${row.kind === "thread" ? "thread" : category}`}
-                    title={row.commandLine || undefined}
-                  >
+                  <tr key={row.id} className={`process-kind-${row.kind === "thread" ? "thread" : category}`} title={row.commandLine || undefined}>
                     <td>
                       <div className="process-name" style={{ paddingLeft: depth * 16 }}>
                         {descendants ? (
@@ -300,8 +290,15 @@ export function ProcessExplorer({ open, onClose }: Props) {
                     <td className="num" title={nested ? `Own: ${formatCpu(row.cpu)}` : undefined}>
                       {row.kind === "thread" ? "" : formatCpu(total.cpu)}
                     </td>
-                    <td className="num" title={nested ? `Own: ${formatBytes(row.memory)}
-Nested processes: ${formatBytes(total.memory - row.memory)}` : undefined}>
+                    <td
+                      className="num"
+                      title={
+                        nested
+                          ? `Own: ${formatBytes(row.memory)}
+Nested processes: ${formatBytes(total.memory - row.memory)}`
+                          : undefined
+                      }
+                    >
                       {formatBytes(total.memory)}
                       <span className="process-own">{nested ? formatBytes(row.memory) : ""}</span>
                     </td>
@@ -318,10 +315,9 @@ Nested processes: ${formatBytes(total.memory - row.memory)}` : undefined}>
             </tbody>
           </table>
           <p className="process-note">
-            Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). A row with
-            processes nested in it shows them added in, with its own share after it. JS heap rows
-            are parts of Lumen's own process (worker threads) and are not added to the total. Task Manager lists Lumen's WebView2
-            processes as a separate "WebView2 Manager" group; they are shown here under Lumen.
+            Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). A row with processes nested in it shows
+            them added in, with its own share after it. JS heap rows are parts of Lumen's own process (worker threads) and are not added to the total. Task
+            Manager lists Lumen's WebView2 processes as a separate "WebView2 Manager" group; they are shown here under Lumen.
           </p>
         </div>
       </div>

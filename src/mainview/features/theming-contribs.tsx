@@ -1,13 +1,7 @@
 import type { ViewFeature, ViewFeatureApi } from "./types";
 import { activeColorTheme, onColorThemeChange } from "../lib/theme";
 import { setSemanticTokenContributions } from "../lib/ext-semantic-tokens";
-import {
-  collectColorContributions,
-  collectSemanticContributions,
-  colorCustomizationsFor,
-  colorsCss,
-  defaultColorFor,
-} from "../../shared/theming-contribs";
+import { collectColorContributions, collectSemanticContributions, colorCustomizationsFor, colorsCss, defaultColorFor } from "../../shared/theming-contribs";
 
 /**
  * Window side of the "theming-contribs" area: contributes.colors become
@@ -79,7 +73,12 @@ export const themingContribsView: ViewFeature = {
         const kind = activeColorTheme().kind;
         await api.showQuickPick(
           colors.map((color) => ({ label: color.id, description: defaultColorFor(color, kind) ?? "no default", detail: color.description || undefined })),
-          { title: "Colors contributed by extensions", placeholder: "Use them with new ThemeColor(id) or workbench.colorCustomizations", matchOnDescription: true, matchOnDetail: true },
+          {
+            title: "Colors contributed by extensions",
+            placeholder: "Use them with new ThemeColor(id) or workbench.colorCustomizations",
+            matchOnDescription: true,
+            matchOnDetail: true,
+          },
         );
       },
     },

@@ -90,7 +90,12 @@ export type OutputsSnapshot = { channels: OutputChannel[]; active: string | null
 
 export type ContributedView = ViewContribution & { extensionId: string; containerId: string };
 
-export type ContributedContainer = ViewContainerContribution & { location: "activitybar" | "secondarySidebar" | "panel"; extensionId: string; iconUrl?: string; views: ContributedView[] };
+export type ContributedContainer = ViewContainerContribution & {
+  location: "activitybar" | "secondarySidebar" | "panel";
+  extensionId: string;
+  iconUrl?: string;
+  views: ContributedView[];
+};
 
 /** contributes.debuggers of one extension, normalised for the (future) debug UI. */
 export type ContributedDebugger = {
@@ -170,9 +175,32 @@ function diff(before: string, after: string): HostContentChange | null {
 /** VS Code key strings ("ctrl+shift+alt+f", "cmd+k cmd+s") → Lumen's ("Ctrl+Shift+Alt+F"). */
 export function normalizeKeybinding(key: string): string {
   const names: Record<string, string> = {
-    left: "Left", right: "Right", up: "Up", down: "Down", pageup: "PageUp", pagedown: "PageDown", home: "Home", end: "End",
-    escape: "Escape", enter: "Enter", tab: "Tab", space: "Space", backspace: "Backspace", delete: "Delete", insert: "Insert",
-    oem_1: ";", oem_plus: "=", oem_comma: ",", oem_minus: "-", oem_period: ".", oem_2: "/", oem_3: "`", oem_4: "[", oem_5: "\\", oem_6: "]", oem_7: "'",
+    left: "Left",
+    right: "Right",
+    up: "Up",
+    down: "Down",
+    pageup: "PageUp",
+    pagedown: "PageDown",
+    home: "Home",
+    end: "End",
+    escape: "Escape",
+    enter: "Enter",
+    tab: "Tab",
+    space: "Space",
+    backspace: "Backspace",
+    delete: "Delete",
+    insert: "Insert",
+    oem_1: ";",
+    oem_plus: "=",
+    oem_comma: ",",
+    oem_minus: "-",
+    oem_period: ".",
+    oem_2: "/",
+    oem_3: "`",
+    oem_4: "[",
+    oem_5: "\\",
+    oem_6: "]",
+    oem_7: "'",
   };
   return key
     .trim()
@@ -185,7 +213,15 @@ export function normalizeKeybinding(key: string): string {
       if (mods.has("ctrl")) out.push("Ctrl");
       if (mods.has("shift")) out.push("Shift");
       if (mods.has("alt")) out.push("Alt");
-      const name = names[keyPart] ?? (/^f\d{1,2}$/.test(keyPart) ? keyPart.toUpperCase() : /^numpad(\d)$/.test(keyPart) ? keyPart.slice(6) : keyPart.length === 1 ? keyPart.toUpperCase() : keyPart);
+      const name =
+        names[keyPart] ??
+        (/^f\d{1,2}$/.test(keyPart)
+          ? keyPart.toUpperCase()
+          : /^numpad(\d)$/.test(keyPart)
+            ? keyPart.slice(6)
+            : keyPart.length === 1
+              ? keyPart.toUpperCase()
+              : keyPart);
       out.push(name);
       return out.join("+");
     })
@@ -491,7 +527,11 @@ class ExtensionService {
     const out: ContributedKeybinding[] = [];
     for (const extension of this.#snapshot.extensions) {
       for (const binding of [extension.manifest.contributes?.keybindings ?? []].flat()) {
-        const raw = platform.startsWith("mac") ? (binding.mac ?? binding.key) : platform.startsWith("win") ? (binding.win ?? binding.key) : (binding.linux ?? binding.key);
+        const raw = platform.startsWith("mac")
+          ? (binding.mac ?? binding.key)
+          : platform.startsWith("win")
+            ? (binding.win ?? binding.key)
+            : (binding.linux ?? binding.key);
         // "-command" entries remove a default binding in VS Code; Lumen's defaults are its own, so they are skipped.
         if (!raw || !binding.command || binding.command.startsWith("-")) continue;
         out.push({ key: normalizeKeybinding(raw), command: binding.command, when: binding.when, args: binding.args, extensionId: extension.id });
@@ -566,21 +606,24 @@ class ExtensionService {
   /** contributes.debuggers of the enabled extensions (the legacy adapter declaration). */
   contributedDebuggers(): ContributedDebugger[] {
     return this.#snapshot.extensions.flatMap((extension) =>
-      [((extension.manifest.contributes ?? {}) as { debuggers?: unknown }).debuggers ?? []].flat().map((raw) => {
-        const entry = raw as Record<string, unknown>;
-        return {
-          extensionId: extension.id,
-          type: String(entry.type ?? ""),
-          label: typeof entry.label === "string" ? entry.label : undefined,
-          languages: Array.isArray(entry.languages) ? entry.languages.map(String) : undefined,
-          program: typeof entry.program === "string" ? entry.program : undefined,
-          runtime: typeof entry.runtime === "string" ? entry.runtime : undefined,
-          configurationAttributes: (entry.configurationAttributes ?? undefined) as Record<string, unknown> | undefined,
-          initialConfigurations: (entry.initialConfigurations ?? undefined) as unknown[] | undefined,
-          configurationSnippets: (entry.configurationSnippets ?? undefined) as unknown[] | undefined,
-          variables: (entry.variables ?? undefined) as Record<string, string> | undefined,
-        };
-      }).filter((entry) => !!entry.type),
+      [((extension.manifest.contributes ?? {}) as { debuggers?: unknown }).debuggers ?? []]
+        .flat()
+        .map((raw) => {
+          const entry = raw as Record<string, unknown>;
+          return {
+            extensionId: extension.id,
+            type: String(entry.type ?? ""),
+            label: typeof entry.label === "string" ? entry.label : undefined,
+            languages: Array.isArray(entry.languages) ? entry.languages.map(String) : undefined,
+            program: typeof entry.program === "string" ? entry.program : undefined,
+            runtime: typeof entry.runtime === "string" ? entry.runtime : undefined,
+            configurationAttributes: (entry.configurationAttributes ?? undefined) as Record<string, unknown> | undefined,
+            initialConfigurations: (entry.initialConfigurations ?? undefined) as unknown[] | undefined,
+            configurationSnippets: (entry.configurationSnippets ?? undefined) as unknown[] | undefined,
+            variables: (entry.variables ?? undefined) as Record<string, string> | undefined,
+          };
+        })
+        .filter((entry) => !!entry.type),
     );
   }
 
@@ -631,7 +674,10 @@ class ExtensionService {
     const language = this.#bindings.language(path);
     if (text === null || !language) return;
     this.#sent.set(lower(path), { path, text, version: 1, language });
-    this.post({ type: "documentOpen", doc: { path, languageId: language, version: 1, text, eol: this.#bindings.eol(path), dirty: this.#bindings.dirty(path) } });
+    this.post({
+      type: "documentOpen",
+      doc: { path, languageId: language, version: 1, text, eol: this.#bindings.eol(path), dirty: this.#bindings.dirty(path) },
+    });
   }
 
   documentChanged(path: string) {
@@ -913,7 +959,9 @@ class ExtensionService {
           showProgress(message.id, { done: true });
           this.#update({ progress: others });
         } else {
-          this.#update({ progress: [...others, { id: message.id, title: message.title ?? previous?.title, message: message.message, percent: message.percent }] });
+          this.#update({
+            progress: [...others, { id: message.id, title: message.title ?? previous?.title, message: message.message, percent: message.percent }],
+          });
         }
         return;
       }

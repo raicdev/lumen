@@ -117,10 +117,7 @@ export function startAssetServer(root = assetRoot(), preferredPort = 0): Promise
 /** URL of a file in the assets directory (the server must be listening — see `app.run()`). */
 export function assetUrl(relative: string): string {
   if (!server || !port) {
-    throw new Error(
-      'Lumen Shell: the asset server is not running yet — create windows from app.on("ready") ' +
-        "or await startAssetServer() first",
-    );
+    throw new Error('Lumen Shell: the asset server is not running yet — create windows from app.on("ready") ' + "or await startAssetServer() first");
   }
   const clean = relative.replace(/^[/\\]+/, "") || "index.html";
   return `http://127.0.0.1:${port}/${clean}`;

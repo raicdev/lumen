@@ -142,7 +142,10 @@ test("transpileExtension converts the VS Code sample and reports compatibility",
 test("a web-only extension using custom editors is reported as limited", () => {
   const dir = temp();
   try {
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "web", publisher: "p", version: "1.0.0", engines: { vscode: "^1.80.0" }, browser: "./b.js" }));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "web", publisher: "p", version: "1.0.0", engines: { vscode: "^1.80.0" }, browser: "./b.js" }),
+    );
     writeFileSync(join(dir, "b.js"), `const vscode = require("vscode"); vscode.window.registerCustomEditorProvider("a", {});`);
     const { report } = transpileExtension(dir);
     // The API is supported now, but a web-only extension still cannot load.
@@ -164,7 +167,13 @@ const SAMPLE_VSIX = () =>
   });
 
 test("a stored report is re-rated against the current API table", () => {
-  const manifest = { name: "old", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, contributes: { views: { explorer: [{ id: "a", name: "A", type: "webview" }] } } };
+  const manifest = {
+    name: "old",
+    publisher: "test",
+    version: "1.0.0",
+    engines: { vscode: "^1.90.0", lumen: "^0.1.0" },
+    contributes: { views: { explorer: [{ id: "a", name: "A", type: "webview" }] } },
+  };
   const stale = {
     transpilerVersion: 1,
     rewrittenImports: 1,
@@ -182,14 +191,23 @@ test("a stored report is re-rated against the current API table", () => {
   const panel = report.apis.find((api) => api.name === "window.createWebviewPanel")!;
   assert.equal(panel.status, "supported");
   assert.equal(panel.count, 2);
-  assert.deepEqual(report.apis.find((api) => api.name === "window.registerWebviewViewProvider"), { name: "window.registerWebviewViewProvider", count: 1, status: "supported" });
+  assert.deepEqual(
+    report.apis.find((api) => api.name === "window.registerWebviewViewProvider"),
+    { name: "window.registerWebviewViewProvider", count: 1, status: "supported" },
+  );
   assert.equal(report.contributions.find((c) => c.name === "views")?.status, "supported");
   // Everything it uses is supported now: limited becomes full.
   assert.equal(report.level, "full");
 });
 
 test("an extension whose APIs are all unsupported is limited, not partial", () => {
-  const manifest = { name: "gone", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, contributes: { commands: [{ command: "a", title: "A" }] } };
+  const manifest = {
+    name: "gone",
+    publisher: "test",
+    version: "1.0.0",
+    engines: { vscode: "^1.90.0", lumen: "^0.1.0" },
+    contributes: { commands: [{ command: "a", title: "A" }] },
+  };
   const unsupported = (name: string) => ({ name, status: "unsupported" as const, count: 1, note: "not part of Lumen's API" });
   const stale = {
     transpilerVersion: 1,
@@ -208,7 +226,13 @@ test("an extension whose APIs are all unsupported is limited, not partial", () =
 });
 
 test("partial extensions are graded by how much of what they use works", () => {
-  const manifest = { name: "graded", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, contributes: { commands: [{ command: "a", title: "A" }] } };
+  const manifest = {
+    name: "graded",
+    publisher: "test",
+    version: "1.0.0",
+    engines: { vscode: "^1.90.0", lumen: "^0.1.0" },
+    contributes: { commands: [{ command: "a", title: "A" }] },
+  };
   const supported = ["commands.registerCommand", "window.showInformationMessage", "window.showQuickPick", "workspace.getConfiguration"];
   const missing = ["window.someFutureApi", "workspace.anotherFutureApi", "env.yetAnotherApi", "languages.notThereYet", "tasks.neverHeardOf"];
   const rate = (working: number, broken: number) =>
@@ -248,7 +272,15 @@ test("partial extensions are graded by how much of what they use works", () => {
 test("readZip reads the entries of a package", () => {
   const entries = readZip(SAMPLE_VSIX());
   assert.equal(entries.length, 4);
-  assert.equal(JSON.parse(entries.find((e) => e.name === "extension/package.json")!.read().toString()).name, "word-tools");
+  assert.equal(
+    JSON.parse(
+      entries
+        .find((e) => e.name === "extension/package.json")!
+        .read()
+        .toString(),
+    ).name,
+    "word-tools",
+  );
 });
 
 test("transpileVsix rejects entries that escape the target folder", () => {
@@ -284,7 +316,10 @@ test("packages for another platform are recognised and refused", () => {
   process.env.LUMEN_EXTENSIONS_DIR = dir;
   try {
     const manager = new ExtensionManager();
-    assert.throws(() => manager.installVsix(vsix(other), { type: "vsix", file: "native.vsix" }), new RegExp(`test\\.native 1\\.0\\.0 is the package for ${platformLabel(other)}`));
+    assert.throws(
+      () => manager.installVsix(vsix(other), { type: "vsix", file: "native.vsix" }),
+      new RegExp(`test\\.native 1\\.0\\.0 is the package for ${platformLabel(other)}`),
+    );
     assert.equal(manager.list().length, 0);
     assert.equal(manager.installVsix(vsix(currentTargetPlatform()), { type: "vsix", file: "native.vsix" }).id, "test.native");
   } finally {
@@ -313,7 +348,11 @@ test("Open VSX downloads take this platform's build, an older version's, or fail
     const entry = versions[key];
     response.setHeader("content-type", "application/json");
     if (!entry) return void response.end(JSON.stringify({ error: `not found: ${namespace}/${key}` }));
-    const all = Object.fromEntries(Object.keys(versions).filter((k) => k.startsWith(`${name}/`) && k !== `${name}/latest`).map((k) => [k.split("/")[1], ""]));
+    const all = Object.fromEntries(
+      Object.keys(versions)
+        .filter((k) => k.startsWith(`${name}/`) && k !== `${name}/latest`)
+        .map((k) => [k.split("/")[1], ""]),
+    );
     const absolute = (path: unknown) => (typeof path === "string" ? `http://127.0.0.1:${(server.address() as { port: number }).port}${path}` : path);
     response.end(
       JSON.stringify({
@@ -332,8 +371,15 @@ test("Open VSX downloads take this platform's build, an older version's, or fail
   try {
     const { downloadFromMarketplace } = await import(`../src/main/extensions/marketplace.ts?registry=${Date.now()}`);
     const latest = await downloadFromMarketplace("test", "native");
-    assert.deepEqual([latest.version, latest.vsix.toString()], ["1.0.0", "1-here.vsix"], "the newest version built for this platform, never another platform's");
-    await assert.rejects(downloadFromMarketplace("test", "native", "2.0.0"), new RegExp(`2\\.0\\.0 has no build for ${platformLabel(here)} on Open VSX \\(published for ${platformLabel(other)}\\)`));
+    assert.deepEqual(
+      [latest.version, latest.vsix.toString()],
+      ["1.0.0", "1-here.vsix"],
+      "the newest version built for this platform, never another platform's",
+    );
+    await assert.rejects(
+      downloadFromMarketplace("test", "native", "2.0.0"),
+      new RegExp(`2\\.0\\.0 has no build for ${platformLabel(here)} on Open VSX \\(published for ${platformLabel(other)}\\)`),
+    );
     await assert.rejects(downloadFromMarketplace("test", "missing"), /has no build for/);
     const plain = await downloadFromMarketplace("test", "plain");
     assert.deepEqual([plain.version, plain.vsix.toString()], ["1.2.3", "plain.vsix"], "packages for every platform still install");
@@ -400,7 +446,18 @@ test("no API member, type or contribution point is listed as unsupported", () =>
 
 test("every supported or partial API member exists on the lumen module", () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const api = host.apiFor(null) as Record<string, Record<string, unknown>>;
   const missing: string[] = [];
   for (const [member, entry] of Object.entries(API_SUPPORT)) {
@@ -412,7 +469,10 @@ test("every supported or partial API member exists on the lumen module", () => {
   for (const type of [...API_TYPES, ...API_TYPES_COMPAT]) if (!(type in api)) missing.push(type);
   assert.deepEqual(missing, []);
   // Types listed as missing really are: once one is exported, move it to API_TYPES.
-  assert.deepEqual(API_TYPES_MISSING.filter((type) => type in api), []);
+  assert.deepEqual(
+    API_TYPES_MISSING.filter((type) => type in api),
+    [],
+  );
   // Unknown members answer gracefully.
   const window = api.window as Record<string, (...args: unknown[]) => unknown>;
   assert.equal(typeof window.onDidChangeSomethingNew, "function");
@@ -422,7 +482,18 @@ test("every supported or partial API member exists on the lumen module", () => {
 
 test("tree views serve items by stable handles, refresh, run commands and reveal", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   const api = host.apiFor(null) as Record<string, Record<string, (...args: unknown[]) => unknown>> & Record<string, unknown>;
@@ -458,19 +529,32 @@ test("tree views serve items by stable handles, refresh, run commands and reveal
 
   assert.ok(posted.some((m) => m.type === "treeView" && m.view.viewId === "test.tree" && m.view.showCollapseAll));
   const root = (await host.methods.treeChildren("test.tree", null))!;
-  assert.deepEqual(root.map((item) => [item.handle, item.label, item.collapsible]), [["/a", "a", "collapsed"], ["/b", "b", "none"], ["/b#1", "b", "none"]]);
+  assert.deepEqual(
+    root.map((item) => [item.handle, item.label, item.collapsible]),
+    [
+      ["/a", "a", "collapsed"],
+      ["/b", "b", "none"],
+      ["/b#1", "b", "none"],
+    ],
+  );
   assert.equal(root[1]!.hasCommand, true);
   assert.equal(root[1]!.contextValue, "leaf");
   assert.deepEqual(root[1]!.icon, { codicon: "star", color: undefined });
   const children = (await host.methods.treeChildren("test.tree", "/a"))!;
-  assert.deepEqual(children.map((item) => item.handle), ["/a/a1"]);
+  assert.deepEqual(
+    children.map((item) => item.handle),
+    ["/a/a1"],
+  );
   assert.equal(await host.methods.treeChildren("missing.view", null), null);
 
   // Changes are batched per tick and name the handles the view knows.
   changed.fire(a);
   changed.fire(a);
   await Promise.resolve();
-  assert.deepEqual(posted.filter((m) => m.type === "treeChanged").map((m) => m.type === "treeChanged" && m.handles), [["/a"]]);
+  assert.deepEqual(
+    posted.filter((m) => m.type === "treeChanged").map((m) => m.type === "treeChanged" && m.handles),
+    [["/a"]],
+  );
   changed.fire(a);
   changed.fire(undefined);
   await Promise.resolve();
@@ -481,7 +565,10 @@ test("tree views serve items by stable handles, refresh, run commands and reveal
   host.handleView({ type: "treeEvent", viewId: "test.tree", event: "open", handles: ["/b"] });
   host.handleView({ type: "treeCommand", viewId: "test.tree", command: "test.remove", handles: ["/b"] });
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(ran, [["open", 42], ["remove", b]]);
+  assert.deepEqual(ran, [
+    ["open", 42],
+    ["remove", b],
+  ]);
 
   await view.reveal(a1, { focus: true });
   assert.deepEqual(posted.at(-1), { type: "treeReveal", viewId: "test.tree", path: ["/a", "/a/a1"], select: true, focus: true, expand: false });
@@ -498,9 +585,19 @@ test("a failed activation is not retried, and editors without documents are not 
     cpSync(join(SAMPLES, "hello-lumen"), location, { recursive: true, filter: (source) => !source.endsWith("extension.js") });
     writeFileSync(
       join(location, "package.json"),
-      JSON.stringify({ name: "broken", publisher: "test", version: "1.0.0", main: "./main.js", engines: { lumen: "^0.1.0" }, activationEvents: ["onCommand:broken.run", "onStartupFinished"] }),
+      JSON.stringify({
+        name: "broken",
+        publisher: "test",
+        version: "1.0.0",
+        main: "./main.js",
+        engines: { lumen: "^0.1.0" },
+        activationEvents: ["onCommand:broken.run", "onStartupFinished"],
+      }),
     );
-    writeFileSync(join(location, "main.js"), `const lumen = require("lumen"); exports.activate = () => { lumen.commands.registerCommand("broken.run", () => 1); throw new Error("boom"); };`);
+    writeFileSync(
+      join(location, "main.js"),
+      `const lumen = require("lumen"); exports.activate = () => { lumen.commands.registerCommand("broken.run", () => 1); throw new Error("boom"); };`,
+    );
     const host = new ExtensionHost();
     await host.start({
       extensions: [describe(location, "lumen")],
@@ -539,7 +636,7 @@ test("the webview resource server only serves registered roots with its token", 
   // Pages are served only from their extension's origin (the Host header), with the bootstrap in front.
   const page = new URL(server.pageUrl("w1", "Pub.Ext"));
   assert.equal(page.origin, webviewOrigin("pub.ext", port));
-  server.setHtml("w1", "<!DOCTYPE html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'\"></head><body>hi</body></html>");
+  server.setHtml("w1", '<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'"></head><body>hi</body></html>');
   const get = (path: string, host: string) =>
     new Promise<{ status: number; body: string }>((resolvePromise, reject) => {
       const request = httpRequest({ host: "127.0.0.1", port, path, headers: { Host: host } }, (response) => {
@@ -556,7 +653,8 @@ test("the webview resource server only serves registered roots with its token", 
   assert.equal((await get(page.pathname, `${new URL(webviewOrigin("other.ext", port)).host}`)).status, 404, "not from another extension's origin");
   assert.equal((await get(page.pathname, `127.0.0.1:${port}`)).status, 404);
   server.setRoots("w1", [media]);
-  const url = (webview: string, path: string, token = server.token) => `${origin}/${token}/${webview}/${path.replace(/\\/g, "/").replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
+  const url = (webview: string, path: string, token = server.token) =>
+    `${origin}/${token}/${webview}/${path.replace(/\\/g, "/").replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
   const css = await fetch(url("w1", join(media, "webview.css")));
   assert.equal(css.status, 200);
   assert.match(css.headers.get("content-type") ?? "", /text\/css/);
@@ -632,7 +730,15 @@ test("the extension host runs Lumen and VS Code extensions", { timeout: 30_000 }
     cpSync(join(SAMPLES, "hello-lumen"), esm, { recursive: true, filter: (source) => !source.endsWith(".js") });
     writeFileSync(
       join(esm, "package.json"),
-      JSON.stringify({ name: "esm", publisher: "test", version: "1.0.0", type: "module", main: "./main.js", engines: { lumen: "^0.1.0" }, activationEvents: ["onCommand:esm.hello"] }),
+      JSON.stringify({
+        name: "esm",
+        publisher: "test",
+        version: "1.0.0",
+        type: "module",
+        main: "./main.js",
+        engines: { lumen: "^0.1.0" },
+        activationEvents: ["onCommand:esm.hello"],
+      }),
     );
     writeFileSync(
       join(esm, "main.js"),
@@ -667,7 +773,10 @@ test("the extension host runs Lumen and VS Code extensions", { timeout: 30_000 }
     // hello-lumen: activation, its commands, a TODO diagnostic, a highlight, a status bar item.
     const activated = (await waitFor((m) => m.type === "activated" && m.extensionId === "lumen.hello-lumen")) as Extract<HostToView, { type: "activated" }>;
     assert.equal(activated.error, undefined);
-    const diagnostics = (await waitFor((m) => m.type === "diagnostics" && m.entries.some(([, list]) => list.length > 0))) as Extract<HostToView, { type: "diagnostics" }>;
+    const diagnostics = (await waitFor((m) => m.type === "diagnostics" && m.entries.some(([, list]) => list.length > 0))) as Extract<
+      HostToView,
+      { type: "diagnostics" }
+    >;
     assert.equal(diagnostics.entries[0]![1][0]!.message, "Something is left to do here");
     assert.equal(diagnostics.entries[0]![1][0]!.severity, "info");
     await waitFor((m) => m.type === "decorations" && m.ranges.length === 1);
@@ -726,7 +835,10 @@ test("the extension host runs Lumen and VS Code extensions", { timeout: 30_000 }
     const viewHtml = (await waitFor((m) => m.type === "webviewHtml" && m.id === "v1")) as Extract<HostToView, { type: "webviewHtml" }>;
     assert.match(viewHtml.html, /<h2>Counter<\/h2>/);
     const helloOrigin = webviewOrigin("lumen.hello-lumen", 4567);
-    assert.ok(viewHtml.html.includes(`${helloOrigin}/secret/v1/`) && viewHtml.html.includes("webview.css"), "asWebviewUri points at the extension's webview origin");
+    assert.ok(
+      viewHtml.html.includes(`${helloOrigin}/secret/v1/`) && viewHtml.html.includes("webview.css"),
+      "asWebviewUri points at the extension's webview origin",
+    );
     assert.ok(viewHtml.html.includes(`style-src ${helloOrigin};`), "cspSource is that origin");
     view({ type: "webviewMessage", id: "v1", message: { type: "increment" } });
     const posted = (await waitFor((m) => m.type === "webviewPost" && m.id === "v1")) as Extract<HostToView, { type: "webviewPost" }>;
@@ -770,11 +882,50 @@ test("the extension host runs Lumen and VS Code extensions", { timeout: 30_000 }
 
 test("language providers registered by extensions are called by the host", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const sent: HostToMain[] = [];
   host.send = (message) => void sent.push(message);
   const api = host.apiFor(null) as any;
-  const { languages, Range, Position, Location, Uri, TextEdit, CodeAction, WorkspaceEdit, Hover, FoldingRange, SelectionRange, SignatureHelp, SignatureInformation, ParameterInformation, InlayHint, DocumentHighlight, DocumentLink, Color, ColorInformation, ColorPresentation, CodeLens, InlineCompletionItem, LinkedEditingRanges, SymbolInformation, SymbolKind, SemanticTokensLegend, SemanticTokensBuilder } = api;
+  const {
+    languages,
+    Range,
+    Position,
+    Location,
+    Uri,
+    TextEdit,
+    CodeAction,
+    WorkspaceEdit,
+    Hover,
+    FoldingRange,
+    SelectionRange,
+    SignatureHelp,
+    SignatureInformation,
+    ParameterInformation,
+    InlayHint,
+    DocumentHighlight,
+    DocumentLink,
+    Color,
+    ColorInformation,
+    ColorPresentation,
+    CodeLens,
+    InlineCompletionItem,
+    LinkedEditingRanges,
+    SymbolInformation,
+    SymbolKind,
+    SemanticTokensLegend,
+    SemanticTokensBuilder,
+  } = api;
   void Hover;
   const path = join(temp(), "a.txt");
   host.handleView({ type: "documentOpen", doc: { path, languageId: "plaintext", version: 1, text: "foo(bar)\nbaz\n", eol: "LF", dirty: false } });
@@ -793,17 +944,23 @@ test("language providers registered by extensions are called by the host", async
       return edit;
     },
   });
-  languages.registerSignatureHelpProvider("plaintext", {
-    provideSignatureHelp: () => {
-      const help = new SignatureHelp();
-      const signature = new SignatureInformation("foo(bar: string)", "docs");
-      signature.parameters = [new ParameterInformation("bar: string")];
-      help.signatures = [signature];
-      return help;
+  languages.registerSignatureHelpProvider(
+    "plaintext",
+    {
+      provideSignatureHelp: () => {
+        const help = new SignatureHelp();
+        const signature = new SignatureInformation("foo(bar: string)", "docs");
+        signature.parameters = [new ParameterInformation("bar: string")];
+        help.signatures = [signature];
+        return help;
+      },
     },
-  }, "(");
+    "(",
+  );
   languages.registerFoldingRangeProvider("plaintext", { provideFoldingRanges: () => [new FoldingRange(0, 1)] });
-  languages.registerSelectionRangeProvider("plaintext", { provideSelectionRanges: () => [new SelectionRange(here(0, 0, 3), new SelectionRange(here(0, 0, 8)))] });
+  languages.registerSelectionRangeProvider("plaintext", {
+    provideSelectionRanges: () => [new SelectionRange(here(0, 0, 3), new SelectionRange(here(0, 0, 8)))],
+  });
   languages.registerInlayHintsProvider("plaintext", { provideInlayHints: () => [new InlayHint(new Position(0, 4), ": string")] });
   languages.registerDocumentLinkProvider("plaintext", { provideDocumentLinks: () => [new DocumentLink(here(1, 0, 3), Uri.parse("https://example.com"))] });
   languages.registerColorProvider("plaintext", {
@@ -823,14 +980,18 @@ test("language providers registered by extensions are called by the host", async
   languages.registerLinkedEditingRangeProvider("plaintext", { provideLinkedEditingRanges: () => new LinkedEditingRanges([here(0, 0, 3), here(1, 0, 3)]) });
   languages.registerWorkspaceSymbolProvider({ provideWorkspaceSymbols: () => [new SymbolInformation("foo", SymbolKind.Function, "", loc())] });
   const legend = new SemanticTokensLegend(["function", "variable"], ["readonly"]);
-  languages.registerDocumentSemanticTokensProvider("plaintext", {
-    provideDocumentSemanticTokens: () => {
-      const builder = new SemanticTokensBuilder(legend);
-      builder.push(0, 0, 3, 0, 0);
-      builder.push(0, 4, 3, 1, 1);
-      return builder.build();
+  languages.registerDocumentSemanticTokensProvider(
+    "plaintext",
+    {
+      provideDocumentSemanticTokens: () => {
+        const builder = new SemanticTokensBuilder(legend);
+        builder.push(0, 0, 3, 0, 0);
+        builder.push(0, 4, 3, 1, 1);
+        return builder.build();
+      },
     },
-  }, legend);
+    legend,
+  );
 
   const m = host.methods;
   assert.equal((await m.provideTypeDefinition(path, 0, 0))[0]?.line, 1);
@@ -840,12 +1001,19 @@ test("language providers registered by extensions are called by the host", async
   assert.ok(await m.prepareRename(path, 0, 0));
   assert.match(JSON.stringify(await m.provideRenameEdits(path, 0, 0, "qux")), /qux/);
   assert.equal((await m.provideSignatureHelp(path, 0, 4, "("))?.signatures[0]?.label, "foo(bar: string)");
-  assert.deepEqual((await m.provideFoldingRanges(path)).map((r) => [r.start, r.end]), [[0, 1]]);
+  assert.deepEqual(
+    (await m.provideFoldingRanges(path)).map((r) => [r.start, r.end]),
+    [[0, 1]],
+  );
   assert.equal((await m.provideSelectionRanges(path, [{ line: 0, character: 1 }]))[0]?.length, 2);
   assert.match(JSON.stringify(await m.provideInlayHints(path, { startLine: 0, startCharacter: 0, endLine: 2, endCharacter: 0 })), /: string/);
   assert.match(JSON.stringify(await m.provideDocumentLinks(path)), /example\.com/);
   assert.equal((await m.provideDocumentColors(path)).length, 1);
-  assert.equal((await m.provideColorPresentations(path, { red: 1, green: 0, blue: 0, alpha: 1 }, { startLine: 1, startCharacter: 0, endLine: 1, endCharacter: 3 }))[0]?.label, "#ff0000");
+  assert.equal(
+    (await m.provideColorPresentations(path, { red: 1, green: 0, blue: 0, alpha: 1 }, { startLine: 1, startCharacter: 0, endLine: 1, endCharacter: 3 }))[0]
+      ?.label,
+    "#ff0000",
+  );
   assert.equal((await m.provideCodeLenses(path))[0]?.title, "Run");
   assert.equal((await m.provideCodeActions(path, { startLine: 0, startCharacter: 0, endLine: 0, endCharacter: 0 }, []))[0]?.title, "Fix it");
   assert.equal((await m.provideOnTypeFormatting(path, 0, 8, ";", { tabSize: 2, insertSpaces: true })).length, 1);
@@ -853,12 +1021,29 @@ test("language providers registered by extensions are called by the host", async
   assert.equal((await m.provideLinkedEditingRanges(path, 0, 1))?.ranges.length, 2);
   assert.equal((await m.provideWorkspaceSymbols("fo"))[0]?.name, "foo");
   const tokens = await m.provideSemanticTokens(path);
-  assert.deepEqual(tokens.map((t) => [t.character, t.type, t.modifiers]), [[0, "function", []], [4, "variable", ["readonly"]]]);
+  assert.deepEqual(
+    tokens.map((t) => [t.character, t.type, t.modifiers]),
+    [
+      [0, "function", []],
+      [4, "variable", ["readonly"]],
+    ],
+  );
 });
 
 test("inline completion lists and file decorations are accepted by the host", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.send = () => {};
   const api = host.apiFor(null) as any;
   const { languages, window, InlineCompletionItem, InlineCompletionList, InlineCompletionTriggerKind, FileDecoration } = api;
@@ -872,7 +1057,10 @@ test("inline completion lists and file decorations are accepted by the host", as
       return new InlineCompletionList([new InlineCompletionItem("bar"), new InlineCompletionItem("baz")]);
     },
   });
-  assert.deepEqual((await host.methods.provideInlineCompletions(path, 0, 3, 1)).map((item) => item.insertText), ["bar", "baz"]);
+  assert.deepEqual(
+    (await host.methods.provideInlineCompletions(path, 0, 3, 1)).map((item) => item.insertText),
+    ["bar", "baz"],
+  );
   assert.deepEqual(triggerKinds, [InlineCompletionTriggerKind.Automatic]);
   await host.methods.provideInlineCompletions(path, 0, 3, 0);
   assert.deepEqual(triggerKinds, [InlineCompletionTriggerKind.Automatic, InlineCompletionTriggerKind.Invoke]);
@@ -889,7 +1077,18 @@ test("inline completion lists and file decorations are accepted by the host", as
 
 test("workspace and window events reach extensions", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.send = () => {};
   const api = host.apiFor(null) as any;
   const { workspace, window, Uri, TextEdit, Position } = api;
@@ -905,11 +1104,15 @@ test("workspace and window events reach extensions", async () => {
   workspace.onDidDeleteFiles((e: any) => seen.push(`didDelete:${e.files.length}`));
   workspace.onWillRenameFiles((e: any) => {
     seen.push(`willRename:${e.files.length}`);
-    e.waitUntil(Promise.resolve((() => {
-      const edit = new api.WorkspaceEdit();
-      edit.insert(Uri.file(path), new Position(0, 0), "renamed ");
-      return edit;
-    })()));
+    e.waitUntil(
+      Promise.resolve(
+        (() => {
+          const edit = new api.WorkspaceEdit();
+          edit.insert(Uri.file(path), new Position(0, 0), "renamed ");
+          return edit;
+        })(),
+      ),
+    );
   });
   workspace.onDidRenameFiles((e: any) => seen.push(`didRename:${e.files[0].newUri.fsPath.endsWith("c.txt")}`));
   workspace.onWillSaveTextDocument((e: any) => e.waitUntil(Promise.resolve([TextEdit.insert(new Position(0, 0), "// ")])));
@@ -930,11 +1133,26 @@ test("workspace and window events reach extensions", async () => {
 
   host.handleView({ type: "visibleRanges", path, ranges: [{ startLine: 0, startCharacter: 0, endLine: 7, endCharacter: 0 }] });
   host.handleView({ type: "options", path, options: { tabSize: 3, insertSpaces: true } } as ViewToHost);
-  host.handleView({ type: "tabs", groups: [{ viewColumn: 1, isActive: true, tabs: [{ label: "a.txt", path, kind: "text", isActive: true, isDirty: false, isPinned: false, isPreview: false }] }] });
+  host.handleView({
+    type: "tabs",
+    groups: [
+      { viewColumn: 1, isActive: true, tabs: [{ label: "a.txt", path, kind: "text", isActive: true, isDirty: false, isPinned: false, isPreview: false }] },
+    ],
+  });
   await new Promise((resolveTick) => setTimeout(resolveTick, 10));
   assert.equal(window.tabGroups.all.length, 1);
   assert.equal(window.tabGroups.all[0].tabs[0].label, "a.txt");
-  assert.deepEqual(seen, ["willCreate:1", "didCreate:true", "willRename:1", "didRename:true", "willDelete:1", "didDelete:1", "visible:7", "options:3", "tabs:1"]);
+  assert.deepEqual(seen, [
+    "willCreate:1",
+    "didCreate:true",
+    "willRename:1",
+    "didRename:true",
+    "willDelete:1",
+    "didDelete:1",
+    "visible:7",
+    "options:3",
+    "tabs:1",
+  ]);
 
   // Virtual documents and file decorations.
   workspace.registerTextDocumentContentProvider("demo", { provideTextDocumentContent: (uri: any) => `content of ${uri.path}` });
@@ -946,7 +1164,18 @@ test("workspace and window events reach extensions", async () => {
 
 test("workspace.applyEdit runs text edits and file operations in order", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.send = () => {};
   host.post = () => {};
   const steps: string[] = [];
@@ -990,7 +1219,11 @@ test("workspace.applyEdit runs text edits and file operations in order", async (
   assert.deepEqual(steps, ["edit:a.txt", "rename:a.txt>b.txt", "edit:b.txt", "create:c.txt", "edit:c.txt", "delete:d.txt"]);
   assert.deepEqual(events, ["willRename", "didRename", "didCreate", "didDelete"]);
   assert.equal(batches[1][0].eol, "CRLF");
-  assert.deepEqual(batches[1][0].edits.map((e: any) => e.newText), ["2"], "a pure setEndOfLine edit changes no text");
+  assert.deepEqual(
+    batches[1][0].edits.map((e: any) => e.newText),
+    ["2"],
+    "a pure setEndOfLine edit changes no text",
+  );
   assert.deepEqual(batches[2][0].edits[0], { startLine: 0, startCharacter: 1, endLine: 0, endCharacter: 1, newText: "x${1:y}", snippet: true });
   assert.equal(readFileSync(join(dir, "b.txt"), "utf8"), "a\n");
   assert.equal(readFileSync(join(dir, "c.txt"), "utf8"), "c");
@@ -1116,12 +1349,23 @@ test("contributes.themes loads VS Code color themes with includes and .tmTheme t
   } as unknown as ExtensionDescription;
   try {
     const themes = contributedThemes([extension]);
-    assert.deepEqual(themes.map((theme) => [theme.id, theme.kind]), [["night", "dark"], ["Paper", "light"], ["Loop", "hcDark"]], "paths outside the extension are ignored");
+    assert.deepEqual(
+      themes.map((theme) => [theme.id, theme.kind]),
+      [
+        ["night", "dark"],
+        ["Paper", "light"],
+        ["Loop", "hcDark"],
+      ],
+      "paths outside the extension are ignored",
+    );
 
     const night = await loadColorTheme(themes[0]!, dir);
     assert.equal(night.colors["editor.background"], "#000000", "the theme's own colors win over its include");
     assert.equal(night.colors["sideBar.background"], "#202020");
-    assert.deepEqual(night.tokenColors.map((rule) => rule.settings.foreground), ["#808080", "#ff0000"]);
+    assert.deepEqual(
+      night.tokenColors.map((rule) => rule.settings.foreground),
+      ["#808080", "#ff0000"],
+    );
     assert.equal(night.semanticHighlighting, true);
     assert.deepEqual(night.semanticTokenColors, { "variable.readonly": "#00ff00" });
 
@@ -1159,13 +1403,29 @@ test("color themes resolve workbench colors and match TextMate scopes like VS Co
   const style = (...scopes: string[]) => matchTokenStyle(rules, scopes);
   assert.equal(style("source.js", "string.quoted.single.js").foreground, "#a");
   assert.equal(style("source.js", "string.quoted.double.js").foreground, "#b", "the more specific selector wins");
-  assert.equal(style("source.html", "meta.embedded.block", "string.quoted.single.js").foreground, "#c", "a matching parent path wins over the same scope alone");
-  assert.equal(style("source.html", "meta.embedded.block", "string.quoted.double.js").foreground, "#b", "a more specific scope wins over a parent path (as in vscode-textmate)");
-  assert.deepEqual(style("source.js", "comment.line.double-slash.js"), { foreground: "#e", fontStyle: "italic" }, "foreground and font style are chosen separately");
+  assert.equal(
+    style("source.html", "meta.embedded.block", "string.quoted.single.js").foreground,
+    "#c",
+    "a matching parent path wins over the same scope alone",
+  );
+  assert.equal(
+    style("source.html", "meta.embedded.block", "string.quoted.double.js").foreground,
+    "#b",
+    "a more specific scope wins over a parent path (as in vscode-textmate)",
+  );
+  assert.deepEqual(
+    style("source.js", "comment.line.double-slash.js"),
+    { foreground: "#e", fontStyle: "italic" },
+    "foreground and font style are chosen separately",
+  );
   assert.equal(style("source.python", "comment.line.number-sign.python").foreground, "#d", "excluded scopes do not match");
   assert.deepEqual(style("source.ts", "keyword.control.flow.ts"), { foreground: "#g", fontStyle: "bold" });
   assert.equal(style("source.ts", "storage.type.ts").foreground, "#f");
-  assert.deepEqual(style("source.ts", "variable.other.ts"), { foreground: undefined, fontStyle: undefined }, "the scope-less rule is the default text color, not a match");
+  assert.deepEqual(
+    style("source.ts", "variable.other.ts"),
+    { foreground: undefined, fontStyle: undefined },
+    "the scope-less rule is the default text color, not a match",
+  );
 });
 
 test("contributes.jsonValidation validates, completes and describes JSON with the schema", async () => {
@@ -1183,10 +1443,23 @@ test("contributes.jsonValidation validates, completes and describes JSON with th
   const extension = {
     id: "test.schemas",
     location: dir,
-    manifest: { name: "schemas", version: "1.0.0", contributes: { jsonValidation: [{ fileMatch: ["lumen.json", "!skip/lumen.json"], url: "./schemas/lumen.json" }, { fileMatch: "*.remote.json", url: "https://example.com/s.json" }, { url: "./x.json" }] } },
+    manifest: {
+      name: "schemas",
+      version: "1.0.0",
+      contributes: {
+        jsonValidation: [
+          { fileMatch: ["lumen.json", "!skip/lumen.json"], url: "./schemas/lumen.json" },
+          { fileMatch: "*.remote.json", url: "https://example.com/s.json" },
+          { url: "./x.json" },
+        ],
+      },
+    },
   } as unknown as ExtensionDescription;
   const associations = jsonSchemaAssociations(extension);
-  assert.deepEqual(associations.map((a) => a.fileMatch), [["/lumen.json", "!skip/lumen.json"], ["/*.remote.json"]]);
+  assert.deepEqual(
+    associations.map((a) => a.fileMatch),
+    [["/lumen.json", "!skip/lumen.json"], ["/*.remote.json"]],
+  );
   assert.match(associations[0]!.url, /^file:\/\/.*\/schemas\/lumen\.json$/);
   assert.equal(associations[1]!.url, "https://example.com/s.json");
   setJsonSchemas([associations[0]!]);
@@ -1221,7 +1494,18 @@ test("contributes.jsonValidation validates, completes and describes JSON with th
 
 test("quick input buttons, tree drag and drop / tooltips and language configurations work", async () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   const api = host.apiFor(null) as any;
@@ -1328,7 +1612,18 @@ const CUSTOM_EDITOR_MAIN = [
 
 test("a file matching a default-priority selector opens with its custom editor", () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const runtime = {
     id: "test.custo",
     description: { id: "test.custo", manifest: customEditorManifest(), location: ROOT, enabled: true, kind: "lumen", development: true },
@@ -1346,7 +1641,10 @@ test("a file matching a default-priority selector opens with its custom editor",
   assert.equal(host.customEditors.defaultEditorFor("C:\\notes\\a.bin", "plaintext")?.viewType, "test.editable");
   assert.equal(host.customEditors.defaultEditorFor("C:\\notes\\a.txt", "plaintext")?.viewType, "test.text");
   // "option" priority editors are only reachable through Reopen Editor With.
-  assert.deepEqual(host.customEditors.contributionsFor("C:\\notes\\a.txt", "plaintext").map((entry) => entry.viewType), ["test.text", "test.option"]);
+  assert.deepEqual(
+    host.customEditors.contributionsFor("C:\\notes\\a.txt", "plaintext").map((entry) => entry.viewType),
+    ["test.text", "test.option"],
+  );
   assert.equal(host.customEditors.defaultEditorFor("C:\\notes\\a.md", "markdown"), undefined);
 });
 
@@ -1445,7 +1743,10 @@ test("custom editors: text and editable providers, dirty / save and vscode.openW
     const other = join(dir, "other.bin");
     writeFileSync(other, "x");
     view({ type: "executeCommand", command: "test.openWith", args: [other] });
-    const opened = (await waitFor((m) => m.type === "webviewCreate" && (m.webview.uri ?? "").toLowerCase() === other.toLowerCase())) as Extract<HostToView, { type: "webviewCreate" }>;
+    const opened = (await waitFor((m) => m.type === "webviewCreate" && (m.webview.uri ?? "").toLowerCase() === other.toLowerCase())) as Extract<
+      HostToView,
+      { type: "webviewCreate" }
+    >;
     assert.equal(opened.webview.viewType, "test.editable");
   } finally {
     await worker.terminate();
@@ -1474,7 +1775,10 @@ test("extensions see worker_threads as on a main thread (bundles with worker cod
   try {
     const location = join(dir, "wt");
     mkdirSync(location, { recursive: true });
-    writeFileSync(join(location, "package.json"), JSON.stringify({ name: "wt", publisher: "test", version: "1.0.0", main: "./main.js", engines: { vscode: "^1.90.0" }, activationEvents: ["*"] }));
+    writeFileSync(
+      join(location, "package.json"),
+      JSON.stringify({ name: "wt", publisher: "test", version: "1.0.0", main: "./main.js", engines: { vscode: "^1.90.0" }, activationEvents: ["*"] }),
+    );
     writeFileSync(
       join(location, "main.js"),
       [
@@ -1505,7 +1809,10 @@ test("extensions see worker_threads as on a main thread (bundles with worker cod
     const info = await call("executeCommand", ["wt.info", []]);
     assert.deepEqual(info.result, { isMainThread: true, parentPort: null, workerData: null, hasWorker: true });
     // The host's own messages were not answered by the extension.
-    assert.deepEqual(messages.filter((message) => !message || typeof message !== "object"), []);
+    assert.deepEqual(
+      messages.filter((message) => !message || typeof message !== "object"),
+      [],
+    );
   } finally {
     await worker.terminate();
     rmSync(dir, { recursive: true, force: true });
@@ -1513,7 +1820,13 @@ test("extensions see worker_threads as on a main thread (bundles with worker cod
 });
 
 test("refreshing a stored report recomputes the manifest warnings", () => {
-  const manifest = { name: "dbg", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, activationEvents: ["onDebugResolve:node", "onUri"] };
+  const manifest = {
+    name: "dbg",
+    publisher: "test",
+    version: "1.0.0",
+    engines: { vscode: "^1.90.0", lumen: "^0.1.0" },
+    activationEvents: ["onDebugResolve:node", "onUri"],
+  };
   const stale = {
     transpilerVersion: 1,
     rewrittenImports: 1,
@@ -1531,9 +1844,23 @@ test("refreshing a stored report recomputes the manifest warnings", () => {
 
 test("getConfiguration() without a section shows every setting as a nested tree, like VS Code", () => {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: temp(), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: temp(),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.configDefaults = { "vsicons.associations.files": [], "vsicons.associations.folders": [], "vsicons.dontShowNewVersionMessage": false };
-  host.config = { lumen: { "editor.tabSize": 4 }, user: { "vsicons.associations.files": [{ icon: "js", extensions: ["mjs"] }], "[python]": { "editor.tabSize": 2 } } };
+  host.config = {
+    lumen: { "editor.tabSize": 4 },
+    user: { "vsicons.associations.files": [{ icon: "js", extensions: ["mjs"] }], "[python]": { "editor.tabSize": 2 } },
+  };
   const api = host.apiFor(null) as any;
   // vscode-icons reads workspace.getConfiguration()["vsicons"].associations.files.
   const root = api.workspace.getConfiguration();

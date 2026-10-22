@@ -205,7 +205,8 @@ export function SettingsEditor({ open, onClose }: Props) {
     const map = new Map<string, ContributedSetting[]>();
     for (const setting of extensionService.contributedSettings()) {
       if (modifiedOnly && !extensionService.isExtensionSettingModified(setting.key)) continue;
-      const haystack = `${setting.key} ${setting.title} ${setting.property.description ?? setting.property.markdownDescription ?? ""} ${setting.extensionName}`.toLowerCase();
+      const haystack =
+        `${setting.key} ${setting.title} ${setting.property.description ?? setting.property.markdownDescription ?? ""} ${setting.extensionName}`.toLowerCase();
       if (q && !q.split(/\s+/).every((word) => haystack.includes(word))) continue;
       const category = `Extensions › ${setting.title}`;
       map.set(category, [...(map.get(category) ?? []), setting]);

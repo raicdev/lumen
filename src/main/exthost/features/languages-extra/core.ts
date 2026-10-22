@@ -105,7 +105,10 @@ export class LanguagesExtra {
     this.#entries.set(id, entry);
     // Inline values providers ask to be asked again.
     const onChange = entry.provider.onDidChangeInlineValues as ((listener: () => void) => { dispose(): unknown }) | undefined;
-    const subscription = kind === "inlineValues" && typeof onChange === "function" ? onChange(() => this.#host.postFeature("languages-extra", { type: "inlineValuesChanged" })) : undefined;
+    const subscription =
+      kind === "inlineValues" && typeof onChange === "function"
+        ? onChange(() => this.#host.postFeature("languages-extra", { type: "inlineValuesChanged" }))
+        : undefined;
     this.#changed();
     return new T.Disposable(() => {
       subscription?.dispose();
@@ -227,7 +230,12 @@ export class LanguagesExtra {
     const kind: HierarchyKind = direction === "incoming" || direction === "outgoing" ? "call" : "type";
     const entry = await this.#ownerOf(item, kind);
     if (!entry) return [];
-    const method = { incoming: "provideCallHierarchyIncomingCalls", outgoing: "provideCallHierarchyOutgoingCalls", supertypes: "provideTypeHierarchySupertypes", subtypes: "provideTypeHierarchySubtypes" }[direction];
+    const method = {
+      incoming: "provideCallHierarchyIncomingCalls",
+      outgoing: "provideCallHierarchyOutgoingCalls",
+      supertypes: "provideTypeHierarchySupertypes",
+      subtypes: "provideTypeHierarchySubtypes",
+    }[direction];
     try {
       const result = asList((await entry.provider[method]?.(item, token())) as unknown[] | undefined) as Record<string, unknown>[];
       const out: { item: HierarchyItem; fromRanges: T.Range[]; entry: Entry }[] = [];
@@ -248,12 +256,20 @@ export class LanguagesExtra {
   async children(direction: HierarchyDirection, handle: number): Promise<WireHierarchyNode[]> {
     const known = this.#items.get(handle);
     if (!known) throw new Error("the hierarchy item is no longer available");
-    return (await this.childrenOf(direction, known.item)).map(({ item, fromRanges, entry }) => ({ item: this.#remember(item, entry), fromRanges: fromRanges.map(wireRange) }));
+    return (await this.childrenOf(direction, known.item)).map(({ item, fromRanges, entry }) => ({
+      item: this.#remember(item, entry),
+      fromRanges: fromRanges.map(wireRange),
+    }));
   }
 
   /* ── debugging: inline values and evaluatable expressions ───────────── */
 
-  async inlineValues(path: string, viewport: { startLine: number; endLine: number }, session: Session, stopped: { line: number; character: number }): Promise<WireInlineValue[]> {
+  async inlineValues(
+    path: string,
+    viewport: { startLine: number; endLine: number },
+    session: Session,
+    stopped: { line: number; character: number },
+  ): Promise<WireInlineValue[]> {
     const document = this.#host.document(path);
     if (!document) return [];
     const entries = this.#matching("inlineValues", document.key, document.languageId);
@@ -338,7 +354,9 @@ export class LanguagesExtra {
     let expression: string | undefined;
     for (const entry of entries) {
       try {
-        const found = (await entry.provider.provideEvaluatableExpression?.(document.toApi(), position, token())) as { range?: T.Range; expression?: string } | undefined;
+        const found = (await entry.provider.provideEvaluatableExpression?.(document.toApi(), position, token())) as
+          | { range?: T.Range; expression?: string }
+          | undefined;
         if (!found?.range) continue;
         range = T.toRange(found.range);
         expression = found.expression ?? document.getText(range);
@@ -413,7 +431,8 @@ export class LanguagesExtra {
   /** An edit that yields to the kind of another edit comes after it. */
   #order(found: FoundEdit[]): FoundEdit[] {
     const yields = ({ edit }: FoundEdit) =>
-      !!edit.yieldTo?.length && found.some((other) => other.edit !== edit && other.edit.kind && (edit.yieldTo as KindLike[]).some((kind) => kind.intersects(other.edit.kind)));
+      !!edit.yieldTo?.length &&
+      found.some((other) => other.edit !== edit && other.edit.kind && (edit.yieldTo as KindLike[]).some((kind) => kind.intersects(other.edit.kind)));
     return [...found.filter((item) => !yields(item)), ...found.filter(yields)];
   }
 
@@ -426,7 +445,9 @@ export class LanguagesExtra {
       this.#matching("drop", document.key, document.languageId).map(async (entry) => {
         if (!acceptsTransfer(entry.metadata?.dropMimeTypes, transfer)) return;
         try {
-          for (const edit of asList((await entry.provider.provideDocumentDropEdits?.(document.toApi(), new T.Position(line, character), transfer, token())) as any[] | undefined)) {
+          for (const edit of asList(
+            (await entry.provider.provideDocumentDropEdits?.(document.toApi(), new T.Position(line, character), transfer, token())) as any[] | undefined,
+          )) {
             if (edit && edit.insertText !== undefined) found.push({ edit, entry });
           }
         } catch (error) {
@@ -458,7 +479,12 @@ export class LanguagesExtra {
     return id;
   }
 
-  async pasteEdits(path: string, ranges: TextRange[], items: WireTransferItem[], options: { copyId?: number | null; triggerKind?: number; only?: string } = {}): Promise<WireDocumentEdit[]> {
+  async pasteEdits(
+    path: string,
+    ranges: TextRange[],
+    items: WireTransferItem[],
+    options: { copyId?: number | null; triggerKind?: number; only?: string } = {},
+  ): Promise<WireDocumentEdit[]> {
     const document = this.#host.document(path);
     if (!document) return [];
     const transfer = this.buildTransfer(items);
@@ -472,7 +498,9 @@ export class LanguagesExtra {
       this.#matching("paste", document.key, document.languageId).map(async (entry) => {
         if (!acceptsTransfer(entry.metadata?.pasteMimeTypes, transfer)) return;
         try {
-          for (const edit of asList((await entry.provider.provideDocumentPasteEdits?.(document.toApi(), selection, transfer, context, token())) as any[] | undefined)) {
+          for (const edit of asList(
+            (await entry.provider.provideDocumentPasteEdits?.(document.toApi(), selection, transfer, context, token())) as any[] | undefined,
+          )) {
             if (!edit || edit.insertText === undefined) continue;
             if (only && edit.kind && !only.intersects(edit.kind)) continue;
             found.push({ edit, entry });

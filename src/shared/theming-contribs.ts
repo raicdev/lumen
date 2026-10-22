@@ -67,7 +67,14 @@ export function collectColorContributions(extensions: ManifestLike[]): ColorCont
 /** The default of a color for a theme kind as a CSS value (`undefined` when it has none or it is not a usable value). */
 export function defaultColorFor(color: ColorContribution, kind: ThemeKind): string | undefined {
   const { defaults } = color;
-  const value = kind === "dark" ? defaults.dark : kind === "light" ? defaults.light : kind === "hcDark" ? defaults.highContrast : (defaults.highContrastLight ?? defaults.highContrast);
+  const value =
+    kind === "dark"
+      ? defaults.dark
+      : kind === "light"
+        ? defaults.light
+        : kind === "hcDark"
+          ? defaults.highContrast
+          : (defaults.highContrastLight ?? defaults.highContrast);
   // Without a high contrast value VS Code falls back to the plain dark / light one.
   const chosen = value ?? (kind === "light" || kind === "hcLight" ? defaults.light : defaults.dark);
   if (!chosen) return undefined;

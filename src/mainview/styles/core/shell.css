@@ -182,7 +182,9 @@
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text-muted);
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
 }
 
 .toolbar-search:hover {

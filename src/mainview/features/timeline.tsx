@@ -48,7 +48,8 @@ async function load(path: string | null, options: { only?: string; more?: boolea
   if (token !== loadToken) return;
   store.set((state) => {
     const next: Record<string, SourceState> = state.path === path ? { ...state.sources } : {};
-    for (const source of sources) next[source.id] = { ...(next[source.id] ?? { items: [] }), label: source.label, loading: !options.only || options.only === source.id };
+    for (const source of sources)
+      next[source.id] = { ...(next[source.id] ?? { items: [] }), label: source.label, loading: !options.only || options.only === source.id };
     for (const id of Object.keys(next)) if (!sources.some((source) => source.id === id)) delete next[id];
     return { ...state, path, sources: next };
   });
@@ -107,7 +108,11 @@ function TimelineRow({ item, path }: { item: TimelineItemWire; path: string | nu
       onContextMenu={(e) => showContributedMenu(e, "timeline/item/context", lookup, args)}
     >
       <span className="timeline-icon">
-        {item.icon && "codicon" in item.icon ? <WithCodicons text={`$(${item.icon.codicon})`} size={14} /> : item.icon ? <img src={item.icon.url} alt="" /> : null}
+        {item.icon && "codicon" in item.icon ? (
+          <WithCodicons text={`$(${item.icon.codicon})`} size={14} />
+        ) : item.icon ? (
+          <img src={item.icon.url} alt="" />
+        ) : null}
       </span>
       <span className="timeline-label">{item.label}</span>
       {item.description && <span className="timeline-description">{item.description}</span>}
@@ -134,7 +139,11 @@ function TimelineSection({ activePath }: { activePath: string | null }) {
   const loading = shown.some(([, source]) => source.loading);
   const more = shown.filter(([, source]) => source.cursor);
   if (!items.length) {
-    const text = loading ? "Loading timeline…" : activePath ? `No timeline information was provided for ${basename(activePath)}.` : "The active editor cannot provide timeline information.";
+    const text = loading
+      ? "Loading timeline…"
+      : activePath
+        ? `No timeline information was provided for ${basename(activePath)}.`
+        : "The active editor cannot provide timeline information.";
     return <div className="timeline-empty muted">{text}</div>;
   }
   return (
@@ -143,7 +152,11 @@ function TimelineSection({ activePath }: { activePath: string | null }) {
         <TimelineRow key={item.handle} item={item} path={activePath} />
       ))}
       {more.length > 0 && (
-        <button type="button" className="timeline-more" onClick={() => more.forEach(([id]) => void load(activePath, { only: id, more: true, trigger: TRIGGER_INVOKE }))}>
+        <button
+          type="button"
+          className="timeline-more"
+          onClick={() => more.forEach(([id]) => void load(activePath, { only: id, more: true, trigger: TRIGGER_INVOKE }))}
+        >
           Load more…
         </button>
       )}

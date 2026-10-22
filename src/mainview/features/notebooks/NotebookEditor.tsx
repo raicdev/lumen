@@ -16,7 +16,8 @@ import { activePath, call, docs, flushText, hostEpoch, loadDoc, pickController, 
 
 /** The editor of a notebook: a toolbar and the cells (markdown rendered, code editable) with their outputs. */
 
-const formatDuration = (ms: number) => (ms < 1000 ? `${Math.round(ms)}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
+const formatDuration = (ms: number) =>
+  ms < 1000 ? `${Math.round(ms)}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
 
 function focusCellDom(root: HTMLElement | null, id: string): void {
   requestAnimationFrame(() => {
@@ -62,7 +63,17 @@ function notebookLookup(notebookType: string, kernel: string | undefined, cell?:
       case "notebookCellType":
         return cell ? (cell.kind === 2 ? "code" : "markup") : undefined;
       case "notebookCellExecutionState":
-        return cell ? (cell.state === "idle" ? (cell.success === undefined ? "idle" : cell.success ? "succeeded" : "failed") : cell.state === "running" ? "executing" : "pending") : undefined;
+        return cell
+          ? cell.state === "idle"
+            ? cell.success === undefined
+              ? "idle"
+              : cell.success
+                ? "succeeded"
+                : "failed"
+            : cell.state === "running"
+              ? "executing"
+              : "pending"
+          : undefined;
       case "notebookCellHasOutputs":
         return cell ? cell.outputs.length > 0 : undefined;
       case "notebookCellExecuting":
@@ -77,7 +88,21 @@ function notebookLookup(notebookType: string, kernel: string | undefined, cell?:
   };
 }
 
-const Cell = memo(function Cell({ path, cell, index, count, selected, api, autoFocus, onSelect, onNavigate, onInserted, notebookType, kernel, interactive }: CellProps) {
+const Cell = memo(function Cell({
+  path,
+  cell,
+  index,
+  count,
+  selected,
+  api,
+  autoFocus,
+  onSelect,
+  onNavigate,
+  onInserted,
+  notebookType,
+  kernel,
+  interactive,
+}: CellProps) {
   const lookup = notebookLookup(notebookType, kernel, cell, index);
   // Cell menus' commands get the `NotebookCell` (revived by the host).
   const cellArgs = [refArg("notebooks", { path, cell: cell.id })];
@@ -151,7 +176,12 @@ const Cell = memo(function Cell({ path, cell, index, count, selected, api, autoF
       </div>
       <div className="nb-cell-main">
         <div className="nb-cell-actions">
-          <MenuActions menuId={interactive ? "interactive/cell/title" : "notebook/cell/title"} lookup={lookup} args={cellArgs} inline={(group) => group === "inline" || group.startsWith("navigation")} />
+          <MenuActions
+            menuId={interactive ? "interactive/cell/title" : "notebook/cell/title"}
+            lookup={lookup}
+            args={cellArgs}
+            inline={(group) => group === "inline" || group.startsWith("navigation")}
+          />
           {isCode && cell.outputs.length ? (
             <button className="icon-btn" title="Clear outputs" onClick={() => void call(api, path, "clearOutputs", cell.id)}>
               <Eraser size={13} />
@@ -162,7 +192,11 @@ const Cell = memo(function Cell({ path, cell, index, count, selected, api, autoF
               {cell.languageId}
             </button>
           ) : null}
-          <button className="icon-btn" title={isCode ? "Change to markdown" : "Change to code"} onClick={() => void call(api, path, "setKind", cell.id, isCode ? 1 : 2)}>
+          <button
+            className="icon-btn"
+            title={isCode ? "Change to markdown" : "Change to code"}
+            onClick={() => void call(api, path, "setKind", cell.id, isCode ? 1 : 2)}
+          >
             {isCode ? <Type size={13} /> : <Code size={13} />}
           </button>
           <button className="icon-btn" title="Move up" disabled={index === 0} onClick={() => void call(api, path, "move", cell.id, -1)}>
@@ -233,7 +267,12 @@ const Cell = memo(function Cell({ path, cell, index, count, selected, api, autoF
 
 function StatusItem({ item, api }: { item: NbWireCell["status"][number]; api: ViewFeatureApi }) {
   const body = <WithCodicons text={item.text} size={12} />;
-  if (!item.command) return <span className="nb-status-item" title={item.tooltip}>{body}</span>;
+  if (!item.command)
+    return (
+      <span className="nb-status-item" title={item.tooltip}>
+        {body}
+      </span>
+    );
   const command = item.command;
   return (
     <button className="nb-status-item clickable" title={item.tooltip} onClick={() => api.executeCommand(command.command, ...(command.arguments ?? []))}>
@@ -387,51 +426,53 @@ export function NotebookEditor({ path, api, interactive = false }: { path: strin
           </button>
         </div>
       ) : (
-      <div className="nb-toolbar">
-        <button className="nb-button" title="Run all cells" onClick={() => void runCells(api, path, "all")}>
-          <Play size={13} /> Run All
-        </button>
-        <button className="nb-button" title="Stop the execution" disabled={!busy} onClick={() => void call(api, path, "interrupt")}>
-          <Square size={13} /> Interrupt
-        </button>
-        <button className="nb-button" title="Clear all outputs" onClick={() => void call(api, path, "clearOutputs")}>
-          <Eraser size={13} /> Clear Outputs
-        </button>
-        <button className="nb-button" title="Add a code cell at the end" onClick={() => insertAt(cells.length, 2)}>
-          <Plus size={13} /> Code
-        </button>
-        <button className="nb-button" title="Add a markdown cell at the end" onClick={() => insertAt(cells.length, 1)}>
-          <Plus size={13} /> Markdown
-        </button>
-        <MenuActions
-          menuId="notebook/toolbar"
-          lookup={notebookLookup(doc.notebookType, doc.controller?.id)}
-          args={[refArg("notebooks", { path })]}
-          inline={(group) => group.startsWith("navigation") || group === "status"}
-          className="nb-toolbar-contributed"
-        />
-        <span className="nb-toolbar-spacer" />
-        <button className="nb-button" title="Save (Ctrl+S)" disabled={!doc.dirty} onClick={() => void call(api, path, "save")}>
-          <Save size={13} /> Save
-        </button>
-        <button className="nb-button" title="Select the kernel that runs this notebook" onClick={() => void pickController(api, path)}>
-          <Cpu size={13} /> {doc.controller ? doc.controller.label : "Select Kernel"}
-        </button>
-      </div>
+        <div className="nb-toolbar">
+          <button className="nb-button" title="Run all cells" onClick={() => void runCells(api, path, "all")}>
+            <Play size={13} /> Run All
+          </button>
+          <button className="nb-button" title="Stop the execution" disabled={!busy} onClick={() => void call(api, path, "interrupt")}>
+            <Square size={13} /> Interrupt
+          </button>
+          <button className="nb-button" title="Clear all outputs" onClick={() => void call(api, path, "clearOutputs")}>
+            <Eraser size={13} /> Clear Outputs
+          </button>
+          <button className="nb-button" title="Add a code cell at the end" onClick={() => insertAt(cells.length, 2)}>
+            <Plus size={13} /> Code
+          </button>
+          <button className="nb-button" title="Add a markdown cell at the end" onClick={() => insertAt(cells.length, 1)}>
+            <Plus size={13} /> Markdown
+          </button>
+          <MenuActions
+            menuId="notebook/toolbar"
+            lookup={notebookLookup(doc.notebookType, doc.controller?.id)}
+            args={[refArg("notebooks", { path })]}
+            inline={(group) => group.startsWith("navigation") || group === "status"}
+            className="nb-toolbar-contributed"
+          />
+          <span className="nb-toolbar-spacer" />
+          <button className="nb-button" title="Save (Ctrl+S)" disabled={!doc.dirty} onClick={() => void call(api, path, "save")}>
+            <Save size={13} /> Save
+          </button>
+          <button className="nb-button" title="Select the kernel that runs this notebook" onClick={() => void pickController(api, path)}>
+            <Cpu size={13} /> {doc.controller ? doc.controller.label : "Select Kernel"}
+          </button>
+        </div>
       )}
       <div className="nb-cells">
-        {cells.length === 0 ? <div className="nb-empty">{interactive ? "Type code below and press Shift+Enter to run it." : "This notebook has no cells."}</div> : null}
+        {cells.length === 0 ? (
+          <div className="nb-empty">{interactive ? "Type code below and press Shift+Enter to run it." : "This notebook has no cells."}</div>
+        ) : null}
         {cells.map((cell, index) => (
           <div key={cell.id} className="nb-slot">
             {!interactive && (
-            <div className="nb-insert">
-              <button onClick={() => insertAt(index, 2)}>
-                <Plus size={11} /> Code
-              </button>
-              <button onClick={() => insertAt(index, 1)}>
-                <Plus size={11} /> Markdown
-              </button>
-            </div>
+              <div className="nb-insert">
+                <button onClick={() => insertAt(index, 2)}>
+                  <Plus size={11} /> Code
+                </button>
+                <button onClick={() => insertAt(index, 1)}>
+                  <Plus size={11} /> Markdown
+                </button>
+              </div>
             )}
             <Cell
               path={path}
@@ -451,14 +492,14 @@ export function NotebookEditor({ path, api, interactive = false }: { path: strin
           </div>
         ))}
         {!interactive && (
-        <div className="nb-insert nb-insert-end">
-          <button onClick={() => insertAt(cells.length, 2)}>
-            <Plus size={11} /> Code
-          </button>
-          <button onClick={() => insertAt(cells.length, 1)}>
-            <Plus size={11} /> Markdown
-          </button>
-        </div>
+          <div className="nb-insert nb-insert-end">
+            <button onClick={() => insertAt(cells.length, 2)}>
+              <Plus size={11} /> Code
+            </button>
+            <button onClick={() => insertAt(cells.length, 1)}>
+              <Plus size={11} /> Markdown
+            </button>
+          </div>
         )}
       </div>
       {interactive && <InteractiveInput path={path} api={api} language={doc.cells.filter((cell) => cell.kind === 2).at(-1)?.languageId ?? "python"} />}

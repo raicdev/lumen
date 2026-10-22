@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { ChevronRight, Cpu, Eye, EyeOff, Plus, RefreshCw, Send, Settings2, Square, ThumbsDown, ThumbsUp, MessageSquare, Wrench } from "lucide-react";
-import type { ChatHostMessage, ChatWireFollowup, ChatWireModel, ChatWireParticipant, ChatWirePart, ChatWireState, ChatWireTreeNode } from "../../shared/chat-lm";
+import type {
+  ChatHostMessage,
+  ChatWireFollowup,
+  ChatWireModel,
+  ChatWireParticipant,
+  ChatWirePart,
+  ChatWireState,
+  ChatWireTreeNode,
+} from "../../shared/chat-lm";
 import { renderMarkdown } from "../lib/markdown";
 import { themeColor } from "../lib/theme";
 import { WithCodicons } from "../components/Codicon";
@@ -107,7 +115,13 @@ function showAllModels(): void {
  * `<extension> wants to use the language models provided by <provider>`: asked once per extension pair,
  * remembered in this window (the host also remembers the answer for its session).
  */
-async function askModelConsent(featureApi: ViewFeatureApi, extensionId: string, providerExtensionId: string, vendor: string, justification?: string): Promise<boolean> {
+async function askModelConsent(
+  featureApi: ViewFeatureApi,
+  extensionId: string,
+  providerExtensionId: string,
+  vendor: string,
+  justification?: string,
+): Promise<boolean> {
   const key = `${extensionId}\u0000${providerExtensionId}`;
   const known = storedConsent()[key];
   if (typeof known === "boolean") return known;
@@ -152,7 +166,9 @@ function send(text: string): void {
       { id, role: "assistant", parts: [], done: false, followups: [] },
     ],
   });
-  api.requestHost("send", [{ id, text: trimmed, modelId: state.modelId || visibleModels()[0]?.id, useTools: state.useTools }]).catch((error: unknown) => finish(id, error instanceof Error ? error.message : String(error), []));
+  api
+    .requestHost("send", [{ id, text: trimmed, modelId: state.modelId || visibleModels()[0]?.id, useTools: state.useTools }])
+    .catch((error: unknown) => finish(id, error instanceof Error ? error.message : String(error), []));
 }
 
 function finish(id: number, error: string | undefined, followups: ChatWireFollowup[], participant?: string): void {
@@ -280,7 +296,13 @@ function Part({ part }: { part: ChatWirePart }) {
       return <div className="chat-warning">{part.value}</div>;
     case "reference":
       return (
-        <button type="button" className="chat-chip" disabled={!part.path} title={part.path} onClick={() => part.path && void api?.openFile(part.path, { line: part.line })}>
+        <button
+          type="button"
+          className="chat-chip"
+          disabled={!part.path}
+          title={part.path}
+          onClick={() => part.path && void api?.openFile(part.path, { line: part.line })}
+        >
           {part.label}
         </button>
       );
@@ -317,7 +339,9 @@ function Part({ part }: { part: ChatWirePart }) {
 function MessageView({ message }: { message: Message }) {
   if (message.role === "user") return <div className="chat-msg chat-user">{message.text}</div>;
   const empty = !message.parts.length && !message.error;
-  const participant = message.participant ? (store.get().host?.participants as Participant[] | undefined)?.find((p) => p.id === message.participant) : undefined;
+  const participant = message.participant
+    ? (store.get().host?.participants as Participant[] | undefined)?.find((p) => p.id === message.participant)
+    : undefined;
   return (
     <div className="chat-msg chat-assistant">
       {message.participant ? (
@@ -335,7 +359,12 @@ function MessageView({ message }: { message: Message }) {
           <button type="button" className={`icon-btn${message.feedback === "up" ? " active" : ""}`} title="Helpful" onClick={() => feedback(message, true)}>
             <ThumbsUp size={13} />
           </button>
-          <button type="button" className={`icon-btn${message.feedback === "down" ? " active" : ""}`} title="Unhelpful" onClick={() => feedback(message, false)}>
+          <button
+            type="button"
+            className={`icon-btn${message.feedback === "down" ? " active" : ""}`}
+            title="Unhelpful"
+            onClick={() => feedback(message, false)}
+          >
             <ThumbsDown size={13} />
           </button>
         </div>
@@ -343,7 +372,14 @@ function MessageView({ message }: { message: Message }) {
       {message.done && message.followups.length ? (
         <div className="chat-followups">
           {message.followups.map((followup, index) => (
-            <button key={index} type="button" className="chat-chip" onClick={() => send(`${followup.participant ? `@${followup.participant} ` : ""}${followup.command ? `/${followup.command} ` : ""}${followup.prompt}`)}>
+            <button
+              key={index}
+              type="button"
+              className="chat-chip"
+              onClick={() =>
+                send(`${followup.participant ? `@${followup.participant} ` : ""}${followup.command ? `/${followup.command} ` : ""}${followup.prompt}`)
+              }
+            >
               {followup.label}
             </button>
           ))}
@@ -365,12 +401,16 @@ function suggestions(input: string, participants: Participant[]): Suggestion[] {
   const mention = /^@(\S*)$/.exec(input);
   if (mention) {
     const typed = mention[1]!.toLowerCase();
-    return participants.filter((p) => p.name.toLowerCase().startsWith(typed)).map((p) => ({ insert: `@${p.name} `, label: `@${p.name}`, description: p.description || p.fullName, icon: p.icon }));
+    return participants
+      .filter((p) => p.name.toLowerCase().startsWith(typed))
+      .map((p) => ({ insert: `@${p.name} `, label: `@${p.name}`, description: p.description || p.fullName, icon: p.icon }));
   }
   const command = /^@(\S+)\s+\/(\S*)$/.exec(input);
   if (command) {
     const participant = participants.find((p) => p.name.toLowerCase() === command[1]!.toLowerCase());
-    return (participant?.commands ?? []).filter((c) => c.name.startsWith(command[2]!)).map((c) => ({ insert: `@${participant!.name} /${c.name} `, label: `/${c.name}`, description: c.description, icon: participant!.icon }));
+    return (participant?.commands ?? [])
+      .filter((c) => c.name.startsWith(command[2]!))
+      .map((c) => ({ insert: `@${participant!.name} /${c.name} `, label: `/${c.name}`, description: c.description, icon: participant!.icon }));
   }
   return [];
 }
@@ -383,7 +423,7 @@ function ChatPanel() {
   const models = (state.host?.models ?? []).filter((model) => !state.hidden.includes(model.id));
   const hints = suggestions(state.input, participants);
   const tools = state.host?.tools.length ?? 0;
-  const nothing = !!state.host && !participants.length && !(state.host.models.length);
+  const nothing = !!state.host && !participants.length && !state.host.models.length;
 
   useEffect(() => {
     const element = log.current;
@@ -408,7 +448,12 @@ function ChatPanel() {
           <button type="button" className="icon-btn" title="New chat" onClick={newChat}>
             <Plus size={14} />
           </button>
-          <button type="button" className={`icon-btn${state.loading ? " chat-spin" : ""}`} title="Refresh models and participants" onClick={() => void refresh()}>
+          <button
+            type="button"
+            className={`icon-btn${state.loading ? " chat-spin" : ""}`}
+            title="Refresh models and participants"
+            onClick={() => void refresh()}
+          >
             <RefreshCw size={14} />
           </button>
         </div>
@@ -422,15 +467,33 @@ function ChatPanel() {
                 <p>
                   <strong>No language model provider is installed.</strong>
                 </p>
-                <p>Install an extension that contributes a language model (contributes.languageModelChatProviders) or a chat participant (contributes.chatParticipants), then press refresh.</p>
+                <p>
+                  Install an extension that contributes a language model (contributes.languageModelChatProviders) or a chat participant
+                  (contributes.chatParticipants), then press refresh.
+                </p>
               </>
             ) : (
               <>
-                <p>{models.length ? "Ask a question, or mention a participant with @." : state.host?.models.length ? "All language models are hidden. Show one in Manage Language Models." : "No language model is available. Chat participants can still be used with @."}</p>
+                <p>
+                  {models.length
+                    ? "Ask a question, or mention a participant with @."
+                    : state.host?.models.length
+                      ? "All language models are hidden. Show one in Manage Language Models."
+                      : "No language model is available. Chat participants can still be used with @."}
+                </p>
                 {participants.length ? (
                   <div className="chat-participants">
                     {participants.map((p) => (
-                      <button key={p.id} type="button" className="chat-chip" title={p.description || p.fullName} onClick={() => { update({ input: `@${p.name} ` }); input.current?.focus(); }}>
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="chat-chip"
+                        title={p.description || p.fullName}
+                        onClick={() => {
+                          update({ input: `@${p.name} ` });
+                          input.current?.focus();
+                        }}
+                      >
                         <ParticipantIconView icon={p.icon} />@{p.name}
                       </button>
                     ))}
@@ -447,7 +510,14 @@ function ChatPanel() {
         {hints.length ? (
           <div className="chat-hints">
             {hints.map((hint) => (
-              <button key={hint.insert} type="button" onClick={() => { update({ input: hint.insert }); input.current?.focus(); }}>
+              <button
+                key={hint.insert}
+                type="button"
+                onClick={() => {
+                  update({ input: hint.insert });
+                  input.current?.focus();
+                }}
+              >
                 <span className="chat-hint-label">
                   <ParticipantIconView icon={hint.icon} />
                   <span>{hint.label}</span>
@@ -468,7 +538,15 @@ function ChatPanel() {
             onKeyDown={onKeyDown}
           />
           {state.busy ? (
-            <button type="button" className="icon-btn" title="Stop" onClick={() => { const last = store.get().messages.at(-1); if (last) api?.sendToHost({ kind: "cancel", id: last.id }); }}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Stop"
+              onClick={() => {
+                const last = store.get().messages.at(-1);
+                if (last) api?.sendToHost({ kind: "cancel", id: last.id });
+              }}
+            >
               <Square size={14} />
             </button>
           ) : (
@@ -479,10 +557,19 @@ function ChatPanel() {
         </div>
         <div className="chat-options">
           {/* chat/input/status: extensions' status entries of the chat input. */}
-          <MenuActions menuId="chat/input/status" lookup={(key) => (key === "chatLocation" ? "panel" : undefined)} args={[]} inline={() => true} className="chat-input-status" />
+          <MenuActions
+            menuId="chat/input/status"
+            lookup={(key) => (key === "chatLocation" ? "panel" : undefined)}
+            args={[]}
+            inline={() => true}
+            className="chat-input-status"
+          />
           {models.length ? (
             <select value={state.modelId} onChange={(event) => update({ modelId: event.target.value })} title="Language model">
-              <option value="">{models[0]!.name}{models.length > 1 ? " (default)" : ""}</option>
+              <option value="">
+                {models[0]!.name}
+                {models.length > 1 ? " (default)" : ""}
+              </option>
               {models.slice(1).map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.name} ({model.vendor})
@@ -491,7 +578,12 @@ function ChatPanel() {
             </select>
           ) : null}
           {state.host?.models.length ? (
-            <button type="button" className="icon-btn" title={models.length ? "Manage Language Models" : "All models are hidden: show one"} onClick={() => api?.revealSidebarView("chat-lm.models")}>
+            <button
+              type="button"
+              className="icon-btn"
+              title={models.length ? "Manage Language Models" : "All models are hidden: show one"}
+              onClick={() => api?.revealSidebarView("chat-lm.models")}
+            >
               <Settings2 size={12} />
             </button>
           ) : null}
@@ -561,14 +653,21 @@ function ManageModelsPanel() {
                     Provided by {model.extensionName ?? model.extensionId}
                   </span>
                 </div>
-                <button type="button" className="icon-btn" title={hidden ? "Show in the model picker" : "Hide from the model picker"} onClick={() => setModelHidden(model.id, !hidden)}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title={hidden ? "Show in the model picker" : "Hide from the model picker"}
+                  onClick={() => setModelHidden(model.id, !hidden)}
+                >
                   {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             );
           })
         ) : (
-          <p className="lm-models-empty">{loading ? "Loading models…" : "No language model is registered. Install an extension that contributes languageModelChatProviders."}</p>
+          <p className="lm-models-empty">
+            {loading ? "Loading models…" : "No language model is registered. Install an extension that contributes languageModelChatProviders."}
+          </p>
         )}
       </div>
       {state.hidden.length ? (
@@ -612,8 +711,21 @@ export const chatLmView: ViewFeature = {
 
   commands: [
     { id: "lumen.chat.focus", title: "Focus on Chat View", category: "Chat", run: (featureApi) => featureApi.revealSidebarView("chat-lm") },
-    { id: "lumen.chat.new", title: "New Chat", category: "Chat", run: (featureApi) => { featureApi.revealSidebarView("chat-lm"); newChat(); } },
-    { id: "lumen.chat.manageLanguageModels", title: "Manage Language Models", category: "Chat", run: (featureApi) => featureApi.revealSidebarView("chat-lm.models") },
+    {
+      id: "lumen.chat.new",
+      title: "New Chat",
+      category: "Chat",
+      run: (featureApi) => {
+        featureApi.revealSidebarView("chat-lm");
+        newChat();
+      },
+    },
+    {
+      id: "lumen.chat.manageLanguageModels",
+      title: "Manage Language Models",
+      category: "Chat",
+      run: (featureApi) => featureApi.revealSidebarView("chat-lm.models"),
+    },
   ],
 
   sidebarViews: [

@@ -104,7 +104,9 @@ export const languagesExtraFeature: HostFeature = {
       case "vscode.provideSubtypes": {
         const [item] = args;
         if (!item) throw new Error(`${command}: expected a type hierarchy item`);
-        return (await state.childrenOf(command === "vscode.provideSupertypes" ? "supertypes" : "subtypes", item as Compat.TypeHierarchyItem)).map((entry) => entry.item);
+        return (await state.childrenOf(command === "vscode.provideSupertypes" ? "supertypes" : "subtypes", item as Compat.TypeHierarchyItem)).map(
+          (entry) => entry.item,
+        );
       }
     }
     return NOT_HANDLED;
@@ -120,7 +122,12 @@ export const languagesExtraFeature: HostFeature = {
       case "children":
         return state.children(args[0] as HierarchyDirection, args[1] as number);
       case "inlineValues":
-        return state.inlineValues(args[0] as string, args[1] as { startLine: number; endLine: number }, session(args[2]), args[3] as { line: number; character: number });
+        return state.inlineValues(
+          args[0] as string,
+          args[1] as { startLine: number; endLine: number },
+          session(args[2]),
+          args[3] as { line: number; character: number },
+        );
       case "evaluatable":
         return state.evaluatable(args[0] as string, args[1] as number, args[2] as number, session(args[3]));
       case "dropEdits":
@@ -128,7 +135,12 @@ export const languagesExtraFeature: HostFeature = {
       case "preparePaste":
         return state.preparePaste(args[0] as string, args[1] as TextRange[]);
       case "pasteEdits":
-        return state.pasteEdits(args[0] as string, args[1] as TextRange[], args[2] as WireTransferItem[], (args[3] ?? {}) as { copyId?: number | null; triggerKind?: number; only?: string });
+        return state.pasteEdits(
+          args[0] as string,
+          args[1] as TextRange[],
+          args[2] as WireTransferItem[],
+          (args[3] ?? {}) as { copyId?: number | null; triggerKind?: number; only?: string },
+        );
       case "resolveEdit":
         return state.resolveEdit(args[0] as number);
       case "commitEdit":

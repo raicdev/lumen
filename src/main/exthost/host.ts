@@ -46,7 +46,13 @@ import type {
   ViewMethods,
   ViewToHost,
 } from "../../shared/extensions.ts";
-import type { Diagnostic as WireDiagnostic, DocumentSymbol as WireSymbol, FileEdits as WireFileEdits, TextEdit as WireTextEdit, TextRange } from "../../shared/types.ts";
+import type {
+  Diagnostic as WireDiagnostic,
+  DocumentSymbol as WireSymbol,
+  FileEdits as WireFileEdits,
+  TextEdit as WireTextEdit,
+  TextRange,
+} from "../../shared/types.ts";
 import { detectLanguage, firstLineOf, setContributedLanguages } from "../language.ts";
 import { createApi, createEditorFacade } from "./api.ts";
 import { NOT_HANDLED, featureByArea, featureCommandIds, hostFeatures } from "./features/registry.ts";
@@ -119,15 +125,62 @@ const WORKER_THREADS_GLOBAL = Symbol.for("lumen.workerThreads");
 const DEFAULT_EXCLUDES = ["**/.git", "**/node_modules", "**/.svn", "**/.hg", "**/CVS", "**/.DS_Store", "**/Thumbs.db"];
 
 const COMPLETION_TYPES = [
-  "text", "method", "function", "function", "property", "variable", "class", "interface", "namespace", "property",
-  "constant", "constant", "enum", "keyword", "snippet", "constant", "text", "variable", "namespace", "enum",
-  "constant", "class", "property", "keyword", "type", "text", "text",
+  "text",
+  "method",
+  "function",
+  "function",
+  "property",
+  "variable",
+  "class",
+  "interface",
+  "namespace",
+  "property",
+  "constant",
+  "constant",
+  "enum",
+  "keyword",
+  "snippet",
+  "constant",
+  "text",
+  "variable",
+  "namespace",
+  "enum",
+  "constant",
+  "class",
+  "property",
+  "keyword",
+  "type",
+  "text",
+  "text",
 ];
 
 const SYMBOL_KINDS = [
-  "file", "module", "module", "module", "class", "method", "property", "property", "constructor", "enum",
-  "interface", "function", "variable", "constant", "constant", "constant", "constant", "variable", "variable", "property",
-  "constant", "enumMember", "class", "property", "function", "type",
+  "file",
+  "module",
+  "module",
+  "module",
+  "class",
+  "method",
+  "property",
+  "property",
+  "constructor",
+  "enum",
+  "interface",
+  "function",
+  "variable",
+  "constant",
+  "constant",
+  "constant",
+  "constant",
+  "variable",
+  "variable",
+  "property",
+  "constant",
+  "enumMember",
+  "class",
+  "property",
+  "function",
+  "type",
 ];
 
 function errorMessage(error: unknown): string {
@@ -317,7 +370,9 @@ export class ExtensionHost {
         }
       }
       // contributes.configurationDefaults override defaults of other extensions' and Lumen's settings
-      for (const [key, value] of Object.entries((manifest.contributes as { configurationDefaults?: Record<string, unknown> } | undefined)?.configurationDefaults ?? {})) {
+      for (const [key, value] of Object.entries(
+        (manifest.contributes as { configurationDefaults?: Record<string, unknown> } | undefined)?.configurationDefaults ?? {},
+      )) {
         const current = this.configDefaultOverrides[key];
         this.configDefaultOverrides[key] =
           key.startsWith("[") && current && typeof current === "object" && value && typeof value === "object" ? { ...current, ...value } : value;
@@ -493,7 +548,10 @@ export class ExtensionHost {
     const id = runtime.id.toLowerCase();
     const root = this.init.userData;
     const workspaceHash = this.workspace
-      ? createHash("sha1").update(process.platform === "win32" ? this.workspace.toLowerCase() : this.workspace).digest("hex").slice(0, 20)
+      ? createHash("sha1")
+          .update(process.platform === "win32" ? this.workspace.toLowerCase() : this.workspace)
+          .digest("hex")
+          .slice(0, 20)
       : null;
     return {
       global: join(root, "globalStorage", id),
@@ -672,7 +730,14 @@ export class ExtensionHost {
       const provided = this.contentProviders.has(uri.scheme) ? await this.contentProviders.provide(uri) : undefined;
       const raw = provided ?? new TextDecoder().decode(await this.fileSystems.readFile(uri));
       const document = new ExtHostDocument(
-        { path: key, languageId: this.languageOf(uri.path, raw), version: 1, text: raw.replace(/\r\n/g, "\n"), eol: raw.includes("\r\n") ? "CRLF" : "LF", dirty: false },
+        {
+          path: key,
+          languageId: this.languageOf(uri.path, raw),
+          version: 1,
+          text: raw.replace(/\r\n/g, "\n"),
+          eol: raw.includes("\r\n") ? "CRLF" : "LF",
+          dirty: false,
+        },
         false,
         (doc) => this.saveDocument(doc),
       );
@@ -683,7 +748,14 @@ export class ExtensionHost {
     if (uri.scheme !== "file") throw new Error(`cannot open ${uri.toString()}: no such untitled document`);
     const text = readFileSync(uri.fsPath, "utf8");
     const document = new ExtHostDocument(
-      { path: uri.fsPath, languageId: this.languageOf(uri.fsPath, text), version: 1, text: text.replace(/\r\n/g, "\n"), eol: text.includes("\r\n") ? "CRLF" : "LF", dirty: false },
+      {
+        path: uri.fsPath,
+        languageId: this.languageOf(uri.fsPath, text),
+        version: 1,
+        text: text.replace(/\r\n/g, "\n"),
+        eol: text.includes("\r\n") ? "CRLF" : "LF",
+        dirty: false,
+      },
       false,
       (doc) => this.saveDocument(doc),
     );
@@ -746,7 +818,14 @@ export class ExtensionHost {
     });
   }
 
-  registerProvider(kind: ProviderKind, selector: unknown, provider: object, extensionId: string, triggerCharacters?: string[], metadata?: unknown): T.Disposable {
+  registerProvider(
+    kind: ProviderKind,
+    selector: unknown,
+    provider: object,
+    extensionId: string,
+    triggerCharacters?: string[],
+    metadata?: unknown,
+  ): T.Disposable {
     const id = ++this.#providerSeq;
     const entry: ProviderEntry = {
       id,
@@ -865,7 +944,10 @@ export class ExtensionHost {
       await Promise.all(
         this.#matching("hover", document).map(async (entry) => {
           try {
-            const hover = (await entry.provider.provideHover?.(document.toApi(), position, new T.CancellationTokenSource().token)) as T.Hover | null | undefined;
+            const hover = (await entry.provider.provideHover?.(document.toApi(), position, new T.CancellationTokenSource().token)) as
+              | T.Hover
+              | null
+              | undefined;
             if (!hover) return;
             for (const part of hover.contents ?? []) {
               const text = markdownOf(part);
@@ -1046,7 +1128,8 @@ export class ExtensionHost {
       // Resolve lazily: the provider fills in the edit (and command) when the user picks the action.
       if (!action.edit && stored.entry.provider.resolveCodeAction) {
         try {
-          action = ((await stored.entry.provider.resolveCodeAction(action, new T.CancellationTokenSource().token)) as T.CodeAction | null | undefined) ?? action;
+          action =
+            ((await stored.entry.provider.resolveCodeAction(action, new T.CancellationTokenSource().token)) as T.CodeAction | null | undefined) ?? action;
         } catch (error) {
           this.log("error", `code action resolution failed: ${errorMessage(error)}`, stored.entry.extensionId);
         }
@@ -1158,7 +1241,10 @@ export class ExtensionHost {
       const cached = this.#documentLinks.get(normalizeKey(path))?.[index];
       if (!document || !cached) return null;
       try {
-        const resolved = (await cached.entry.provider.resolveDocumentLink?.(cached.link, new T.CancellationTokenSource().token)) as T.DocumentLink | null | undefined;
+        const resolved = (await cached.entry.provider.resolveDocumentLink?.(cached.link, new T.CancellationTokenSource().token)) as
+          | T.DocumentLink
+          | null
+          | undefined;
         const link = resolved ?? cached.link;
         return link?.range ? wireDocumentLink(link) : null;
       } catch (error) {
@@ -1200,11 +1286,10 @@ export class ExtensionHost {
       await Promise.all(
         this.#matching("color", document).map(async (entry) => {
           try {
-            const presentations = (await entry.provider.provideColorPresentations?.(
-              apiColor,
-              context,
-              new T.CancellationTokenSource().token,
-            )) as T.ColorPresentation[] | null | undefined;
+            const presentations = (await entry.provider.provideColorPresentations?.(apiColor, context, new T.CancellationTokenSource().token)) as
+              | T.ColorPresentation[]
+              | null
+              | undefined;
             for (const presentation of presentations ?? []) {
               if (!presentation) continue;
               out.push({ label: presentation.label, textEdit: presentation.textEdit ? wireEdit(presentation.textEdit) : undefined });
@@ -1429,9 +1514,11 @@ export class ExtensionHost {
       const cached = this.#workspaceSymbols.get(id);
       if (!cached) return null;
       try {
-        const resolved = (cached.entry.provider.resolveWorkspaceSymbol
-          ? await cached.entry.provider.resolveWorkspaceSymbol(cached.symbol, new T.CancellationTokenSource().token)
-          : cached.symbol) as WorkspaceSymbolLike | null | undefined;
+        const resolved = (
+          cached.entry.provider.resolveWorkspaceSymbol
+            ? await cached.entry.provider.resolveWorkspaceSymbol(cached.symbol, new T.CancellationTokenSource().token)
+            : cached.symbol
+        ) as WorkspaceSymbolLike | null | undefined;
         return resolved ? wireWorkspaceLocation(resolved) : null;
       } catch (error) {
         this.log("error", `workspace symbol provider failed: ${errorMessage(error)}`, cached.entry.extensionId);
@@ -1677,7 +1764,14 @@ export class ExtensionHost {
         }
         for (const snippet of snippets) {
           if (snippet.languages && !snippet.languages.includes(document.languageId)) continue;
-          items.push({ label: snippet.prefix, detail: snippet.description, documentation: snippet.body, kind: "snippet", insertText: snippet.body, snippet: true });
+          items.push({
+            label: snippet.prefix,
+            detail: snippet.description,
+            documentation: snippet.body,
+            kind: "snippet",
+            insertText: snippet.body,
+            snippet: true,
+          });
         }
       }
     }
@@ -1747,12 +1841,16 @@ export class ExtensionHost {
 
   /* ── workspace files ─────────────────────────────────────────────────── */
 
-  async findFiles(include: string | T.RelativePattern, exclude: string | T.RelativePattern | null | undefined, maxResults?: number, token?: T.CancellationToken): Promise<T.Uri[]> {
+  async findFiles(
+    include: string | T.RelativePattern,
+    exclude: string | T.RelativePattern | null | undefined,
+    maxResults?: number,
+    token?: T.CancellationToken,
+  ): Promise<T.Uri[]> {
     const base = include instanceof T.RelativePattern ? include.baseUri.fsPath : this.workspace;
     if (!base) return [];
     const pattern = include instanceof T.RelativePattern ? include.pattern : include;
-    const excludes =
-      exclude === null ? [] : exclude === undefined ? DEFAULT_EXCLUDES : [exclude instanceof T.RelativePattern ? exclude.pattern : exclude];
+    const excludes = exclude === null ? [] : exclude === undefined ? DEFAULT_EXCLUDES : [exclude instanceof T.RelativePattern ? exclude.pattern : exclude];
     const isExcluded = (rel: string) => excludes.some((glob) => matchGlob(glob, rel) || matchGlob(`${glob}/**`, rel));
     const results: T.Uri[] = [];
     let visited = 0;
@@ -1974,8 +2072,7 @@ export class ExtensionHost {
         this.config = message.config;
         const changed = message.changed;
         this.onDidChangeConfiguration.fire({
-          affectsConfiguration: (section: string) =>
-            changed.some((key) => key === section || key.startsWith(`${section}.`) || section.startsWith(`${key}.`)),
+          affectsConfiguration: (section: string) => changed.some((key) => key === section || key.startsWith(`${section}.`) || section.startsWith(`${key}.`)),
         });
         return;
       }
@@ -2157,11 +2254,7 @@ function codeActionOf(value: T.Command | T.CodeAction): T.CodeAction | null {
   if (!value || typeof value.title !== "string") return null;
   if (value instanceof T.CodeAction) return value;
   const bareCommand =
-    typeof (value as T.Command).command === "string" &&
-    !("edit" in value) &&
-    !("kind" in value) &&
-    !("isPreferred" in value) &&
-    !("disabled" in value);
+    typeof (value as T.Command).command === "string" && !("edit" in value) && !("kind" in value) && !("isPreferred" in value) && !("disabled" in value);
   if (bareCommand) {
     const action = new T.CodeAction(value.title);
     action.command = value as T.Command;
@@ -2412,7 +2505,9 @@ export async function runExtensionHost(): Promise<void> {
       }
     };
   }
-  process.on("unhandledRejection", (reason) => host.log("error", `unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : reason}`));
+  process.on("unhandledRejection", (reason) =>
+    host.log("error", `unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : reason}`),
+  );
   process.on("uncaughtException", (error) => host.log("error", `uncaught exception: ${error.stack ?? error.message}`));
 
   parentPort.on("message", (message: MainToHost) => {
@@ -2445,4 +2540,3 @@ export async function runExtensionHost(): Promise<void> {
     }
   });
 }
-

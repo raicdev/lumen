@@ -115,7 +115,8 @@ function contributedProfiles(api: ViewFeatureApi): { id: string; name: string }[
     const contributed = (extension.manifest.contributes as { terminal?: { profiles?: { id?: string; title?: string }[] } } | undefined)?.terminal?.profiles;
     if (!Array.isArray(contributed)) continue;
     for (const profile of contributed) {
-      if (typeof profile?.id === "string" && profile.id) profiles.push({ id: `${EXTENSION_PROFILE_PREFIX}${profile.id}`, name: String(profile.title ?? profile.id) });
+      if (typeof profile?.id === "string" && profile.id)
+        profiles.push({ id: `${EXTENSION_PROFILE_PREFIX}${profile.id}`, name: String(profile.title ?? profile.id) });
     }
   }
   return profiles;

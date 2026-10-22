@@ -174,7 +174,9 @@ class TerminalService {
     // Shell sessions live in the main process: after a reload (or a restarted
     // renderer) the previous page's are orphans. Requests run in order, so
     // this ends them before this page starts any of its own.
-    void api().request.terminalReset({}).catch(() => {});
+    void api()
+      .request.terminalReset({})
+      .catch(() => {});
     window.addEventListener("lumen:terminal-data", (e) => {
       const { id, data } = (e as CustomEvent<{ id: string; data: string }>).detail;
       const instance = this.bySession.get(id);
@@ -524,7 +526,9 @@ class TerminalService {
     if (!instance || instance.pty) return;
     if (instance.sessionId) {
       this.bySession.delete(instance.sessionId);
-      await api().request.terminalKill({ id: instance.sessionId }).catch(() => {});
+      await api()
+        .request.terminalKill({ id: instance.sessionId })
+        .catch(() => {});
       instance.sessionId = null;
     }
     instance.exited = false;
@@ -549,7 +553,9 @@ class TerminalService {
     this.emitEvent({ type: "closed", id, code: instance.exitCode });
     if (instance.sessionId) {
       this.bySession.delete(instance.sessionId);
-      void api().request.terminalKill({ id: instance.sessionId }).catch(() => {});
+      void api()
+        .request.terminalKill({ id: instance.sessionId })
+        .catch(() => {});
     }
     instance.term.dispose();
     instance.el.remove();

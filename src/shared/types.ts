@@ -1,4 +1,13 @@
-import type { ConfigSnapshot, ExtensionDescription, HostMethods, HostToView, MarketplaceCompat, MarketplaceDetails, MarketplaceExtension, ViewToHost } from "./extensions.ts";
+import type {
+  ConfigSnapshot,
+  ExtensionDescription,
+  HostMethods,
+  HostToView,
+  MarketplaceCompat,
+  MarketplaceDetails,
+  MarketplaceExtension,
+  ViewToHost,
+} from "./extensions.ts";
 import type { ColorThemeData, ExtensionColorTheme } from "./color-theme.ts";
 
 export type FileEntry = {

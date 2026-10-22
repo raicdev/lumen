@@ -79,7 +79,9 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
             ? await api().request.searchInFiles({ root: workspaceRoot, query, ...options })
             : { matches: [], truncated: false, error: undefined as string | undefined };
           // Provided schemes have no TextSearchProvider here: walk their folders through the provider.
-          const provided = providerRoots.length ? await extensionService.call("providerSearchFiles", providerRoots, query, options) : { matches: [], truncated: false };
+          const provided = providerRoots.length
+            ? await extensionService.call("providerSearchFiles", providerRoots, query, options)
+            : { matches: [], truncated: false };
           if (result.error) {
             setMatches([]);
             setMeta(result.error);
@@ -199,7 +201,13 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                     if (e.key === "Enter" && (e.ctrlKey || e.altKey)) void replaceAll();
                   }}
                 />
-                <button type="button" className="search-toggle" title="Replace All (Ctrl+Alt+Enter)" disabled={!matches.length} onClick={() => void replaceAll()}>
+                <button
+                  type="button"
+                  className="search-toggle"
+                  title="Replace All (Ctrl+Alt+Enter)"
+                  disabled={!matches.length}
+                  onClick={() => void replaceAll()}
+                >
                   <ReplaceAll size={15} />
                 </button>
               </div>
@@ -263,7 +271,9 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                   })
                 }
               >
-                <span className={`chevron${open ? " open" : ""}`}><ChevronRight size={14} /></span>
+                <span className={`chevron${open ? " open" : ""}`}>
+                  <ChevronRight size={14} />
+                </span>
                 <FileIcon name={name} />
                 <span className="search-file">{name}</span>
                 <span className="search-dir">{rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ""}</span>

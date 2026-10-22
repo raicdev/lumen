@@ -59,7 +59,9 @@ function VariableRow({ api, path, node, depth, version }: { api: ViewFeatureApi;
     let cancelled = false;
     const load =
       node.kind === "range"
-        ? call<NbVariableWire[]>(api, path, "variables", node.parent, 2, node.start).then((list) => (list ?? []).map((variable): Node => ({ kind: "variable", variable })))
+        ? call<NbVariableWire[]>(api, path, "variables", node.parent, 2, node.start).then((list) =>
+            (list ?? []).map((variable): Node => ({ kind: "variable", variable })),
+          )
         : childrenOf(api, path, node.variable);
     load.then(
       (nodes) => !cancelled && setChildren(nodes),
@@ -80,7 +82,9 @@ function VariableRow({ api, path, node, depth, version }: { api: ViewFeatureApi;
         onClick={() => expandable && setOpen((value) => !value)}
         onContextMenu={(e) => {
           if (node.kind !== "variable") return;
-          showContributedMenu(e, "notebook/variables/context", variableLookup(path, node.variable), [refArg("notebooks", { path, variable: node.variable.handle })]);
+          showContributedMenu(e, "notebook/variables/context", variableLookup(path, node.variable), [
+            refArg("notebooks", { path, variable: node.variable.handle }),
+          ]);
         }}
       >
         <ChevronRight size={14} className={`nbv-chevron${open ? " open" : ""}${expandable ? "" : " hidden"}`} />
@@ -88,8 +92,22 @@ function VariableRow({ api, path, node, depth, version }: { api: ViewFeatureApi;
         {node.kind === "variable" && <span className="nbv-value">{node.variable.value}</span>}
         {node.kind === "variable" && node.variable.type && <span className="nbv-type">{node.variable.type}</span>}
       </div>
-      {open && children?.map((child, index) => <VariableRow key={child.kind === "variable" ? child.variable.handle : `r${child.start}`} api={api} path={path} node={child} depth={depth + 1} version={version} />)}
-      {open && children?.length === 0 && <div className="nbv-row nbv-empty" style={{ paddingLeft: 22 + depth * 14 }}>No children</div>}
+      {open &&
+        children?.map((child, index) => (
+          <VariableRow
+            key={child.kind === "variable" ? child.variable.handle : `r${child.start}`}
+            api={api}
+            path={path}
+            node={child}
+            depth={depth + 1}
+            version={version}
+          />
+        ))}
+      {open && children?.length === 0 && (
+        <div className="nbv-row nbv-empty" style={{ paddingLeft: 22 + depth * 14 }}>
+          No children
+        </div>
+      )}
     </>
   );
 }
@@ -119,7 +137,8 @@ export function NotebookVariablesPanel({ api }: { api: ViewFeatureApi }) {
   if (!path || !doc) return <div className="nbv-panel nbv-placeholder">Open a notebook to see its variables.</div>;
   if (!kernel) return <div className="nbv-panel nbv-placeholder">Select a kernel for {basename(path)} to see its variables.</div>;
   if (!variables) return <div className="nbv-panel nbv-placeholder">Loading variables…</div>;
-  if (!variables.length) return <div className="nbv-panel nbv-placeholder">No variables (the kernel {doc.controller?.label} reports none, or has no variable provider).</div>;
+  if (!variables.length)
+    return <div className="nbv-panel nbv-placeholder">No variables (the kernel {doc.controller?.label} reports none, or has no variable provider).</div>;
   return (
     <div className="nbv-panel">
       {variables.map((variable) => (

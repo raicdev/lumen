@@ -32,9 +32,7 @@ async function resourceApi(): Promise<ResourceApi> {
   const kernel32 = koffi.load("kernel32.dll");
   return {
     begin: kernel32.func("void *__stdcall BeginUpdateResourceW(const char16_t *file, int deleteExisting)"),
-    update: kernel32.func(
-      "int __stdcall UpdateResourceW(void *handle, uintptr_t type, uintptr_t name, uint16_t lang, void *data, uint32_t size)",
-    ),
+    update: kernel32.func("int __stdcall UpdateResourceW(void *handle, uintptr_t type, uintptr_t name, uint16_t lang, void *data, uint32_t size)"),
     end: kernel32.func("int __stdcall EndUpdateResourceW(void *handle, int discard)"),
   };
 }
@@ -85,7 +83,10 @@ function parseIco(ico: Buffer): { images: Buffer[]; group: Buffer } {
 
 /** "1.2.3-beta.1" → [1, 2, 3, 0] */
 export function versionParts(version: string): [number, number, number, number] {
-  const parts = version.split(/[-+]/)[0].split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const parts = version
+    .split(/[-+]/)[0]
+    .split(".")
+    .map((part) => Number.parseInt(part, 10) || 0);
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 0];
 }
 

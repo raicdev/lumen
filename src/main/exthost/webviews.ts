@@ -226,7 +226,14 @@ export class WebviewManager {
     await this.#host.activateByEvent(`onWebviewPanel:${viewType}`);
     const entry = this.serializers.get(viewType);
     if (!entry) return false;
-    const panel = this.createPanel(entry.runtime, viewType, title, { viewColumn: T.ViewColumn.Active, preserveFocus: true }, options ?? { enableScripts: true }, webviewId);
+    const panel = this.createPanel(
+      entry.runtime,
+      viewType,
+      title,
+      { viewColumn: T.ViewColumn.Active, preserveFocus: true },
+      options ?? { enableScripts: true },
+      webviewId,
+    );
     try {
       await entry.serializer.deserializeWebviewPanel(panel, state);
       return true;
@@ -239,7 +246,12 @@ export class WebviewManager {
 
   /* ── views ─────────────────────────────────────────────────────────── */
 
-  registerViewProvider(runtime: ExtensionRuntime | null, viewId: string, provider: ViewProvider["provider"], options?: { webviewOptions?: { retainContextWhenHidden?: boolean } }): T.Disposable {
+  registerViewProvider(
+    runtime: ExtensionRuntime | null,
+    viewId: string,
+    provider: ViewProvider["provider"],
+    options?: { webviewOptions?: { retainContextWhenHidden?: boolean } },
+  ): T.Disposable {
     if (this.viewProviders.has(viewId)) throw new Error(`a webview view provider for '${viewId}' is already registered`);
     this.viewProviders.set(viewId, { provider, extensionId: runtime?.id ?? "unknown", retain: !!options?.webviewOptions?.retainContextWhenHidden });
     queueMicrotask(() => void this.#resolveView(viewId));

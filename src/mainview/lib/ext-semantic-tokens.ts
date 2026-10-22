@@ -2,12 +2,7 @@ import { RangeSetBuilder, StateEffect, StateField, type Extension, type Text } f
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { HostSemanticToken } from "../../shared/extensions";
 import { compileTokenRules, matchTokenStyle, type ColorThemeData } from "../../shared/color-theme";
-import {
-  semanticLanguageClass,
-  semanticSelectorCss,
-  semanticTypeChain,
-  type SemanticContributions,
-} from "../../shared/theming-contribs";
+import { semanticLanguageClass, semanticSelectorCss, semanticTypeChain, type SemanticContributions } from "../../shared/theming-contribs";
 import { extensionService } from "./extensions";
 import { activeColorTheme, onColorThemeChange } from "./theme";
 
@@ -39,7 +34,10 @@ function styleBody(style: { foreground?: string; fontStyle?: string }): string {
 }
 
 /** CSS of semanticTokenScopes: the style of the first scope the theme has a rule for (the theme's own semanticTokenColors win). */
-export function semanticScopesCss(scopes: SemanticContributions["scopes"], theme: Pick<ColorThemeData, "tokenColors" | "semanticHighlighting" | "semanticTokenColors">): string {
+export function semanticScopesCss(
+  scopes: SemanticContributions["scopes"],
+  theme: Pick<ColorThemeData, "tokenColors" | "semanticHighlighting" | "semanticTokenColors">,
+): string {
   if (theme.semanticHighlighting === false) return "";
   const rules = compileTokenRules(theme.tokenColors);
   const own = theme.semanticTokenColors ?? {};

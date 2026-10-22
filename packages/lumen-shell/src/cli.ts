@@ -216,22 +216,19 @@ async function commandDev(config: LumenConfig, options: { watch: boolean }): Pro
   if (options.watch) {
     // One rebuild at a time, so stopping the service never cuts one short.
     let rebuilds = Promise.resolve();
-    const watchers = watchTree(
-      [join(ROOT, "src"), join(ROOT, "packages")],
-      () => {
-        rebuilds = rebuilds.then(async () => {
-          try {
-            await buildView(config, outDir, false);
-            app.reloadAllWindows();
-            log("view rebuilt — window reloaded");
-          } catch (error) {
-            console.error("[lumen] rebuild failed:", error);
-          } finally {
-            await esbuild.stop();
-          }
-        });
-      },
-    );
+    const watchers = watchTree([join(ROOT, "src"), join(ROOT, "packages")], () => {
+      rebuilds = rebuilds.then(async () => {
+        try {
+          await buildView(config, outDir, false);
+          app.reloadAllWindows();
+          log("view rebuilt — window reloaded");
+        } catch (error) {
+          console.error("[lumen] rebuild failed:", error);
+        } finally {
+          await esbuild.stop();
+        }
+      });
+    });
     log(`watching src/ and packages/ (${watchers.length} watcher(s))`);
   }
 }
@@ -402,12 +399,7 @@ async function buildExecutable(config: LumenConfig, exePath: string): Promise<vo
 
   const require = createRequire(import.meta.url);
   const { inject } = require("postject") as {
-    inject: (
-      file: string,
-      resource: string,
-      data: Buffer,
-      options: { sentinelFuse: string; machoSegmentName?: string },
-    ) => Promise<void>;
+    inject: (file: string, resource: string, data: Buffer, options: { sentinelFuse: string; machoSegmentName?: string }) => Promise<void>;
   };
   await inject(exePath, "NODE_SEA_BLOB", await readFile(blob), {
     sentinelFuse: "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",

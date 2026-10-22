@@ -345,7 +345,9 @@ function semanticCss(theme: ColorThemeData, rules: CompiledTokenRule[]): string 
             fontStyle:
               value.fontStyle ??
               (value.bold || value.italic || value.underline || value.strikethrough
-                ? [value.bold && "bold", value.italic && "italic", value.underline && "underline", value.strikethrough && "strikethrough"].filter(Boolean).join(" ")
+                ? [value.bold && "bold", value.italic && "italic", value.underline && "underline", value.strikethrough && "strikethrough"]
+                    .filter(Boolean)
+                    .join(" ")
                 : undefined),
           };
     const body = declarations(style, true);

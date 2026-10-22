@@ -126,7 +126,8 @@ export function CellEditor(props: Props) {
         language.current.of(languageExtension(latest.current.languageId)),
         theme.current.of(themeExtensions()),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external))) latest.current.onChange(update.state.doc.toString());
+          if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external)))
+            latest.current.onChange(update.state.doc.toString());
         }),
         EditorView.domEventHandlers({
           focus: () => {

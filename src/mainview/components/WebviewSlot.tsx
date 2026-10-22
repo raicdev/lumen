@@ -66,7 +66,11 @@ export function ViewContainerView({ views, webviews, alwaysHeaders = false }: { 
                   <WithCodicons text={info?.title || view.name} />
                 </span>
                 {info?.description && <span className="view-section-description">{info.description}</span>}
-                {info?.badge?.value ? <span className="badge" title={info.badge.tooltip}>{info.badge.value}</span> : null}
+                {info?.badge?.value ? (
+                  <span className="badge" title={info.badge.tooltip}>
+                    {info.badge.value}
+                  </span>
+                ) : null}
                 {open && <ViewTitleActions view={view} />}
               </div>
             )}

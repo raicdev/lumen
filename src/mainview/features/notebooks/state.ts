@@ -129,7 +129,12 @@ export async function pickController(api: ViewFeatureApi, path: string): Promise
     return false;
   }
   const picked = await api.showQuickPick(
-    doc.controllers.map((controller) => ({ label: controller.label, description: controller.description, detail: controller.detail, picked: controller.id === doc.controller?.id })),
+    doc.controllers.map((controller) => ({
+      label: controller.label,
+      description: controller.description,
+      detail: controller.detail,
+      picked: controller.id === doc.controller?.id,
+    })),
     { title: "Select Notebook Kernel", placeholder: "Select a kernel to run this notebook" },
   );
   const controller = picked?.[0] !== undefined ? doc.controllers[picked[0]] : undefined;

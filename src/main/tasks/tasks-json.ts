@@ -28,7 +28,16 @@ export type JsonTask = {
   [key: string]: unknown;
 };
 
-export type InputDef = { id: string; type: string; description?: string; default?: string; password?: boolean; options?: (string | { label: string; value: string })[]; command?: string; args?: unknown };
+export type InputDef = {
+  id: string;
+  type: string;
+  description?: string;
+  default?: string;
+  password?: boolean;
+  options?: (string | { label: string; value: string })[];
+  command?: string;
+  args?: unknown;
+};
 
 export type TasksFile = { version?: string; tasks: JsonTask[]; inputs: InputDef[] };
 
@@ -44,7 +53,8 @@ function withPlatform(value: Record<string, unknown>, platform: string): Record<
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) if (key !== "windows" && key !== "osx" && key !== "linux") out[key] = item;
   if (isObject(override)) {
-    for (const [key, item] of Object.entries(override)) out[key] = key === "options" && isObject(item) && isObject(out.options) ? { ...out.options, ...item } : item;
+    for (const [key, item] of Object.entries(override))
+      out[key] = key === "options" && isObject(item) && isObject(out.options) ? { ...out.options, ...item } : item;
   }
   return out;
 }
@@ -59,14 +69,23 @@ export function parseTasksJson(text: string, platform: string = process.platform
   if (!isObject(parsed)) return { tasks: [], inputs: [] };
   const top = withPlatform(parsed, platform);
   const list = Array.isArray(top.tasks) ? top.tasks : [];
-  const inputs = (Array.isArray(top.inputs) ? top.inputs : []).filter((item): item is InputDef => isObject(item) && typeof item.id === "string" && typeof item.type === "string");
+  const inputs = (Array.isArray(top.inputs) ? top.inputs : []).filter(
+    (item): item is InputDef => isObject(item) && typeof item.id === "string" && typeof item.type === "string",
+  );
   const globalCommand = typeof top.command === "string" ? top.command : undefined;
   const tasks: JsonTask[] = [];
   for (const entry of list) {
     if (!isObject(entry)) continue;
     const task = withPlatform(entry, platform);
     // Version 0.1.0 style: `taskName` and a global command the tasks only pass arguments to.
-    const label = typeof task.label === "string" ? task.label : typeof task.taskName === "string" ? task.taskName : typeof task.script === "string" && typeof task.type === "string" ? `${task.type}: ${task.script}` : undefined;
+    const label =
+      typeof task.label === "string"
+        ? task.label
+        : typeof task.taskName === "string"
+          ? task.taskName
+          : typeof task.script === "string" && typeof task.type === "string"
+            ? `${task.type}: ${task.script}`
+            : undefined;
     if (!label) continue;
     let command = typeof task.command === "string" ? task.command : undefined;
     let args = Array.isArray(task.args) ? (task.args as JsonTask["args"]) : undefined;
@@ -263,12 +282,16 @@ function variableValue(name: string, argument: string | undefined, context: Vari
       return value === undefined || value === null ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
     }
     case "input":
-      return argument === undefined ? undefined : Promise.resolve(context.input?.(argument)).then((value) => {
-        if (value === undefined) throw new InputCancelled();
-        return value;
-      });
+      return argument === undefined
+        ? undefined
+        : Promise.resolve(context.input?.(argument)).then((value) => {
+            if (value === undefined) throw new InputCancelled();
+            return value;
+          });
     case "command":
-      return argument === undefined ? undefined : Promise.resolve(context.command?.(argument)).then((value) => (value === undefined || value === null ? "" : String(value)));
+      return argument === undefined
+        ? undefined
+        : Promise.resolve(context.command?.(argument)).then((value) => (value === undefined || value === null ? "" : String(value)));
     default:
       return undefined;
   }

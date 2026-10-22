@@ -124,36 +124,33 @@ export class NativeWebview {
    * or a promise; the page's promise resolves with the JSON round-tripped value.
    */
   bind(name: string, callback: BindCallback): void {
-    const pointer = koffi.register(
-      (seqRaw: string | null, reqRaw: string | null) => {
-        const seq = seqRaw ?? "";
-        let args: unknown[] = [];
-        try {
-          const parsed = JSON.parse(reqRaw || "[]");
-          args = Array.isArray(parsed) ? parsed : [parsed];
-        } catch {
-          args = [];
-        }
+    const pointer = koffi.register((seqRaw: string | null, reqRaw: string | null) => {
+      const seq = seqRaw ?? "";
+      let args: unknown[] = [];
+      try {
+        const parsed = JSON.parse(reqRaw || "[]");
+        args = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        args = [];
+      }
 
-        let result: unknown;
-        try {
-          result = callback(seq, args);
-        } catch (error) {
-          this.#respond(seq, 1, errorMessage(error));
-          return;
-        }
+      let result: unknown;
+      try {
+        result = callback(seq, args);
+      } catch (error) {
+        this.#respond(seq, 1, errorMessage(error));
+        return;
+      }
 
-        if (result instanceof Promise) {
-          result.then(
-            (value) => this.#respond(seq, 0, value),
-            (error: unknown) => this.#respond(seq, 1, errorMessage(error)),
-          );
-        } else {
-          this.#respond(seq, 0, result);
-        }
-      },
-      koffi.pointer(BindCallbackProto),
-    );
+      if (result instanceof Promise) {
+        result.then(
+          (value) => this.#respond(seq, 0, value),
+          (error: unknown) => this.#respond(seq, 1, errorMessage(error)),
+        );
+      } else {
+        this.#respond(seq, 0, result);
+      }
+    }, koffi.pointer(BindCallbackProto));
 
     this.#callbacks.set(name, pointer);
     symbols.webview_bind(this.handle, name, pointer, null);

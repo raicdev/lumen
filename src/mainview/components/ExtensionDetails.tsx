@@ -1,7 +1,15 @@
 import { Check, ExternalLink, LoaderCircle, X } from "lucide-react";
 import { ModalEditorTitleActions } from "../features/menus-walkthroughs/MenuActions";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { CompatReport, ExtensionDescription, ExtensionManifest, MarketplaceCompat, MarketplaceDetails, MarketplaceExtension, SupportLevel } from "../../shared/extensions";
+import type {
+  CompatReport,
+  ExtensionDescription,
+  ExtensionManifest,
+  MarketplaceCompat,
+  MarketplaceDetails,
+  MarketplaceExtension,
+  SupportLevel,
+} from "../../shared/extensions";
 import { renderMarkdown } from "../lib/markdown";
 import { api } from "../lib/rpc";
 import { COMPAT_GRADES, compatClass, compatGrade } from "../lib/compat";
@@ -32,7 +40,11 @@ function onLinkClick(e: React.MouseEvent) {
 /** `note` says where the report comes from (installed, development folder, or a package analyzed before install). */
 function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; report: CompatReport | undefined; note: string }) {
   if (kind !== "vscode") {
-    return <div className="ext-details-empty">This is a Lumen extension: it is written against the <code>lumen</code> API and needs no conversion.</div>;
+    return (
+      <div className="ext-details-empty">
+        This is a Lumen extension: it is written against the <code>lumen</code> API and needs no conversion.
+      </div>
+    );
   }
   if (!report) return <div className="ext-details-empty">No compatibility report was recorded for this extension.</div>;
   const order: SupportLevel[] = ["unsupported", "partial", "supported"];
@@ -117,7 +129,13 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
   const title = (value: string | { value: string } | undefined) => (typeof value === "string" ? value : (value?.value ?? ""));
   const keyOf = (command: string) => {
     const binding = keybindings.find((entry) => entry.command === command);
-    const raw = binding ? (navigator.platform.startsWith("Mac") ? (binding.mac ?? binding.key) : navigator.platform.startsWith("Win") ? (binding.win ?? binding.key) : (binding.linux ?? binding.key)) : undefined;
+    const raw = binding
+      ? navigator.platform.startsWith("Mac")
+        ? (binding.mac ?? binding.key)
+        : navigator.platform.startsWith("Win")
+          ? (binding.win ?? binding.key)
+          : (binding.linux ?? binding.key)
+      : undefined;
     return raw ? normalizeKeybinding(raw) : "";
   };
   if (!commands.length && !settings.length && !languages.length && !snippets.length && !keybindings.length) {
@@ -293,7 +311,12 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
   const check = (refresh = false) => {
     setResult("checking");
     void api()
-      .request.extensionsMarketplaceCompat({ namespace: marketplace.namespace, name: marketplace.name, version: marketplace.version, mode: refresh ? "refresh" : undefined })
+      .request.extensionsMarketplaceCompat({
+        namespace: marketplace.namespace,
+        name: marketplace.name,
+        version: marketplace.version,
+        mode: refresh ? "refresh" : undefined,
+      })
       .then(setResult)
       .catch((error: unknown) => setResult({ error: error instanceof Error ? error.message : String(error) }));
   };
@@ -310,7 +333,9 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
     return (
       <div className="ext-details-empty">
         {typeof result === "object" && result?.error && <p className="ext-compat-error">Could not check the compatibility: {result.error}</p>}
-        <p className="muted">Downloads the package of v{marketplace.version} from Open VSX and analyzes which APIs and contribution points it uses. Nothing is installed.</p>
+        <p className="muted">
+          Downloads the package of v{marketplace.version} from Open VSX and analyzes which APIs and contribution points it uses. Nothing is installed.
+        </p>
         <button type="button" className="ext-install" onClick={() => check()}>
           {result ? "Try Again" : "Check Compatibility"}
         </button>
@@ -494,7 +519,14 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
         </div>
         <div className="ext-details-tabs" role="tablist">
           {tabs.map((entry) => (
-            <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} className={`panel-tab${tab === entry.id ? " active" : ""}`} onClick={() => setTab(entry.id)}>
+            <button
+              key={entry.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === entry.id}
+              className={`panel-tab${tab === entry.id ? " active" : ""}`}
+              onClick={() => setTab(entry.id)}
+            >
               {entry.label}
             </button>
           ))}
@@ -512,7 +544,8 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
                     <>
                       <p>{listing?.error ? `Could not load the README from Open VSX: ${listing.error}` : marketplace?.description}</p>
                       <p className="muted">
-                        Installing downloads the package from Open VSX. VS Code extensions are converted to Lumen extensions by the transpiler; the Compatibility tab can check what works first.
+                        Installing downloads the package from Open VSX. VS Code extensions are converted to Lumen extensions by the transpiler; the
+                        Compatibility tab can check what works first.
                       </p>
                     </>
                   )
@@ -539,7 +572,7 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
                 report={installed.compat}
                 note={
                   installed.development
-                    ? "Loaded from a development folder: the code runs unchanged through Lumen's compatibility layer (require(\"vscode\") resolves to the Lumen API)."
+                    ? 'Loaded from a development folder: the code runs unchanged through Lumen\'s compatibility layer (require("vscode") resolves to the Lumen API).'
                     : installed.compat
                       ? `Transpiled from a VS Code extension${installed.manifest.lumen?.vscodeEngine ? ` (engine ${installed.manifest.lumen.vscodeEngine})` : ""}: ${installed.compat.rewrittenImports} import(s) of "vscode" rewritten to "lumen" in ${installed.compat.filesRewritten} of ${installed.compat.filesScanned} script(s).`
                       : ""
@@ -555,7 +588,15 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
                 <tbody>
                   <tr>
                     <td>State</td>
-                    <td>{!installed.enabled ? "Disabled" : runtime?.error ? "Activation failed" : runtime ? "Activated" : "Not activated yet (waiting for its activation events)"}</td>
+                    <td>
+                      {!installed.enabled
+                        ? "Disabled"
+                        : runtime?.error
+                          ? "Activation failed"
+                          : runtime
+                            ? "Activated"
+                            : "Not activated yet (waiting for its activation events)"}
+                    </td>
                   </tr>
                   {runtime && (
                     <tr>

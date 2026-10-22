@@ -1,10 +1,4 @@
-import type {
-  RpcApi,
-  RpcHandlers,
-  RpcHandlersOf,
-  RPCSchema,
-  ResEnvelope,
-} from "../shared/protocol.ts";
+import type { RpcApi, RpcHandlers, RpcHandlersOf, RPCSchema, ResEnvelope } from "../shared/protocol.ts";
 import type { MenuGroup } from "../shared/menu.ts";
 import { RpcEndpoint, createApi } from "../shared/rpc.ts";
 

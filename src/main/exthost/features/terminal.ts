@@ -5,7 +5,14 @@ import * as T from "../types.ts";
 import { normalizeKey } from "../documents.ts";
 import { CommandLineConfidence, ShellIntegrationModel, shellTypeOf } from "./terminal/shell.ts";
 import type { ShellExecution } from "./terminal/shell.ts";
-import { applyQuickFix, clearQuickFixes, registerQuickFixProvider, runQuickFixes, TerminalQuickFixOpener, TerminalQuickFixTerminalCommand } from "./terminal/quickfix.ts";
+import {
+  applyQuickFix,
+  clearQuickFixes,
+  registerQuickFixProvider,
+  runQuickFixes,
+  TerminalQuickFixOpener,
+  TerminalQuickFixTerminalCommand,
+} from "./terminal/quickfix.ts";
 export type { TerminalQuickFixContext } from "./terminal/quickfix.ts";
 import type {
   CreateTerminalRequest,
@@ -127,7 +134,14 @@ function stateOf(host: ExtensionHost): FeatureState {
 const MAX_LINKS = 400;
 const LINK_TIMEOUT_MS = 2000;
 const MAX_ICON_BYTES = 512 * 1024;
-const IMAGE_TYPES: Record<string, string> = { svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+const IMAGE_TYPES: Record<string, string> = {
+  svg: "image/svg+xml",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 const post = (host: ExtensionHost, message: TerminalHostMessage) => host.postFeature(TERMINAL_AREA, message);
 
@@ -345,7 +359,10 @@ async function provideLinks(host: ExtensionHost, state: FeatureState, id: string
           resolve(undefined);
         }, LINK_TIMEOUT_MS);
       });
-      const result = (await Promise.race([Promise.resolve(provider.provideTerminalLinks({ line, terminal: record.facade }, source.token)), timeout])) as unknown;
+      const result = (await Promise.race([
+        Promise.resolve(provider.provideTerminalLinks({ line, terminal: record.facade }, source.token)),
+        timeout,
+      ])) as unknown;
       clearTimeout(timer);
       if (!Array.isArray(result)) continue;
       for (const link of result as any[]) {
@@ -368,7 +385,9 @@ function activateLink(host: ExtensionHost, state: FeatureState, linkId: string) 
   const entry = state.links.get(linkId);
   if (!entry) return;
   try {
-    void Promise.resolve(entry.provider.handleTerminalLink(entry.link)).catch((error: unknown) => host.log("error", `handleTerminalLink failed: ${String(error)}`));
+    void Promise.resolve(entry.provider.handleTerminalLink(entry.link)).catch((error: unknown) =>
+      host.log("error", `handleTerminalLink failed: ${String(error)}`),
+    );
   } catch (error) {
     host.log("error", `handleTerminalLink failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -376,7 +395,13 @@ function activateLink(host: ExtensionHost, state: FeatureState, linkId: string) 
 
 /* ── profiles ────────────────────────────────────────────────────────────── */
 
-async function resolveProfile(host: ExtensionHost, state: FeatureState, profileId: string, viewId: string, size?: { cols: number; rows: number }): Promise<ResolvedProfileWire | null> {
+async function resolveProfile(
+  host: ExtensionHost,
+  state: FeatureState,
+  profileId: string,
+  viewId: string,
+  size?: { cols: number; rows: number },
+): Promise<ResolvedProfileWire | null> {
   const id = profileId.replace(/^ext:/, "");
   await host.activateByEvent(`onTerminalProfile:${id}`);
   const entry = state.profileProviders.get(id);
@@ -400,7 +425,12 @@ async function resolveProfile(host: ExtensionHost, state: FeatureState, profileI
   }
   record.creationOptions = options;
   if (typeof options.name === "string") record.name = options.name;
-  const common = { title: typeof options.name === "string" ? options.name : undefined, cwd: cwdOf(options.cwd), icon: await iconOf(options.iconPath), color: colorOf(options.color) };
+  const common = {
+    title: typeof options.name === "string" ? options.name : undefined,
+    cwd: cwdOf(options.cwd),
+    icon: await iconOf(options.iconPath),
+    color: colorOf(options.color),
+  };
   if (options.pty) {
     record.pty = options.pty;
     record.resolvePid(undefined);
@@ -484,7 +514,8 @@ function handleViewMessage(host: ExtensionHost, state: FeatureState, message: Te
       if (record) record.exit = { code: message.code ?? undefined, reason: T.TerminalExitReason.Process };
       return;
     case "closed":
-      if (record && message.code !== undefined && message.code !== null && !record.exit) record.exit = { code: message.code, reason: T.TerminalExitReason.Process };
+      if (record && message.code !== undefined && message.code !== null && !record.exit)
+        record.exit = { code: message.code, reason: T.TerminalExitReason.Process };
       closeRecord(host, state, message.id);
       return;
     case "interacted":
@@ -529,7 +560,10 @@ export const terminalFeature: HostFeature = {
           splitWith = parent ? await parent.ready.catch(() => undefined) : undefined;
         }
         // TerminalEditorLocationOptions: { viewColumn, preserveFocus? }.
-        const editorOptions = !!location && typeof location === "object" && !location.parentTerminal && ("viewColumn" in location || "preserveFocus" in location) ? location : undefined;
+        const editorOptions =
+          !!location && typeof location === "object" && !location.parentTerminal && ("viewColumn" in location || "preserveFocus" in location)
+            ? location
+            : undefined;
         const editor = location === T.TerminalLocation.Editor || !!editorOptions;
         const request: CreateTerminalRequest = {
           name: options.name,
@@ -569,7 +603,8 @@ export const terminalFeature: HostFeature = {
         onDidEndTerminalShellExecution: state.onDidEndExecution.event,
         onDidChangeTextEditorViewColumn: state.onDidChangeViewColumn.event,
         registerTerminalLinkProvider(provider: any) {
-          if (!provider || typeof provider.provideTerminalLinks !== "function") throw new Error("registerTerminalLinkProvider: provideTerminalLinks is required");
+          if (!provider || typeof provider.provideTerminalLinks !== "function")
+            throw new Error("registerTerminalLinkProvider: provideTerminalLinks is required");
           const key = ++state.linkProviderSeq;
           state.linkProviders.set(key, { extensionId, provider });
           post(host, { kind: "linkProviders", count: state.linkProviders.size });
@@ -579,7 +614,8 @@ export const terminalFeature: HostFeature = {
           });
         },
         registerTerminalProfileProvider(id: string, provider: any) {
-          if (!provider || typeof provider.provideTerminalProfile !== "function") throw new Error("registerTerminalProfileProvider: provideTerminalProfile is required");
+          if (!provider || typeof provider.provideTerminalProfile !== "function")
+            throw new Error("registerTerminalProfileProvider: provideTerminalProfile is required");
           const entry = { extensionId, provider };
           state.profileProviders.set(String(id), entry);
           return new T.Disposable(() => {
@@ -587,7 +623,8 @@ export const terminalFeature: HostFeature = {
           });
         },
         registerTerminalQuickFixProvider(id: string, provider: any) {
-          if (!provider || typeof provider.provideTerminalQuickFixes !== "function") throw new Error("registerTerminalQuickFixProvider: provideTerminalQuickFixes is required");
+          if (!provider || typeof provider.provideTerminalQuickFixes !== "function")
+            throw new Error("registerTerminalQuickFixProvider: provideTerminalQuickFixes is required");
           return registerQuickFixProvider(host, String(id), extensionId, provider);
         },
       },

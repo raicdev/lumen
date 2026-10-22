@@ -1,18 +1,4 @@
-import {
-  Box,
-  Component,
-  Dot,
-  Hash,
-  Heading,
-  ListOrdered,
-  Package,
-  Pi,
-  SquareFunction,
-  Type,
-  Variable,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
+import { Box, Component, Dot, Hash, Heading, ListOrdered, Package, Pi, SquareFunction, Type, Variable, Wrench, type LucideIcon } from "lucide-react";
 
 /** Icon + color per symbol kind (outline, breadcrumbs, Go to Symbol), after VS Code's. */
 const KINDS: Record<string, { Icon: LucideIcon; color: string }> = {

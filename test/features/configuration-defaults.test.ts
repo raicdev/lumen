@@ -39,10 +39,7 @@ function reset(): void {
 
 test("extension defaults of built-in settings apply below user settings, later extensions win", () => {
   reset();
-  applyConfigurationDefaults([
-    extension("a", { "editor.tabSize": 4, "files.autoSave": "afterDelay" }),
-    extension("b", { "editor.tabSize": 8 }),
-  ]);
+  applyConfigurationDefaults([extension("a", { "editor.tabSize": 4, "files.autoSave": "afterDelay" }), extension("b", { "editor.tabSize": 8 })]);
 
   assert.equal(getDefaultSettings()["editor.tabSize"], 8);
   assert.equal(getDefaultSettings()["files.autoSave"], "afterDelay");
@@ -62,10 +59,7 @@ test("extension defaults of built-in settings apply below user settings, later e
 
 test("unknown keys and values of the wrong type are ignored", () => {
   reset();
-  applyConfigurationDefaults([
-    extension("a", { "editor.tabSize": 4, "not.a.setting": 1 }),
-    extension("b", { "editor.tabSize": "8" }),
-  ]);
+  applyConfigurationDefaults([extension("a", { "editor.tabSize": 4, "not.a.setting": 1 }), extension("b", { "editor.tabSize": "8" })]);
 
   assert.equal(getDefaultSettings()["editor.tabSize"], 4);
   assert.equal((getSettings() as Record<string, unknown>)["not.a.setting"], undefined);

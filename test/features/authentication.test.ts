@@ -98,7 +98,10 @@ test("existing account without access asks for consent; access persists across i
   assert.equal((await second.instance.getSession(ext, "fake", ["a"], { silent: true }))?.id, "s1");
   assert.equal(second.log.confirms, 0);
   const accounts = await second.instance.listAccounts();
-  assert.deepEqual(accounts.map((account) => [account.accountId, account.extensions[0]?.id]), [["a1", "pub.ext"]]);
+  assert.deepEqual(
+    accounts.map((account) => [account.accountId, account.extensions[0]?.id]),
+    [["a1", "pub.ext"]],
+  );
 
   second.instance.revoke("fake", "a1", ext.id);
   assert.equal(await second.instance.getSession(ext, "fake", ["a"], { silent: true }), undefined);
@@ -138,7 +141,18 @@ test("the host API object exposes authentication.* backed by the service", async
   const { mkdtempSync: mk } = await import("node:fs");
   const { ExtensionHost } = await import("../../src/main/exthost/host.ts");
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mk(join(tmpdir(), "lumen-auth-host-")), appRoot: process.cwd(), appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mk(join(tmpdir(), "lumen-auth-host-")),
+    appRoot: process.cwd(),
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.post = () => {};
   const api = host.apiFor(null) as { authentication: Record<string, (...args: unknown[]) => any> };
   const { provider } = fakeProvider();

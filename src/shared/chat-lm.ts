@@ -26,7 +26,14 @@ export type ChatWireParticipant = {
 
 export type ChatWireModel = { id: string; name: string; vendor: string; family: string; version: string; detail?: string };
 
-export type ChatWireMcpServer = { id: string; label: string; extensionId: string; status: "stopped" | "starting" | "running" | "error"; tools: number; error?: string };
+export type ChatWireMcpServer = {
+  id: string;
+  label: string;
+  extensionId: string;
+  status: "stopped" | "starting" | "running" | "error";
+  tools: number;
+  error?: string;
+};
 
 export type ChatWireFollowup = { prompt: string; label: string; participant?: string; command?: string };
 
@@ -49,10 +56,7 @@ export type ChatHostMessage =
   | { kind: "clear" };
 
 /** window -> host (`api.sendToHost`). */
-export type ChatViewMessage =
-  | { kind: "cancel"; id: number }
-  | { kind: "clear" }
-  | { kind: "feedback"; id: number; helpful: boolean };
+export type ChatViewMessage = { kind: "cancel"; id: number } | { kind: "clear" } | { kind: "feedback"; id: number; helpful: boolean };
 
 /** Arguments of `api.requestHost("send", [ChatSendArgs])`. */
 export type ChatSendArgs = { id: number; text: string; modelId?: string; useTools?: boolean };

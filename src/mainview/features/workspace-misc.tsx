@@ -14,7 +14,11 @@ export const workspaceMiscView: ViewFeature = {
       title: "Open URI…",
       category: "Developer",
       run: async (api) => {
-        const uri = await api.showInputBox({ title: "Open URI", prompt: "lumen://<publisher.extension>/<path>?<query>", placeholder: "lumen://publisher.extension/path" });
+        const uri = await api.showInputBox({
+          title: "Open URI",
+          prompt: "lumen://<publisher.extension>/<path>?<query>",
+          placeholder: "lumen://publisher.extension/path",
+        });
         if (uri?.trim()) api.sendToHost({ type: "uri", uri: uri.trim() });
       },
     },

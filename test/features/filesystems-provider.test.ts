@@ -124,8 +124,7 @@ test("workspace.fs write methods respect a read-only provider; isWritableFileSys
     "plainfs",
     provider({
       stat: (uri) => ({ type: uri.path === "/dir" ? T.FileType.Directory : T.FileType.File, ctime: 0, mtime: 0, size: 0 }),
-      readDirectory: (uri) =>
-        (uri.path === "/dir" ? ([["a.txt", T.FileType.File]] as never) : ([] as never)),
+      readDirectory: (uri) => (uri.path === "/dir" ? ([["a.txt", T.FileType.File]] as never) : ([] as never)),
       readFile: () => new TextEncoder().encode("hello"),
       writeFile: (_uri, content) => void assert.equal(new TextDecoder().decode(content), "hello"),
     }),
@@ -239,13 +238,21 @@ test("stat resolves FileType.Unknown from readDirectory for the explorer", async
     provider({
       stat: (uri) => ({ type: uri.path === "/dir" ? T.FileType.Directory : T.FileType.File, ctime: 0, mtime: 0, size: 0 }),
       readDirectory: (uri) =>
-        (uri.path === "/" ? ([["dir", T.FileType.Unknown], ["file", T.FileType.Unknown]] as never) : ([] as never)),
+        uri.path === "/"
+          ? ([
+              ["dir", T.FileType.Unknown],
+              ["file", T.FileType.Unknown],
+            ] as never)
+          : ([] as never),
     }),
   );
   const listing = await host.methods.providerReadDirectory("memfs:/");
   assert.deepEqual(
     listing.entries.map((entry: { name: string; isDirectory: boolean }) => [entry.name, entry.isDirectory]),
-    [["dir", true], ["file", false]],
+    [
+      ["dir", true],
+      ["file", false],
+    ],
   );
 });
 
@@ -295,7 +302,10 @@ test("Quick Open lists provided files and Find in Files searches and replaces th
   assert.equal(found.truncated, false);
 
   const markdown = await host.methods.providerSearchFiles(["memfs:/"], "needle", { include: "*.md", maxResults: 100 });
-  assert.deepEqual(markdown.matches.map((match) => match.path), ["memfs:/dir/c.md"]);
+  assert.deepEqual(
+    markdown.matches.map((match) => match.path),
+    ["memfs:/dir/c.md"],
+  );
 
   const replaced = await host.methods.providerReplaceFiles(["memfs:/"], "needle", "pin", {}, ["memfs:/a.txt", "memfs:/dir/b.txt"]);
   assert.deepEqual(replaced, { replacements: 3, files: 2 });

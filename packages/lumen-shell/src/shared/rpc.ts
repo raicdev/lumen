@@ -1,14 +1,4 @@
-import type {
-  Envelope,
-  MsgEnvelope,
-  Namespace,
-  ReqEnvelope,
-  ResEnvelope,
-  RpcApi,
-  RpcHandlers,
-  RpcHandlersOf,
-  RPCSchema,
-} from "./protocol.ts";
+import type { Envelope, MsgEnvelope, Namespace, ReqEnvelope, ResEnvelope, RpcApi, RpcHandlers, RpcHandlersOf, RPCSchema } from "./protocol.ts";
 
 /**
  * Outbound transport.
@@ -18,9 +8,7 @@ import type {
  * - The main-process transport evaluates JS in the page and resolves with
  *   `undefined`; the response comes back later through `receive()`.
  */
-export type Outbound = (
-  envelope: Envelope,
-) => Promise<ResEnvelope | null | undefined> | ResEnvelope | null | undefined;
+export type Outbound = (envelope: Envelope) => Promise<ResEnvelope | null | undefined> | ResEnvelope | null | undefined;
 
 export type RpcEndpointOptions = {
   /** Namespace this endpoint *handles*. */
@@ -196,22 +184,18 @@ export function describe(error: unknown): string {
 }
 
 /** Build a typed caller facade around an endpoint. */
-export function createApi<S extends RPCSchema, PeerNs extends Namespace>(
-  endpoint: RpcEndpoint,
-): RpcApi<S, PeerNs> {
+export function createApi<S extends RPCSchema, PeerNs extends Namespace>(endpoint: RpcEndpoint): RpcApi<S, PeerNs> {
   const request = new Proxy(
     {},
     {
-      get: (_target, channel: string) => (params: unknown) =>
-        endpoint.request(channel, params ?? {}),
+      get: (_target, channel: string) => (params: unknown) => endpoint.request(channel, params ?? {}),
     },
   ) as RpcApi<S, PeerNs>["request"];
 
   const send = new Proxy(
     {},
     {
-      get: (_target, channel: string) => (payload: unknown) =>
-        endpoint.post(channel, payload),
+      get: (_target, channel: string) => (payload: unknown) => endpoint.post(channel, payload),
     },
   ) as RpcApi<S, PeerNs>["send"];
 
@@ -219,8 +203,6 @@ export function createApi<S extends RPCSchema, PeerNs extends Namespace>(
 }
 
 /** Narrow handler objects so the schema's params/response types are enforced. */
-export function normalizeHandlers(
-  handlers: RpcHandlers,
-): RpcHandlers {
+export function normalizeHandlers(handlers: RpcHandlers): RpcHandlers {
   return handlers;
 }

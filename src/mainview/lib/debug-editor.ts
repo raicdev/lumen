@@ -146,12 +146,8 @@ export function debugEditorExtension(getPath: () => string | null): Extension {
           const existing = breakpointsFor(path).find((bp) => bp.line === line);
           const e = event as MouseEvent;
           void showContextMenu(e.clientX, e.clientY, [
-            existing
-              ? { type: "item", label: "Remove Breakpoint", action: "toggle" }
-              : { type: "item", label: "Add Breakpoint", action: "toggle" },
-            ...(existing
-              ? [{ type: "item" as const, label: existing.enabled ? "Disable Breakpoint" : "Enable Breakpoint", action: "enable" }]
-              : []),
+            existing ? { type: "item", label: "Remove Breakpoint", action: "toggle" } : { type: "item", label: "Add Breakpoint", action: "toggle" },
+            ...(existing ? [{ type: "item" as const, label: existing.enabled ? "Disable Breakpoint" : "Enable Breakpoint", action: "enable" }] : []),
             { type: "separator" },
             { type: "item", label: existing?.condition ? "Edit Condition…" : "Add Conditional Breakpoint…", action: "condition" },
             { type: "item", label: existing?.hitCondition ? "Edit Hit Count…" : "Add Hit Count Breakpoint…", action: "hitCondition" },
@@ -177,7 +173,9 @@ export function debugEditorExtension(getPath: () => string | null): Extension {
       moveTimer = setTimeout(() => {
         moveTimer = null;
         const moved: { id: string; line: number }[] = [];
-        view.state.field(debugField).marks.between(0, view.state.doc.length, (from, _to, m) => void moved.push({ id: m.id, line: view.state.doc.lineAt(from).number }));
+        view.state
+          .field(debugField)
+          .marks.between(0, view.state.doc.length, (from, _to, m) => void moved.push({ id: m.id, line: view.state.doc.lineAt(from).number }));
         moveBreakpoints(path, moved);
       }, 400);
     }),
@@ -191,14 +189,17 @@ const lastSync = new WeakMap<EditorView, string>();
  * `force` re-applies them after the view got a new EditorState.
  */
 export function syncDebugMarks(view: EditorView, path: string | null, force = false) {
-  const breakpoints: Mark[] = path
-    ? breakpointsFor(path).map((bp) => ({ id: bp.id, line: bp.line ?? 0, bp }))
-    : [];
+  const breakpoints: Mark[] = path ? breakpointsFor(path).map((bp) => ({ id: bp.id, line: bp.line ?? 0, bp })) : [];
   const focused = debugUi.getSnapshot().focused;
   const current = path && focused?.line && samePath(focused.path, path) ? { line: focused.line, top: focused.top } : null;
   const running = debugService.getSnapshot().sessions.some((s) => s.state !== "terminated");
   // The debug store also changes for console output: skip when nothing shown changed.
-  const key = JSON.stringify([path, running, current, breakpoints.map((m) => [m.id, m.line, m.bp.enabled, m.bp.verified, m.bp.condition, m.bp.hitCondition, m.bp.logMessage, m.bp.message])]);
+  const key = JSON.stringify([
+    path,
+    running,
+    current,
+    breakpoints.map((m) => [m.id, m.line, m.bp.enabled, m.bp.verified, m.bp.condition, m.bp.hitCondition, m.bp.logMessage, m.bp.message]),
+  ]);
   if (!force && lastSync.get(view) === key) return;
   lastSync.set(view, key);
   view.dispatch({ effects: setDebugMarks.of({ breakpoints, current }) });

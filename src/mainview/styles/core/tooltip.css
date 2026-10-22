@@ -16,7 +16,9 @@
   pointer-events: none;
   opacity: 0;
   transform: translateY(-2px);
-  transition: opacity 0.1s ease-out, transform 0.1s ease-out;
+  transition:
+    opacity 0.1s ease-out,
+    transform 0.1s ease-out;
 }
 
 .lumen-tooltip[data-side="above"] {

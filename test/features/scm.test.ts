@@ -15,7 +15,18 @@ const ROOT = resolve(import.meta.dirname, "..", "..");
 function startedHost() {
   const host = new ExtensionHost();
   const userData = mkdtempSync(join(tmpdir(), "lumen-scm-test-"));
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData, appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData,
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   return { host, posted, userData };
@@ -29,7 +40,14 @@ test("source controls, groups, input box and counts reach the snapshot", async (
   const root = api.Uri.file(join(tmpdir(), "repo"));
   const control = api.scm.createSourceControl("fake", "Fake SCM", root);
   const group = control.createResourceGroup("work", "Changes");
-  group.resourceStates = [{ resourceUri: api.Uri.file(join(tmpdir(), "repo", "src", "a.ts")), command: { command: "fake.open", title: "Open" }, contextValue: "modified", decorations: { tooltip: "Modified", strikeThrough: true } }];
+  group.resourceStates = [
+    {
+      resourceUri: api.Uri.file(join(tmpdir(), "repo", "src", "a.ts")),
+      command: { command: "fake.open", title: "Open" },
+      contextValue: "modified",
+      decorations: { tooltip: "Modified", strikeThrough: true },
+    },
+  ];
   control.inputBox.placeholder = "Message";
   control.acceptInputCommand = { command: "fake.commit", title: "Commit" };
   control.statusBarCommands = [{ command: "fake.sync", title: "sync" }];
@@ -162,7 +180,12 @@ test("scm/* menu arguments are revived into the source control, group and resour
   assert.equal(resource.index, 1);
   const ref = (fields: Record<string, unknown>) => ({ $ref: { area: "scm", ...fields } });
   const [c, g, s, gone] = reviveMenuArg(
-    [ref({ control: data.handle }), ref({ control: data.handle, group: group.handle }), ref({ control: data.handle, group: group.handle, index: resource.index }), ref({ control: 999 })],
+    [
+      ref({ control: data.handle }),
+      ref({ control: data.handle, group: group.handle }),
+      ref({ control: data.handle, group: group.handle, index: resource.index }),
+      ref({ control: 999 }),
+    ],
     host,
   ) as unknown[];
   assert.equal(c, control);
@@ -172,9 +195,15 @@ test("scm/* menu arguments are revived into the source control, group and resour
 });
 
 test("vscodeLineChanges gives VS Code's LineChange form (scm/change/title)", () => {
-  assert.deepEqual(vscodeLineChanges("a\nb\nc", "a\nX\nc"), [{ originalStartLineNumber: 2, originalEndLineNumber: 2, modifiedStartLineNumber: 2, modifiedEndLineNumber: 2 }]);
-  assert.deepEqual(vscodeLineChanges("a\nb", "a\nb\nc"), [{ originalStartLineNumber: 2, originalEndLineNumber: 0, modifiedStartLineNumber: 3, modifiedEndLineNumber: 3 }]);
-  assert.deepEqual(vscodeLineChanges("a\nb\nc", "a\nc"), [{ originalStartLineNumber: 2, originalEndLineNumber: 2, modifiedStartLineNumber: 1, modifiedEndLineNumber: 0 }]);
+  assert.deepEqual(vscodeLineChanges("a\nb\nc", "a\nX\nc"), [
+    { originalStartLineNumber: 2, originalEndLineNumber: 2, modifiedStartLineNumber: 2, modifiedEndLineNumber: 2 },
+  ]);
+  assert.deepEqual(vscodeLineChanges("a\nb", "a\nb\nc"), [
+    { originalStartLineNumber: 2, originalEndLineNumber: 0, modifiedStartLineNumber: 3, modifiedEndLineNumber: 3 },
+  ]);
+  assert.deepEqual(vscodeLineChanges("a\nb\nc", "a\nc"), [
+    { originalStartLineNumber: 2, originalEndLineNumber: 2, modifiedStartLineNumber: 1, modifiedEndLineNumber: 0 },
+  ]);
 });
 
 test("computeLineChanges marks added, modified and deleted lines", () => {

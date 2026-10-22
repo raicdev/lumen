@@ -10,13 +10,13 @@ If you need something they do not offer, put it in "followups" in your answer.
 
 ## Files of an area `<area>` (e.g. `chat-lm`)
 
-| File | What |
-| --- | --- |
-| `src/main/exthost/features/<area>.ts` | `export const <camelArea>Feature: HostFeature` (extension host worker) |
-| `src/mainview/features/<area>.tsx` | `export const <camelArea>View: ViewFeature` (window, React) |
+| File                                       | What                                                                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/exthost/features/<area>.ts`      | `export const <camelArea>Feature: HostFeature` (extension host worker)                                                                                                      |
+| `src/mainview/features/<area>.tsx`         | `export const <camelArea>View: ViewFeature` (window, React)                                                                                                                 |
 | `src/mainview/features/feature-<area>.css` | styles; `@import` it from `src/mainview/index.css` (the build inlines it). **Do not `import` css from a .tsx** (esbuild would emit `index.css`, which the build overwrites) |
-| `src/shared/extension-support/<area>.ts` | `export const <camelArea>Support: AreaSupport`: the support table changes (see below) |
-| `test/<area>.test.ts` | your tests (`pnpm test` runs `test/*.test.ts`) |
+| `src/shared/extension-support/<area>.ts`   | `export const <camelArea>Support: AreaSupport`: the support table changes (see below)                                                                                       |
+| `test/<area>.test.ts`                      | your tests (`pnpm test` runs `test/*.test.ts`)                                                                                                                              |
 
 You may add more files: `src/main/exthost/features/<area>/*.ts`,
 `src/mainview/features/<area>/*.tsx`, `src/shared/feature-<area>.ts` (types shared by

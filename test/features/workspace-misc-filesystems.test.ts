@@ -14,7 +14,18 @@ import type { HostToView } from "../../src/shared/extensions.ts";
 
 function startedHost(workspace: string | null = null) {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace, userData: mkdtempSync(join(tmpdir(), "lumen-fs-")), appRoot: workspace ?? tmpdir(), appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace,
+    userData: mkdtempSync(join(tmpdir(), "lumen-fs-")),
+    appRoot: workspace ?? tmpdir(),
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.workspace = workspace;
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
@@ -39,12 +50,14 @@ test("provider folders list folders first then by name, with the window's docume
   host.post = () => {};
   const fs = provider({
     readDirectory: (uri) =>
-      (uri.path === "/" ? [
-        ["b.txt", 1],
-        ["dir", 2],
-        ["a.txt", 1],
-        ["link", 2 | 64],
-      ] : []) as never,
+      (uri.path === "/"
+        ? [
+            ["b.txt", 1],
+            ["dir", 2],
+            ["a.txt", 1],
+            ["link", 2 | 64],
+          ]
+        : []) as never,
   });
   host.fileSystems.register(null, "memfs", fs);
 
@@ -164,7 +177,8 @@ test("the workspace-misc feature announces extra folders for the explorer", asyn
   const root = mkdtempSync(join(tmpdir(), "lumen-fs-root-"));
   const { host, posted } = startedHost(root);
   workspaceMiscFeature.init!(host);
-  const folders = () => posted.filter((message) => message.type === "feature" && message.area === "workspace-misc").map((message) => (message as { payload: any }).payload);
+  const folders = () =>
+    posted.filter((message) => message.type === "feature" && message.area === "workspace-misc").map((message) => (message as { payload: any }).payload);
 
   assert.deepEqual(folders().at(-1), {
     type: "folders",

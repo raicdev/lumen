@@ -33,7 +33,10 @@ const extensions = [
 
 test("colors: contributions are validated and defaults follow the theme kind", () => {
   const colors = collectColorContributions(extensions);
-  assert.deepEqual(colors.map((color) => color.id), ["myext.bg", "myext.fg"]);
+  assert.deepEqual(
+    colors.map((color) => color.id),
+    ["myext.bg", "myext.fg"],
+  );
   assert.equal(defaultColorFor(colors[0]!, "dark"), "#112233");
   assert.equal(defaultColorFor(colors[0]!, "light"), "#ffeedd");
   assert.equal(defaultColorFor(colors[0]!, "hcDark"), "#000000");
@@ -45,7 +48,12 @@ test("colors: contributions are validated and defaults follow the theme kind", (
 
 test("colors: theme values win over defaults, colorCustomizations over both", () => {
   const colors = collectColorContributions(extensions);
-  const css = colorsCss({ colors, kind: "dark", themeColors: { "myext.bg": "#abcdef" }, customizations: { "myext.fg": "#ff0000", "editor.background": "rgba(0, 0, 0, 0.5)" } });
+  const css = colorsCss({
+    colors,
+    kind: "dark",
+    themeColors: { "myext.bg": "#abcdef" },
+    customizations: { "myext.fg": "#ff0000", "editor.background": "rgba(0, 0, 0, 0.5)" },
+  });
   assert.ok(!css.includes("--vscode-myext-bg"), "theme-set colors are left to the theme");
   assert.ok(css.includes("--vscode-myext-fg: #ff0000 !important;"));
   assert.ok(css.includes("--vscode-editor-background: rgba(0, 0, 0, 0.5) !important;"));
@@ -53,18 +61,34 @@ test("colors: theme values win over defaults, colorCustomizations over both", ()
 });
 
 test("colorCustomizations: per-theme sections and unsafe values", () => {
-  const setting = { "editor.background": "#111111", "[Lumen Dark]": { "editor.background": "#222222", "myext.bg": "red" }, "[Other]": { "editor.background": "#333333" }, "x.y": "#fff; } body { display: none", "bad id": "#fff" };
+  const setting = {
+    "editor.background": "#111111",
+    "[Lumen Dark]": { "editor.background": "#222222", "myext.bg": "red" },
+    "[Other]": { "editor.background": "#333333" },
+    "x.y": "#fff; } body { display: none",
+    "bad id": "#fff",
+  };
   assert.deepEqual(colorCustomizationsFor(setting, { id: "dark", label: "Lumen Dark" }), { "editor.background": "#222222", "myext.bg": "red" });
   assert.deepEqual(colorCustomizationsFor(null, { id: "a", label: "b" }), {});
 });
 
 test("semantic tokens: types, modifiers and scope mappings", () => {
   const contributions = collectSemanticContributions(extensions);
-  assert.deepEqual(contributions.types.map((type) => [type.id, type.superType]), [["templateType", "type"]]);
-  assert.deepEqual(contributions.modifiers.map((modifier) => modifier.id), ["native"]);
+  assert.deepEqual(
+    contributions.types.map((type) => [type.id, type.superType]),
+    [["templateType", "type"]],
+  );
+  assert.deepEqual(
+    contributions.modifiers.map((modifier) => modifier.id),
+    ["native"],
+  );
   assert.deepEqual(
     contributions.scopes.map((scope) => [scope.selector, scope.language]),
-    [["templateType", "typescript"], ["property.readonly", "typescript"], ["*.native", undefined]],
+    [
+      ["templateType", "typescript"],
+      ["property.readonly", "typescript"],
+      ["*.native", undefined],
+    ],
   );
   const parents = new Map(contributions.types.map((type) => [type.id, type.superType]));
   assert.deepEqual(semanticTypeChain("templateType", parents), ["templateType", "type"]);

@@ -24,7 +24,9 @@ export type TokenColorSettings = { foreground?: string; background?: string; fon
 /** A tokenColors rule: TextMate scope selectors (comma separated or a list) and their style. */
 export type TokenColorRule = { name?: string; scope?: string | string[]; settings: TokenColorSettings };
 
-export type SemanticTokenStyle = string | { foreground?: string; fontStyle?: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean };
+export type SemanticTokenStyle =
+  | string
+  | { foreground?: string; fontStyle?: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean };
 
 /** A theme with its `include`s and token color files loaded. */
 export type ColorThemeData = {
@@ -384,7 +386,8 @@ export function matchTokenStyle(rules: CompiledTokenRule[], scopes: readonly str
     }
     if (!best) continue;
     if (compiled.settings.foreground && better(best, foreground?.score ?? null)) foreground = { value: compiled.settings.foreground, score: best };
-    if (typeof compiled.settings.fontStyle === "string" && better(best, fontStyle?.score ?? null)) fontStyle = { value: compiled.settings.fontStyle, score: best };
+    if (typeof compiled.settings.fontStyle === "string" && better(best, fontStyle?.score ?? null))
+      fontStyle = { value: compiled.settings.fontStyle, score: best };
   }
   return { foreground: foreground?.value, fontStyle: fontStyle?.value };
 }

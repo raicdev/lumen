@@ -165,7 +165,12 @@ export const portsFeature: HostFeature = {
       openTunnel: (options: TunnelOptions) => openTunnel(host, options, extensionId),
       get tunnels() {
         return Promise.resolve(
-          portsSnapshot(host).map((port) => ({ remoteAddress: { host: port.remoteHost, port: port.remotePort }, localAddress: port.localAddress, privacy: port.privacy, protocol: port.protocol })),
+          portsSnapshot(host).map((port) => ({
+            remoteAddress: { host: port.remoteHost, port: port.remotePort },
+            localAddress: port.localAddress,
+            privacy: port.privacy,
+            protocol: port.protocol,
+          })),
         );
       },
       onDidChangeTunnels: stateOf(host).onDidChange.event,

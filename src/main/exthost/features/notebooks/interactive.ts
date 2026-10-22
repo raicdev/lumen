@@ -33,7 +33,10 @@ export async function openInteractive(service: NotebookService, host: ExtensionH
   const state = windowsOf(service);
   const wanted = T.Uri.revive(resource as T.Uri | undefined);
   // An open Interactive Window of that resource is shown again.
-  let doc = wanted && wanted.path.endsWith(".interactive") ? [...service.docs.values()].find((candidate) => candidate.interactive && candidate.uri.toString() === wanted.toString()) : undefined;
+  let doc =
+    wanted && wanted.path.endsWith(".interactive")
+      ? [...service.docs.values()].find((candidate) => candidate.interactive && candidate.uri.toString() === wanted.toString())
+      : undefined;
   if (!doc) {
     let n = ++state.seq;
     while ([...service.docs.values()].some((candidate) => candidate.uri.path === `/Interactive-${n}.interactive`)) n = ++state.seq;
@@ -44,8 +47,12 @@ export async function openInteractive(service: NotebookService, host: ExtensionH
     doc.title = title;
     service.scheduleSnapshot(doc);
   }
-  if (typeof controllerId === "string" && controllerId && service.controllers.get(controllerId)?.matches(doc.notebookType)) service.selectController(doc, controllerId);
-  await host.requestFeatureView("notebooks", "show", [doc.viewPath, { preserveFocus: options.preserveFocus ?? false, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside }]);
+  if (typeof controllerId === "string" && controllerId && service.controllers.get(controllerId)?.matches(doc.notebookType))
+    service.selectController(doc, controllerId);
+  await host.requestFeatureView("notebooks", "show", [
+    doc.viewPath,
+    { preserveFocus: options.preserveFocus ?? false, viewColumn: options.viewColumn, beside: options.viewColumn === T.ViewColumn.Beside },
+  ]);
   let editor: unknown;
   for (let waited = 0; waited < 5000 && !editor; waited += 50) {
     editor = service.editorOf(doc);

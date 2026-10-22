@@ -94,9 +94,7 @@ function loadWin32() {
     Process32NextW: kernel32.func("int __stdcall Process32NextW(void *snapshot, void *entry)"),
     OpenProcess: kernel32.func("void *__stdcall OpenProcess(uint32_t access, int inherit, uint32_t pid)"),
     CloseHandle: kernel32.func("int __stdcall CloseHandle(void *handle)"),
-    GetProcessTimes: kernel32.func(
-      "int __stdcall GetProcessTimes(void *process, void *creation, void *exit, void *kernel, void *user)",
-    ),
+    GetProcessTimes: kernel32.func("int __stdcall GetProcessTimes(void *process, void *creation, void *exit, void *kernel, void *user)"),
     K32GetProcessMemoryInfo: kernel32.func("int __stdcall K32GetProcessMemoryInfo(void *process, void *counters, uint32_t size)"),
     NtQueryInformationProcess: ntdll.func(
       "int32_t __stdcall NtQueryInformationProcess(void *process, int infoClass, void *info, uint32_t size, _Out_ uint32_t *returned)",

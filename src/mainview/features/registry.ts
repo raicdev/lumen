@@ -8,7 +8,15 @@ import { notify } from "../lib/toast";
 import { isDarkTheme, onColorThemeChange, themeColor } from "../lib/theme";
 import { terminalService } from "../lib/terminals";
 import { refreshFeatures } from "./store";
-import type { FeatureEditorOpener, FeatureExplorerSection, FeaturePanelTab, FeatureSidebarView, FeatureStatusBarItem, ViewFeature, ViewFeatureApi } from "./types";
+import type {
+  FeatureEditorOpener,
+  FeatureExplorerSection,
+  FeaturePanelTab,
+  FeatureSidebarView,
+  FeatureStatusBarItem,
+  ViewFeature,
+  ViewFeatureApi,
+} from "./types";
 import { tasksView } from "./tasks";
 import { scmView } from "./scm";
 import { testingView } from "./testing";
@@ -227,12 +235,14 @@ export type OwnedPanelTab = FeaturePanelTab & { area: string };
 export type OwnedEditorOpener = FeatureEditorOpener & { area: string };
 export type OwnedStatusItem = FeatureStatusBarItem & { area: string };
 
-const own = <T extends { id: string }>(feature: ViewFeature, list: T[] | undefined): (T & { area: string })[] => (list ?? []).map((entry) => ({ ...entry, area: feature.area }));
+const own = <T extends { id: string }>(feature: ViewFeature, list: T[] | undefined): (T & { area: string })[] =>
+  (list ?? []).map((entry) => ({ ...entry, area: feature.area }));
 
 export const featureSidebarViews = (): OwnedSidebarView[] => viewFeatures.flatMap((feature) => own(feature, feature.sidebarViews));
 export const featurePanelTabs = (): OwnedPanelTab[] => viewFeatures.flatMap((feature) => own(feature, feature.panelTabs));
 export const featureStatusItems = (): OwnedStatusItem[] => viewFeatures.flatMap((feature) => own(feature, feature.statusBarItems));
-export const featureExplorerSections = (): (FeatureExplorerSection & { area: string })[] => viewFeatures.flatMap((feature) => own(feature, feature.explorerSections));
+export const featureExplorerSections = (): (FeatureExplorerSection & { area: string })[] =>
+  viewFeatures.flatMap((feature) => own(feature, feature.explorerSections));
 const featureEditorOpeners = (): OwnedEditorOpener[] => viewFeatures.flatMap((feature) => own(feature, feature.editorOpeners));
 
 /** The opener that renders the file's editor, if a feature claims it. */
@@ -267,10 +277,20 @@ export function featureCommands(): Command[] {
       });
     }
     for (const view of feature.sidebarViews ?? []) {
-      list.push({ id: `workbench.view.feature.${view.id}`, title: `Show ${view.title}`, category: "View", run: () => bridge?.showSideView(featureViewId(view.id)) });
+      list.push({
+        id: `workbench.view.feature.${view.id}`,
+        title: `Show ${view.title}`,
+        category: "View",
+        run: () => bridge?.showSideView(featureViewId(view.id)),
+      });
     }
     for (const tab of feature.panelTabs ?? []) {
-      list.push({ id: `workbench.panel.feature.${tab.id}`, title: `Show ${tab.title}`, category: "View", run: () => bridge?.showPanelTab(featureViewId(tab.id)) });
+      list.push({
+        id: `workbench.panel.feature.${tab.id}`,
+        title: `Show ${tab.title}`,
+        category: "View",
+        run: () => bridge?.showPanelTab(featureViewId(tab.id)),
+      });
     }
   }
   return list;

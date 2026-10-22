@@ -92,7 +92,11 @@ function activate(context) {
     }
     diagnostics.set(document.uri, found);
     for (const editor of lumen.window.visibleTextEditors) {
-      if (editor.document === document) editor.setDecorations(highlight, found.map((d) => d.range));
+      if (editor.document === document)
+        editor.setDecorations(
+          highlight,
+          found.map((d) => d.range),
+        );
     }
   };
   context.subscriptions.push(

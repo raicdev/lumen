@@ -83,7 +83,11 @@ function ThemedGlyph({ icon, folder }: { icon: ThemedIcon; folder?: boolean }) {
   if (icon.kind === "image") return <span className={className} style={{ backgroundImage: `url("${icon.src}")` }} aria-hidden="true" />;
   if (icon.kind === "font") {
     return (
-      <span className={className} style={{ fontFamily: `"${icon.family}"`, color: icon.color, fontSize: icon.size, fontWeight: "normal", letterSpacing: 0 }} aria-hidden="true">
+      <span
+        className={className}
+        style={{ fontFamily: `"${icon.family}"`, color: icon.color, fontSize: icon.size, fontWeight: "normal", letterSpacing: 0 }}
+        aria-hidden="true"
+      >
         {icon.char}
       </span>
     );

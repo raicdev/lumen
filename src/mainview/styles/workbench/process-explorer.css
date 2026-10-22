@@ -32,12 +32,24 @@
   background: var(--process-color, var(--text-muted));
 }
 
-.process-kind-app { --process-color: #e5a442; }
-.process-kind-webview { --process-color: #4f9cf0; }
-.process-kind-terminal { --process-color: #4cbf7a; }
-.process-kind-extension { --process-color: #e0679b; }
-.process-kind-process { --process-color: #a07ce0; }
-.process-kind-thread { --process-color: transparent; }
+.process-kind-app {
+  --process-color: #e5a442;
+}
+.process-kind-webview {
+  --process-color: #4f9cf0;
+}
+.process-kind-terminal {
+  --process-color: #4cbf7a;
+}
+.process-kind-extension {
+  --process-color: #e0679b;
+}
+.process-kind-process {
+  --process-color: #a07ce0;
+}
+.process-kind-thread {
+  --process-color: transparent;
+}
 
 .process-table .num {
   text-align: right;

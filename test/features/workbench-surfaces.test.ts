@@ -25,10 +25,22 @@ const ROOT = resolve(import.meta.dirname, "..", "..");
 
 function startedHost() {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-surfaces-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-surfaces-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
-  const features = (area: string) => posted.filter((m) => m.type === "feature" && (m as { area: string }).area === area).map((m) => (m as { payload: any }).payload);
+  const features = (area: string) =>
+    posted.filter((m) => m.type === "feature" && (m as { area: string }).area === area).map((m) => (m as { payload: any }).payload);
   return { host, posted, features, api: host.apiFor(null) as any };
 }
 
@@ -44,10 +56,14 @@ test("timeline providers are listed by scheme, paged, and their items revived fo
     id: "demo",
     label: "Demo History",
     onDidChangeTimeline: fired.event,
-    provideTimeline: async (_uri: unknown, options: { cursor?: string }) => (options.cursor ? { items: [new api.TimelineItem("Older", 10)] } : { items: [item], paging: { cursor: "1" } }),
+    provideTimeline: async (_uri: unknown, options: { cursor?: string }) =>
+      options.cursor ? { items: [new api.TimelineItem("Older", 10)] } : { items: [item], paging: { cursor: "1" } },
   });
   const file = join(tmpdir(), "a.txt");
-  assert.deepEqual(timelineSources(host, file).map((source) => source.id), ["demo"]);
+  assert.deepEqual(
+    timelineSources(host, file).map((source) => source.id),
+    ["demo"],
+  );
   assert.deepEqual(timelineSources(host, "untitled:x"), []);
   const first = await provideTimeline(host, file, "demo", undefined, 1);
   assert.equal(first.items[0]!.label, "Saved");
@@ -84,7 +100,10 @@ test("Lumen's Git History source lists a file's commits and opens a revision", a
   timelineFeature.init!(host);
   assert.ok(timelineSources(host, file).some((source) => source.id === GIT_SOURCE));
   const page = await provideTimeline(host, file, GIT_SOURCE, undefined, 1);
-  assert.deepEqual(page.items.map((item) => item.label), ["second", "first"]);
+  assert.deepEqual(
+    page.items.map((item) => item.label),
+    ["second", "first"],
+  );
   assert.equal(page.items[0]!.contextValue, "git:file:commit");
   assert.equal(page.cursor, undefined);
   // The item's command opens the file at that commit (a read-only virtual document).
@@ -107,9 +126,17 @@ test("TextEditor.viewColumn reports the editor's group and moving between groups
   host.handleView({ type: "documentOpen", doc: { path: file, languageId: "plaintext", version: 1, text: "a\n", eol: "LF", dirty: false } } as never);
   host.handleView({ type: "documentOpen", doc: { path: other, languageId: "plaintext", version: 1, text: "b\n", eol: "LF", dirty: false } } as never);
   host.handleView({ type: "tabs", groups: [{ viewColumn: 1, isActive: true, tabs: [textTab("column.txt", file)] }] } as never);
-  host.handleView({ type: "activeEditor", path: file, selections: [{ anchorLine: 0, anchorCharacter: 0, activeLine: 0, activeCharacter: 0 }], visible: [file] } as never);
+  host.handleView({
+    type: "activeEditor",
+    path: file,
+    selections: [{ anchorLine: 0, anchorCharacter: 0, activeLine: 0, activeCharacter: 0 }],
+    visible: [file],
+  } as never);
   assert.equal(api.window.activeTextEditor.viewColumn, 1);
-  assert.deepEqual(api.window.visibleTextEditors.map((editor: any) => editor.viewColumn), [1]);
+  assert.deepEqual(
+    api.window.visibleTextEditors.map((editor: any) => editor.viewColumn),
+    [1],
+  );
 
   const moved: any[] = [];
   api.window.onDidChangeTextEditorViewColumn((event: any) => moved.push(event));
@@ -124,8 +151,14 @@ test("TextEditor.viewColumn reports the editor's group and moving between groups
   host.handleView({ type: "activeEditor", path: file, selections: [], visible: [other, file] } as never);
 
   assert.equal(api.window.activeTextEditor.viewColumn, 2);
-  assert.deepEqual(api.window.visibleTextEditors.map((editor: any) => editor.viewColumn), [1, 2]);
-  assert.deepEqual(moved.map((event) => event.viewColumn), [2]);
+  assert.deepEqual(
+    api.window.visibleTextEditors.map((editor: any) => editor.viewColumn),
+    [1, 2],
+  );
+  assert.deepEqual(
+    moved.map((event) => event.viewColumn),
+    [2],
+  );
   assert.equal(moved[0]!.textEditor.viewColumn, 2);
   assert.equal(moved[0]!.textEditor.document.uri.fsPath.toLowerCase(), file.toLowerCase());
 });
@@ -175,7 +208,12 @@ test("ports: openTunnel forwards a local port through a forwarder, lists it and 
 test("the issue reporter reads VS Code's arguments and builds the GitHub issue", async () => {
   assert.deepEqual(parseIssueArgs(["pub.ext"]), { extensionId: "pub.ext" });
   assert.deepEqual(parseIssueArgs([["pub.ext"]]), { extensionId: "pub.ext" });
-  assert.deepEqual(parseIssueArgs([{ extensionId: "pub.ext", issueTitle: "T", issueBody: "B" }]), { extensionId: "pub.ext", title: "T", body: "B", extensionData: undefined });
+  assert.deepEqual(parseIssueArgs([{ extensionId: "pub.ext", issueTitle: "T", issueBody: "B" }]), {
+    extensionId: "pub.ext",
+    title: "T",
+    body: "B",
+    extensionData: undefined,
+  });
   assert.deepEqual(parseIssueArgs([]), {});
 
   assert.equal(githubRepository("git+https://github.com/o/r.git"), "https://github.com/o/r");
@@ -242,7 +280,10 @@ test("custom editors: several editors share a document with supportsMultipleEdit
   // A change marks both editors dirty.
   changed.fire({ document: {}, undo() {}, redo() {} });
   assert.deepEqual(
-    posted.filter((m: any) => m.type === "webviewUpdate" && m.dirty === true).map((m: any) => m.id).sort(),
+    posted
+      .filter((m: any) => m.type === "webviewUpdate" && m.dirty === true)
+      .map((m: any) => m.id)
+      .sort(),
     [first!.id, second!.id].sort(),
   );
   // Without the option, opening again reveals the one editor.

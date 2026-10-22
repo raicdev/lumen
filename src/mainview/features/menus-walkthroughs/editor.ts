@@ -268,11 +268,16 @@ export function installTabMenu(): void {
     if (!tab || !path) return null;
     if (path.startsWith("terminal:")) {
       const id = path.slice("terminal:".length);
-      const items = contributedMenuItems("terminal/title/context", (key) => (key === "terminalEditorActive" || key === "terminalEditorFocus" ? true : undefined), [{ $ref: { area: "terminal", id } }]);
+      const items = contributedMenuItems(
+        "terminal/title/context",
+        (key) => (key === "terminalEditorActive" || key === "terminalEditorFocus" ? true : undefined),
+        [{ $ref: { area: "terminal", id } }],
+      );
       return items.length ? items : null;
     }
     const base = resourceLookup(path);
-    const lookup = (key: string) => (key === "isActiveEditorGroup" ? tab.classList.contains("active") : key === "activeEditorIsPinned" ? !tab.classList.contains("preview") : base(key));
+    const lookup = (key: string) =>
+      key === "isActiveEditorGroup" ? tab.classList.contains("active") : key === "activeEditorIsPinned" ? !tab.classList.contains("preview") : base(key);
     const context = { groupId: tab.dataset.group, editorIndex: Number(tab.dataset.index) };
     const items = contributedMenuItems("editor/title/context", lookup, [uriArg(path), context]);
     return items.length ? items : null;

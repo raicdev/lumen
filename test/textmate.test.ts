@@ -65,8 +65,7 @@ test("tokenizes a tiny grammar with vscode-textmate", async () => {
   };
   const registry = new Registry({
     onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
-    loadGrammar: async (scopeName) =>
-      scopeName === raw.scopeName ? parseRawGrammar(JSON.stringify(raw), "tiny.tmLanguage.json") : null,
+    loadGrammar: async (scopeName) => (scopeName === raw.scopeName ? parseRawGrammar(JSON.stringify(raw), "tiny.tmLanguage.json") : null),
   });
   const grammar = await registry.loadGrammar(raw.scopeName);
   assert.ok(grammar);

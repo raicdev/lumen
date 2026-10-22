@@ -5,23 +5,52 @@
   "publisher": "lumen-samples",
   "version": "1.0.0",
   "license": "MIT",
-  "engines": { "vscode": "^1.80.0" },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
     "commands": [
-      { "command": "wordTools.reverse", "title": "Reverse Selection", "category": "Word Tools" },
-      { "command": "wordTools.sortWords", "title": "Sort Words in Selection", "category": "Word Tools" },
-      { "command": "wordTools.count", "title": "Count Words", "category": "Word Tools" }
+      {
+        "command": "wordTools.reverse",
+        "title": "Reverse Selection",
+        "category": "Word Tools"
+      },
+      {
+        "command": "wordTools.sortWords",
+        "title": "Sort Words in Selection",
+        "category": "Word Tools"
+      },
+      {
+        "command": "wordTools.count",
+        "title": "Count Words",
+        "category": "Word Tools"
+      }
     ],
-    "keybindings": [{ "command": "wordTools.reverse", "key": "ctrl+k ctrl+r", "when": "editorHasSelection" }],
+    "keybindings": [
+      {
+        "command": "wordTools.reverse",
+        "key": "ctrl+k ctrl+r",
+        "when": "editorHasSelection"
+      }
+    ],
     "menus": {
-      "commandPalette": [{ "command": "wordTools.sortWords", "when": "editorHasSelection" }]
+      "commandPalette": [
+        {
+          "command": "wordTools.sortWords",
+          "when": "editorHasSelection"
+        }
+      ]
     },
     "configuration": {
       "title": "Word Tools",
       "properties": {
-        "wordTools.caseSensitiveSort": { "type": "boolean", "default": false, "description": "Sort words case-sensitively." }
+        "wordTools.caseSensitiveSort": {
+          "type": "boolean",
+          "default": false,
+          "description": "Sort words case-sensitively."
+        }
       }
     }
   }

@@ -12,7 +12,21 @@ const MIME_STDOUT = "application/vnd.code.notebook.stdout";
 const MIME_STDERR = "application/vnd.code.notebook.stderr";
 const MIME_ERROR = "application/vnd.code.notebook.error";
 
-const PRIORITY = [MIME_ERROR, "text/html", "image/svg+xml", "image/png", "image/jpeg", "image/gif", "image/webp", "text/markdown", "application/json", MIME_STDERR, MIME_STDOUT, "text/latex", "text/plain"];
+const PRIORITY = [
+  MIME_ERROR,
+  "text/html",
+  "image/svg+xml",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "text/markdown",
+  "application/json",
+  MIME_STDERR,
+  MIME_STDOUT,
+  "text/latex",
+  "text/plain",
+];
 
 const MAX_TEXT = 200_000;
 
@@ -79,7 +93,13 @@ export function CellOutputs({ outputs }: { outputs: NbWireOutput[] }) {
         const item = pickItem(output);
         return (
           <div className="nb-output" key={output.id}>
-            {item ? renderItem(item) : <span className="nb-output-unsupported">Output of type {output.items.map((candidate) => candidate.mime).join(", ") || "(empty)"} cannot be shown.</span>}
+            {item ? (
+              renderItem(item)
+            ) : (
+              <span className="nb-output-unsupported">
+                Output of type {output.items.map((candidate) => candidate.mime).join(", ") || "(empty)"} cannot be shown.
+              </span>
+            )}
           </div>
         );
       })}

@@ -157,9 +157,7 @@ export async function listProcesses(options: {
   const names = new Map(options.extensions.map((extension) => [extension.id.toLowerCase(), extension.name]));
   const context: Context = {
     terminals: new Map(options.terminals.map((terminal) => [terminal.pid, terminal.label])),
-    extensionProcesses: new Map(
-      [...options.extensionProcesses(known)].map(([pid, id]) => [pid, names.get(id.toLowerCase()) ?? id]),
-    ),
+    extensionProcesses: new Map([...options.extensionProcesses(known)].map(([pid, id]) => [pid, names.get(id.toLowerCase()) ?? id])),
     renderers: rendererOwners(frames, options.extensions),
     ownWebviews: ownWebviews(tree),
   };

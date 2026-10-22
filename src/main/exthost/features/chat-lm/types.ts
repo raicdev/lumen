@@ -193,7 +193,9 @@ export class LanguageModelChatMessage {
 /** The text of the text parts of a message / result content. */
 export function textOf(content: unknown): string {
   return messageParts(content)
-    .map((part) => (part instanceof LanguageModelTextPart ? part.value : typeof (part as { value?: unknown })?.value === "string" ? (part as { value: string }).value : ""))
+    .map((part) =>
+      part instanceof LanguageModelTextPart ? part.value : typeof (part as { value?: unknown })?.value === "string" ? (part as { value: string }).value : "",
+    )
     .join("");
 }
 

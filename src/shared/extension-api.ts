@@ -62,7 +62,10 @@ const BASE_API_SUPPORT: Record<string, Entry> = {
   "window.createWebviewPanel": ["supported", "hidden pages are dropped unless retainContextWhenHidden; enableFindWidget adds the find bar (Ctrl+F, F3)"],
   "window.registerWebviewViewProvider": "supported",
   "window.registerWebviewPanelSerializer": "supported",
-  "window.registerCustomEditorProvider": ["supported", "text, readonly and editable providers; supportsMultipleEditorsPerDocument; backups of unsaved changes come back as openContext.backupId"],
+  "window.registerCustomEditorProvider": [
+    "supported",
+    "text, readonly and editable providers; supportsMultipleEditorsPerDocument; backups of unsaved changes come back as openContext.backupId",
+  ],
   "window.registerTreeDataProvider": "supported",
   "window.createTreeView": "supported",
   "window.tabGroups": "supported",
@@ -98,7 +101,10 @@ const BASE_API_SUPPORT: Record<string, Entry> = {
   "workspace.onWillDeleteFiles": "supported",
   "workspace.onWillRenameFiles": "supported",
   "workspace.registerTextDocumentContentProvider": ["supported", "read-only virtual documents"],
-  "workspace.registerFileSystemProvider": ["supported", "including isCaseSensitive providers (case-insensitive URIs share documents, tabs, explorer entries and watcher events)"],
+  "workspace.registerFileSystemProvider": [
+    "supported",
+    "including isCaseSensitive providers (case-insensitive URIs share documents, tabs, explorer entries and watcher events)",
+  ],
 
   /* languages */
   "languages.registerCompletionItemProvider": "supported",
@@ -187,7 +193,6 @@ const BASE_API_SUPPORT: Record<string, Entry> = {
   "debug.addBreakpoints": "supported",
   "debug.removeBreakpoints": "supported",
   "debug.asDebugSourceUri": ["partial", "sources with a path map to a file URI; others get a debug: URI that Lumen cannot open (no debug: content provider)"],
-
 };
 
 /** Classes, enums and helpers exported at the top level of the module. */
@@ -304,9 +309,7 @@ const BASE_API_TYPES = [
  * Classes and enums that are data-only stand-ins (editor tab input types, …),
  * exported so libraries that reference them (vscode-languageclient, …) still load.
  */
-const BASE_API_TYPES_COMPAT: string[] = [
-  "LinkedEditingRanges",
-];
+const BASE_API_TYPES_COMPAT: string[] = ["LinkedEditingRanges"];
 
 /**
  * Classes and enums of the `vscode` module that Lumen does not export at all:
@@ -327,16 +330,28 @@ const BASE_CONTRIBUTION_SUPPORT: Record<string, Entry> = {
   configuration: "supported",
   languages: ["supported", "the icon field is not used (Lumen draws its own file icons)"],
   snippets: "supported",
-  configurationDefaults: ["partial", "extension settings and the defaults of Lumen's own settings (below user settings); language-scoped defaults (\"[python]\") are not applied in the editor yet"],
+  configurationDefaults: [
+    "partial",
+    'extension settings and the defaults of Lumen\'s own settings (below user settings); language-scoped defaults ("[python]") are not applied in the editor yet',
+  ],
   codeActions: ["partial", "metadata only: code actions come from registered providers; not used for codeActionsOnSave completion"],
   documentation: ["partial", "ignored: refactorings work, but the refactor menu shows no documentation entries"],
-  grammars: ["partial", "highlighting for languages CodeMirror has no built-in support for, in Lumen's theme; no embedded-language highlighting or TextMate themes"],
+  grammars: [
+    "partial",
+    "highlighting for languages CodeMirror has no built-in support for, in Lumen's theme; no embedded-language highlighting or TextMate themes",
+  ],
   themes: "supported",
   views: "supported",
   viewsContainers: "supported",
   viewsWelcome: "supported",
-  debuggers: ["partial", "type, label, program/runtime/args (with platform overrides), languages and initialConfigurations; the adapter runs when no descriptor factory is registered; variables, configurationSnippets, configurationAttributes (launch.json IntelliSense), when and hiddenWhen are not used"],
-  breakpoints: ["partial", "enablement, conditions, hit counts and log points are sent to the adapter; breakpoints can be set in any file (the declared languages and when clauses are not used)"],
+  debuggers: [
+    "partial",
+    "type, label, program/runtime/args (with platform overrides), languages and initialConfigurations; the adapter runs when no descriptor factory is registered; variables, configurationSnippets, configurationAttributes (launch.json IntelliSense), when and hiddenWhen are not used",
+  ],
+  breakpoints: [
+    "partial",
+    "enablement, conditions, hit counts and log points are sent to the adapter; breakpoints can be set in any file (the declared languages and when clauses are not used)",
+  ],
   jsonValidation: "supported",
   customEditors: "supported",
 };
@@ -344,7 +359,10 @@ const BASE_CONTRIBUTION_SUPPORT: Record<string, Entry> = {
 /* -- the tables with what the feature areas changed (shared/extension-support/<area>.ts) -- */
 
 /** Applies the areas' entries (`null` removes one) over a table. */
-function withAreas(base: Record<string, Entry>, pick: (area: (typeof AREA_SUPPORT)[number]) => Record<string, Entry | null> | undefined): Record<string, Entry> {
+function withAreas(
+  base: Record<string, Entry>,
+  pick: (area: (typeof AREA_SUPPORT)[number]) => Record<string, Entry | null> | undefined,
+): Record<string, Entry> {
   const out = { ...base };
   for (const area of AREA_SUPPORT) {
     for (const [key, entry] of Object.entries(pick(area) ?? {})) {

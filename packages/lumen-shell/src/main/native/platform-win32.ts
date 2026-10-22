@@ -23,65 +23,45 @@ import type {
  * the event loop so Node's async event loop keeps running between messages.
  */
 
-const WndProcProto = koffi.proto(
-  "intptr_t __stdcall LumenWndProc(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
-);
+const WndProcProto = koffi.proto("intptr_t __stdcall LumenWndProc(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)");
 
 function loadUser32() {
   const user32 = koffi.load("user32.dll");
   return {
-    PeekMessageW: user32.func(
-      "int __stdcall PeekMessageW(void *msg, void *hwnd, uint32_t min, uint32_t max, uint32_t remove)",
-    ),
+    PeekMessageW: user32.func("int __stdcall PeekMessageW(void *msg, void *hwnd, uint32_t min, uint32_t max, uint32_t remove)"),
     TranslateMessage: user32.func("int __stdcall TranslateMessage(void *msg)"),
     DispatchMessageW: user32.func("intptr_t __stdcall DispatchMessageW(void *msg)"),
     SetWindowTextW: user32.func("int __stdcall SetWindowTextW(void *hwnd, const char16_t *text)"),
-    SetWindowPos: user32.func(
-      "int __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)",
-    ),
+    SetWindowPos: user32.func("int __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)"),
     GetSystemMetrics: user32.func("int __stdcall GetSystemMetrics(int index)"),
     ShowWindow: user32.func("int __stdcall ShowWindow(void *hwnd, int cmd)"),
     IsZoomed: user32.func("int __stdcall IsZoomed(void *hwnd)"),
     SetForegroundWindow: user32.func("int __stdcall SetForegroundWindow(void *hwnd)"),
     SetFocus: user32.func("void *__stdcall SetFocus(void *hwnd)"),
     SetWindowLongPtrW: user32.func("intptr_t __stdcall SetWindowLongPtrW(void *hwnd, int index, intptr_t value)"),
-    CallWindowProcW: user32.func(
-      "intptr_t __stdcall CallWindowProcW(void *proc, void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
-    ),
+    CallWindowProcW: user32.func("intptr_t __stdcall CallWindowProcW(void *proc, void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)"),
     CreateMenu: user32.func("void *__stdcall CreateMenu()"),
     CreatePopupMenu: user32.func("void *__stdcall CreatePopupMenu()"),
-    AppendMenuW: user32.func(
-      "int __stdcall AppendMenuW(void *menu, uint32_t flags, uintptr_t id, const char16_t *label)",
-    ),
+    AppendMenuW: user32.func("int __stdcall AppendMenuW(void *menu, uint32_t flags, uintptr_t id, const char16_t *label)"),
     SetMenu: user32.func("int __stdcall SetMenu(void *hwnd, void *menu)"),
     DrawMenuBar: user32.func("int __stdcall DrawMenuBar(void *hwnd)"),
     IsWindowVisible: user32.func("int __stdcall IsWindowVisible(void *hwnd)"),
     GetWindow: user32.func("void *__stdcall GetWindow(void *hwnd, uint32_t cmd)"),
     ReleaseCapture: user32.func("int __stdcall ReleaseCapture()"),
     GetCursorPos: user32.func("int __stdcall GetCursorPos(void *point)"),
-    PostMessageW: user32.func(
-      "int __stdcall PostMessageW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
-    ),
+    PostMessageW: user32.func("int __stdcall PostMessageW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)"),
     SetClassLongPtrW: user32.func("uintptr_t __stdcall SetClassLongPtrW(void *hwnd, int index, intptr_t value)"),
     GetClientRect: user32.func("int __stdcall GetClientRect(void *hwnd, void *rect)"),
     RegisterClassExW: user32.func("uint16_t __stdcall RegisterClassExW(const LumenWndClassEx *wc)"),
     CreateWindowExW: user32.func(
       "void *__stdcall CreateWindowExW(uint32_t exStyle, const char16_t *cls, const char16_t *name, uint32_t style, int x, int y, int w, int h, void *parent, void *menu, void *instance, void *param)",
     ),
-    DefWindowProcW: user32.func(
-      "intptr_t __stdcall DefWindowProcW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
-    ),
-    SetLayeredWindowAttributes: user32.func(
-      "int __stdcall SetLayeredWindowAttributes(void *hwnd, uint32_t key, uint8_t alpha, uint32_t flags)",
-    ),
+    DefWindowProcW: user32.func("intptr_t __stdcall DefWindowProcW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)"),
+    SetLayeredWindowAttributes: user32.func("int __stdcall SetLayeredWindowAttributes(void *hwnd, uint32_t key, uint8_t alpha, uint32_t flags)"),
     TrackMouseEvent: user32.func("int __stdcall TrackMouseEvent(void *event)"),
     LoadCursorW: user32.func("void *__stdcall LoadCursorW(void *instance, uintptr_t name)"),
-    LoadImageW: user32.func(
-      "void *__stdcall LoadImageW(void *instance, uintptr_t name, uint32_t type, int cx, int cy, uint32_t flags)",
-    ),
-    SendMessageW: user32.func(
-      "intptr_t __stdcall SendMessageW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)",
-    ),
+    LoadImageW: user32.func("void *__stdcall LoadImageW(void *instance, uintptr_t name, uint32_t type, int cx, int cy, uint32_t flags)"),
+    SendMessageW: user32.func("intptr_t __stdcall SendMessageW(void *hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam)"),
   };
 }
 
@@ -112,9 +92,7 @@ function loadGdiDwm() {
   const dwmapi = koffi.load("dwmapi.dll");
   return {
     CreateSolidBrush: gdi32.func("void *__stdcall CreateSolidBrush(uint32_t color)"),
-    DwmSetWindowAttribute: dwmapi.func(
-      "int32_t __stdcall DwmSetWindowAttribute(void *hwnd, uint32_t attribute, void *value, uint32_t size)",
-    ),
+    DwmSetWindowAttribute: dwmapi.func("int32_t __stdcall DwmSetWindowAttribute(void *hwnd, uint32_t attribute, void *value, uint32_t size)"),
   };
 }
 
@@ -258,12 +236,7 @@ export async function runMessageLoop(options: { shouldContinue: () => boolean })
   }
 }
 
-function wndProc(
-  handle: NativeHandle | null,
-  message: number,
-  wParam: number | bigint,
-  lParam: number | bigint,
-): number | bigint {
+function wndProc(handle: NativeHandle | null, message: number, wParam: number | bigint, lParam: number | bigint): number | bigint {
   const entry = handle ? windows.get(key(handle)) : undefined;
   if (!entry) return 0;
 
@@ -323,12 +296,7 @@ function sizeState(kind: number): WindowState | null {
  * Windows 10/11 those are the invisible resize borders, so snapping, shadows
  * and resizing stay native) and only drop the caption at the top.
  */
-function calcFramelessClientArea(
-  entry: WindowEntry,
-  handle: NativeHandle,
-  wParam: number | bigint,
-  lParam: number | bigint,
-): number | bigint {
+function calcFramelessClientArea(entry: WindowEntry, handle: NativeHandle, wParam: number | bigint, lParam: number | bigint): number | bigint {
   // NCCALCSIZE_PARAMS.rgrc[0]: the proposed window rect, rewritten in place
   // into the client rect.
   const rect = new Int32Array(koffi.view(BigInt(lParam), 16));
@@ -388,15 +356,7 @@ function applyWindowStyle(handle: NativeHandle, entry: WindowEntry, style: Windo
   }
 
   if (entry.frameless) {
-    symbols().SetWindowPos(
-      handle,
-      null,
-      0,
-      0,
-      0,
-      0,
-      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
-    );
+    symbols().SetWindowPos(handle, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
   }
 }
 
@@ -499,12 +459,7 @@ function setOverlayState(overlay: SnapOverlay, hover: boolean, pressed: boolean)
   }
 }
 
-function snapOverlayProc(
-  handle: NativeHandle | null,
-  message: number,
-  wParam: number | bigint,
-  lParam: number | bigint,
-): number | bigint {
+function snapOverlayProc(handle: NativeHandle | null, message: number, wParam: number | bigint, lParam: number | bigint): number | bigint {
   const overlay = handle ? snapOverlays.get(key(handle)) : undefined;
   if (overlay) {
     switch (message) {
@@ -552,20 +507,7 @@ function setMaximizeButtonRegion(handle: NativeHandle, rect: PageRect | null): v
   if (!entry.snapOverlay) {
     const { instance } = overlayClass();
     const overlay = asPointer(
-      api.CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP,
-        SNAP_OVERLAY_CLASS,
-        "",
-        WS_CHILD,
-        0,
-        0,
-        0,
-        0,
-        handle,
-        null,
-        instance,
-        null,
-      ),
+      api.CreateWindowExW(WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP, SNAP_OVERLAY_CLASS, "", WS_CHILD, 0, 0, 0, 0, handle, null, instance, null),
     );
     if (!overlay) return;
     // Fully opaque, but with no redirection bitmap nothing is ever drawn: the
@@ -639,10 +581,7 @@ function setTitle(handle: NativeHandle, title: string): void {
   symbols().SetWindowTextW(handle, title);
 }
 
-function moveResize(
-  handle: NativeHandle,
-  bounds: { x?: number; y?: number; width?: number; height?: number },
-): void {
+function moveResize(handle: NativeHandle, bounds: { x?: number; y?: number; width?: number; height?: number }): void {
   const flags =
     SWP_NOZORDER |
     SWP_NOACTIVATE |
@@ -800,7 +739,10 @@ try {
 foreach ($folder in $picked) { [Console]::Out.WriteLine($folder) }`);
     const result = await powershell(script);
     assertDialogOk(result);
-    return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    return result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
   }
 
   const multi = options.properties?.includes("multiSelections") ?? false;
@@ -816,13 +758,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 }`);
   const result = await powershell(script);
   assertDialogOk(result);
-  return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function dialogFilter(filters: SaveDialogOptions["filters"]): string {
-  const parts = (filters ?? []).map(
-    (filter) => `${filter.name}|${filter.extensions.map((ext) => `*.${ext}`).join(";")}`,
-  );
+  const parts = (filters ?? []).map((filter) => `${filter.name}|${filter.extensions.map((ext) => `*.${ext}`).join(";")}`);
   parts.push("All files (*.*)|*.*");
   return parts.join("|");
 }
@@ -853,8 +796,7 @@ async function showMessageBox(options: MessageBoxOptions): Promise<{ response: n
   if (buttons.length === 2) buttonCode = buttons.some((b) => /no/i.test(b)) ? 4 : 1;
   else if (buttons.length >= 3) buttonCode = 3; // YesNoCancel
 
-  const iconCode =
-    options.type === "error" ? 16 : options.type === "warning" ? 48 : options.type === "question" ? 32 : 64;
+  const iconCode = options.type === "error" ? 16 : options.type === "warning" ? 48 : options.type === "question" ? 32 : 64;
 
   const text = options.detail ? `${options.message}\n\n${options.detail}` : options.message;
   const defaultButton = (options.defaultId ?? 0) * 256;
@@ -873,11 +815,7 @@ $result = [System.Windows.Forms.MessageBox]::Show($text, $title, [System.Windows
   return { response };
 }
 
-function mapMessageBoxResponse(
-  raw: number,
-  buttonCount: number,
-  options: MessageBoxOptions,
-): number {
+function mapMessageBoxResponse(raw: number, buttonCount: number, options: MessageBoxOptions): number {
   // WinForms DialogResult: OK=1, Cancel=2, Yes=6, No=7
   switch (raw) {
     case 6:

@@ -97,7 +97,7 @@ const DECORATION_COLORS: Record<string, string> = {
   "gitDecoration.ignoredResourceForeground": "#8c8c8c",
   "gitDecoration.conflictingResourceForeground": "#e4676b",
   "gitDecoration.submoduleResourceForeground": "#8db9e2",
-  "errorForeground": "#f48771",
+  errorForeground: "#f48771",
   "problemsErrorIcon.foreground": "#f14c4c",
   "problemsWarningIcon.foreground": "#cca700",
   "problemsInfoIcon.foreground": "#3794ff",
@@ -196,9 +196,7 @@ function TreeNode(props: NodeProps) {
       ? { letter: "•", className: "git-modified" }
       : undefined
     : props.decorations.git.get(key(entry.path));
-  const problem = entry.isDirectory
-    ? props.folderDecorations.problems.get(key(entry.path))
-    : props.decorations.problems.get(key(entry.path));
+  const problem = entry.isDirectory ? props.folderDecorations.problems.get(key(entry.path)) : props.decorations.problems.get(key(entry.path));
   const extension = entry.isDirectory ? props.folderDecorations.extension.get(key(entry.path)) : props.decorations.fileDecorations.get(key(entry.path));
   const nameClass = problem ? `problem-${problem}` : (git?.className ?? "");
   const extensionColor = decorationColor(extension?.color);
@@ -247,7 +245,12 @@ function TreeNode(props: NodeProps) {
           e.preventDefault();
           e.stopPropagation();
           props.setSelected(entry.path);
-          void contextMenuFor(entry, e.clientX, e.clientY, { provider, readOnly: props.readOnly, readOnlyMessage: props.readOnlyMessage, canPaste: !!providerClipboard }).then((action) => {
+          void contextMenuFor(entry, e.clientX, e.clientY, {
+            provider,
+            readOnly: props.readOnly,
+            readOnlyMessage: props.readOnlyMessage,
+            canPaste: !!providerClipboard,
+          }).then((action) => {
             if (!action) return;
             if (action === "copy" || action === "cut") {
               providerClipboard = { paths: [entry.path], copy: action === "copy" };
@@ -405,7 +408,11 @@ export function FileTreeView(props: Props) {
         // A case-insensitive provider's explorer rows may only differ from the target in case.
         const targetKey = normalizeDocumentKey(target);
         const candidateKey = normalizeDocumentKey(candidate);
-        return targetKey === candidateKey || targetKey.startsWith(candidateKey.endsWith("/") ? candidateKey : `${candidateKey}/`) || targetKey.startsWith(candidateKey);
+        return (
+          targetKey === candidateKey ||
+          targetKey.startsWith(candidateKey.endsWith("/") ? candidateKey : `${candidateKey}/`) ||
+          targetKey.startsWith(candidateKey)
+        );
       })
       .sort((a, b) => b.length - a.length)[0];
     if (!root) return;

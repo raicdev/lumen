@@ -19,7 +19,18 @@ const ROOT = resolve(import.meta.dirname, "..", "..");
 
 function startedHost() {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: mkdtempSync(join(tmpdir(), "lumen-testing-test-")), appRoot: ROOT, appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: mkdtempSync(join(tmpdir(), "lumen-testing-test-")),
+    appRoot: ROOT,
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   const posted: HostToView[] = [];
   host.post = (message) => void posted.push(message);
   const events = () => posted.filter((m) => m.type === "feature" && m.area === "testing").map((m) => (m as { payload: TestingHostEvent }).payload);
@@ -42,7 +53,9 @@ test("controllers build a tree that is synced to the window", async () => {
   assert.equal(child.parent, file);
   assert.equal(controller.items.size, 1);
   await wait();
-  const tree = events().filter((e) => e.kind === "tree").at(-1)!;
+  const tree = events()
+    .filter((e) => e.kind === "tree")
+    .at(-1)!;
   assert.ok(tree.kind === "tree");
   const item = tree.controllers[0]!.items[0]!;
   assert.equal(item.label, "a.test.ts");
@@ -55,7 +68,9 @@ test("controllers build a tree that is synced to the window", async () => {
   assert.equal(child.parent, undefined);
   controller.dispose();
   await wait();
-  const last = events().filter((e) => e.kind === "tree").at(-1)!;
+  const last = events()
+    .filter((e) => e.kind === "tree")
+    .at(-1)!;
   assert.ok(last.kind === "tree" && last.controllers.length === 0);
 });
 
@@ -174,7 +189,9 @@ test("resolve and refresh handlers, default profiles", async () => {
   send(host, { kind: "setDefaults", profileIds: [profile.id] });
   assert.equal(profile.isDefault, true);
   await wait();
-  const tree = events().filter((e) => e.kind === "tree").at(-1)!;
+  const tree = events()
+    .filter((e) => e.kind === "tree")
+    .at(-1)!;
   assert.ok(tree.kind === "tree" && tree.controllers[0]!.items[0]!.children[0]!.label === "leaf" && tree.controllers[0]!.canRefresh);
 });
 
@@ -250,7 +267,9 @@ test("continuous runs call the handler once with continuous and stop by cancelli
   assert.equal(continuous().runs[0].profileId, profile.id);
   assert.deepEqual(continuous().runs[0].testIds, []);
   // A test run created for the continuous request uses its token and is linked to the state.
-  const runStart = events().filter((e) => e.kind === "runStart").at(-1) as any;
+  const runStart = events()
+    .filter((e) => e.kind === "runStart")
+    .at(-1) as any;
   assert.equal(continuous().runs[0].runId, runStart.runId);
 
   // Starting the same continuous run again does not call the handler twice.

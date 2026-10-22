@@ -67,7 +67,14 @@ class Cell {
     this.summary = summary ? { ...summary } : undefined;
     const uri = doc.uri.with({ scheme: CELL_SCHEME, fragment: this.id });
     this.document = new ExtHostDocument(
-      { path: uri.toString(), languageId: data.languageId || (this.kind === NotebookCellKind.Code ? "plaintext" : "markdown"), version: 1, text: data.value ?? "", eol: "LF", dirty: false },
+      {
+        path: uri.toString(),
+        languageId: data.languageId || (this.kind === NotebookCellKind.Code ? "plaintext" : "markdown"),
+        version: 1,
+        text: data.value ?? "",
+        eol: "LF",
+        dirty: false,
+      },
       true,
       async () => doc.service.save(doc),
     );
@@ -180,7 +187,10 @@ export class Controller {
   executeHandler: (cells: unknown[], notebook: unknown, controller: unknown) => unknown;
   interruptHandler?: (notebook: unknown) => unknown;
   /** Proposed `NotebookController.variableProvider` (the Notebook Variables panel). */
-  variableProvider?: { onDidChangeVariables?: T.Event<unknown>; provideVariables(notebook: unknown, parent: unknown, kind: number, start: number, token: unknown): AsyncIterable<unknown> };
+  variableProvider?: {
+    onDidChangeVariables?: T.Event<unknown>;
+    provideVariables(notebook: unknown, parent: unknown, kind: number, start: number, token: unknown): AsyncIterable<unknown>;
+  };
   variableSubscription?: T.Disposable;
   readonly onDidChangeSelectedNotebooks = new T.EventEmitter<{ notebook: unknown; selected: boolean }>();
   disposed = false;
@@ -207,13 +217,16 @@ function normalizeOutput(output: unknown): NotebookCellOutput {
   return new NotebookCellOutput([...(like.items ?? [])], like.metadata);
 }
 
-const TEXT_MIME = /^(text\/|application\/(json|javascript|xml|x-latex|x-tex)$|image\/svg\+xml$|application\/vnd\.code\.notebook\.(stdout|stderr|error)$)|\+json$|\+xml$/;
+const TEXT_MIME =
+  /^(text\/|application\/(json|javascript|xml|x-latex|x-tex)$|image\/svg\+xml$|application\/vnd\.code\.notebook\.(stdout|stderr|error)$)|\+json$|\+xml$/;
 
 export function wireOutput(output: NotebookCellOutput): NbWireOutput {
   return {
     id: output.id,
     items: output.items.map((item) =>
-      TEXT_MIME.test(item.mime) ? { mime: item.mime, data: Buffer.from(item.data).toString("utf8") } : { mime: item.mime, data: Buffer.from(item.data).toString("base64"), base64: true },
+      TEXT_MIME.test(item.mime)
+        ? { mime: item.mime, data: Buffer.from(item.data).toString("utf8") }
+        : { mime: item.mime, data: Buffer.from(item.data).toString("base64"), base64: true },
     ),
     metadata: output.metadata,
   };
@@ -250,7 +263,12 @@ const toStatusItem = (item: Json): NbWireStatusItem => {
     alignment: item.alignment === 2 ? "right" : "left",
     priority: typeof item.priority === "number" ? item.priority : 0,
     tooltip: typeof item.tooltip === "string" ? item.tooltip : undefined,
-    command: typeof command === "string" ? { command } : command && typeof command === "object" && typeof (command as Json).command === "string" ? { command: (command as Json).command as string, arguments: (command as Json).arguments as unknown[] | undefined } : undefined,
+    command:
+      typeof command === "string"
+        ? { command }
+        : command && typeof command === "object" && typeof (command as Json).command === "string"
+          ? { command: (command as Json).command as string, arguments: (command as Json).arguments as unknown[] | undefined }
+          : undefined,
   };
 };
 
@@ -321,10 +339,12 @@ export class NotebookService {
     const api: Record<string, unknown> = {};
     const accessor = <K extends keyof Controller>(key: K, readonly = false) => ({
       get: () => controller[key],
-      set: readonly ? undefined : (value: Controller[K]) => {
-        controller[key] = value;
-        changed();
-      },
+      set: readonly
+        ? undefined
+        : (value: Controller[K]) => {
+            controller[key] = value;
+            changed();
+          },
       enumerable: true,
     });
     Object.defineProperties(api, {
@@ -393,7 +413,9 @@ export class NotebookService {
   #autoSelect(doc: Doc): void {
     const candidates = this.controllersFor(doc);
     const preferred = candidates.find((controller) => doc.affinity.get(controller.id) === NotebookControllerAffinity.Preferred);
-    const chosen = preferred ?? (candidates.length === 1 ? candidates[0] : candidates.find((controller) => doc.affinity.get(controller.id) === NotebookControllerAffinity.Default));
+    const chosen =
+      preferred ??
+      (candidates.length === 1 ? candidates[0] : candidates.find((controller) => doc.affinity.get(controller.id) === NotebookControllerAffinity.Default));
     if (chosen) this.selectController(doc, chosen.id);
   }
 
@@ -436,9 +458,12 @@ export class NotebookService {
   typeFor(uri: T.Uri): string {
     const path = uri.scheme === "file" ? uri.fsPath : uri.path;
     for (const runtime of this.host.runtimes.values()) {
-      const contributed = (runtime.description.manifest.contributes as { notebooks?: { type: string; selector?: { filenamePattern?: string }[] }[] } | undefined)?.notebooks;
+      const contributed = (
+        runtime.description.manifest.contributes as { notebooks?: { type: string; selector?: { filenamePattern?: string }[] }[] } | undefined
+      )?.notebooks;
       for (const entry of contributed ?? []) {
-        if (entry.type !== DEFAULT_NOTEBOOK_TYPE && entry.selector?.some((selector) => selector.filenamePattern && globMatches(selector.filenamePattern, path))) return entry.type;
+        if (entry.type !== DEFAULT_NOTEBOOK_TYPE && entry.selector?.some((selector) => selector.filenamePattern && globMatches(selector.filenamePattern, path)))
+          return entry.type;
       }
     }
     return DEFAULT_NOTEBOOK_TYPE;
@@ -536,8 +561,20 @@ export class NotebookService {
     }
   }
 
-  #fire(doc: Doc, change: { metadata?: Json; contentChanges?: { range: NotebookRange; addedCells: unknown[]; removedCells: unknown[] }[]; cellChanges?: { cell: unknown; document?: unknown; metadata?: Json; outputs?: unknown[]; executionSummary?: unknown }[] }): void {
-    this.onDidChange.fire({ notebook: doc.facade, metadata: change.metadata, contentChanges: change.contentChanges ?? [], cellChanges: change.cellChanges ?? [] });
+  #fire(
+    doc: Doc,
+    change: {
+      metadata?: Json;
+      contentChanges?: { range: NotebookRange; addedCells: unknown[]; removedCells: unknown[] }[];
+      cellChanges?: { cell: unknown; document?: unknown; metadata?: Json; outputs?: unknown[]; executionSummary?: unknown }[];
+    },
+  ): void {
+    this.onDidChange.fire({
+      notebook: doc.facade,
+      metadata: change.metadata,
+      contentChanges: change.contentChanges ?? [],
+      cellChanges: change.cellChanges ?? [],
+    });
   }
 
   /** Replace `deleteCount` cells at `start` with cells (new ones from data, or existing ones that move). */
@@ -551,7 +588,11 @@ export class NotebookService {
       if (!added.includes(cell)) cell.document.isClosed = true;
     }
     this.#touch(doc);
-    this.#fire(doc, { contentChanges: [{ range: new NotebookRange(first, first + count), addedCells: added.map((cell) => cell.facade), removedCells: removed.map((cell) => cell.facade) }] });
+    this.#fire(doc, {
+      contentChanges: [
+        { range: new NotebookRange(first, first + count), addedCells: added.map((cell) => cell.facade), removedCells: removed.map((cell) => cell.facade) },
+      ],
+    });
     this.scheduleStatus(doc, false);
     this.scheduleSnapshot(doc);
   }
@@ -574,7 +615,8 @@ export class NotebookService {
       this.scheduleSnapshot(doc);
       return;
     }
-    if (edit.range.start > doc.cells.length || edit.range.end > doc.cells.length) throw new Error(`notebook edit: range ${edit.range.start}-${edit.range.end} is outside the ${doc.cells.length} cell(s)`);
+    if (edit.range.start > doc.cells.length || edit.range.end > doc.cells.length)
+      throw new Error(`notebook edit: range ${edit.range.start}-${edit.range.end} is outside the ${doc.cells.length} cell(s)`);
     this.splice(doc, edit.range.start, edit.range.end - edit.range.start, edit.newCells);
   }
 
@@ -621,7 +663,11 @@ export class NotebookService {
 
   setKind(doc: Doc, cell: Cell, kind: number): void {
     if (cell.kind === kind) return;
-    const data = new NotebookCellData(kind, cell.document.getText(), kind === NotebookCellKind.Code ? (typeof doc.metadata.language === "string" ? doc.metadata.language : this.#defaultLanguage(doc)) : "markdown");
+    const data = new NotebookCellData(
+      kind,
+      cell.document.getText(),
+      kind === NotebookCellKind.Code ? (typeof doc.metadata.language === "string" ? doc.metadata.language : this.#defaultLanguage(doc)) : "markdown",
+    );
     data.metadata = cell.metadata;
     this.splice(doc, cell.index, 1, [data]);
   }
@@ -795,7 +841,13 @@ export class NotebookService {
     doc.queue = doc.queue.then(async () => {
       const alive = code.filter((cell) => cell.doc === doc && !doc.closed && cell.state === "pending");
       try {
-        if (alive.length) await controller.executeHandler.call(controller.api, alive.map((cell) => cell.facade), doc.facade, controller.api);
+        if (alive.length)
+          await controller.executeHandler.call(
+            controller.api,
+            alive.map((cell) => cell.facade),
+            doc.facade,
+            controller.api,
+          );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.host.log("error", `notebook execution failed: ${message}`, controller.extensionId);
@@ -913,7 +965,8 @@ export class NotebookService {
       viewColumn: { value: T.ViewColumn.One, enumerable: true },
     });
     Object.assign(state.api, {
-      revealRange: (range: NotebookRange, type?: number) => service.host.postFeature("notebooks", { t: "reveal", path: doc.viewPath, index: range.start, type: type ?? 0 }),
+      revealRange: (range: NotebookRange, type?: number) =>
+        service.host.postFeature("notebooks", { t: "reveal", path: doc.viewPath, index: range.start, type: type ?? 0 }),
     });
     editor = state;
     this.#editors.set(key, editor);
@@ -1041,7 +1094,12 @@ export class NotebookService {
   /* snapshots */
 
   wire(doc: Doc, error?: string): NbWireDoc {
-    const controllers: NbWireController[] = this.controllersFor(doc).map((controller) => ({ id: controller.id, label: controller.label, description: controller.description, detail: controller.detail }));
+    const controllers: NbWireController[] = this.controllersFor(doc).map((controller) => ({
+      id: controller.id,
+      label: controller.label,
+      description: controller.description,
+      detail: controller.detail,
+    }));
     return {
       path: doc.viewPath,
       title: doc.title,

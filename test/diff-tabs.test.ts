@@ -14,7 +14,18 @@ import type { HostTab } from "../src/shared/extensions.ts";
 
 function makeHost(): ExtensionHost {
   const host = new ExtensionHost();
-  host.init = { extensions: [], config: { lumen: {}, user: {} }, workspace: null, userData: process.cwd(), appRoot: process.cwd(), appName: "Lumen", appVersion: "0.1.0", languages: [], webviewPort: 1, webviewToken: "t" };
+  host.init = {
+    extensions: [],
+    config: { lumen: {}, user: {} },
+    workspace: null,
+    userData: process.cwd(),
+    appRoot: process.cwd(),
+    appName: "Lumen",
+    appVersion: "0.1.0",
+    languages: [],
+    webviewPort: 1,
+    webviewToken: "t",
+  };
   host.send = () => {};
   return host;
 }

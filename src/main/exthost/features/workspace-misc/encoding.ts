@@ -129,7 +129,8 @@ function multiByteTable(label: string): Map<number, number[]> {
       pairs(range(0x81, 0xfe), [...range(0x40, 0x7e), ...range(0x80, 0xfe)]);
       if (label === "gb18030") {
         // Four-byte sequences of the rest of the BMP (supplementary planes are computed in gb18030Bytes).
-        for (const b1 of range(0x81, 0x84)) for (const b2 of range(0x30, 0x39)) for (const b3 of range(0x81, 0xfe)) for (const b4 of range(0x30, 0x39)) add([b1, b2, b3, b4]);
+        for (const b1 of range(0x81, 0x84))
+          for (const b2 of range(0x30, 0x39)) for (const b3 of range(0x81, 0xfe)) for (const b4 of range(0x30, 0x39)) add([b1, b2, b3, b4]);
       }
       break;
   }

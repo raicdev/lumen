@@ -70,9 +70,18 @@ class DebugUi {
   constructor() {
     debugService.onStopped((stopped) => {
       this.#set({
-        focused: stopped.frameId !== undefined
-          ? { sessionId: stopped.sessionId, threadId: stopped.threadId, frameId: stopped.frameId, path: stopped.path, line: stopped.line, column: stopped.column, top: true }
-          : null,
+        focused:
+          stopped.frameId !== undefined
+            ? {
+                sessionId: stopped.sessionId,
+                threadId: stopped.threadId,
+                frameId: stopped.frameId,
+                path: stopped.path,
+                line: stopped.line,
+                column: stopped.column,
+                top: true,
+              }
+            : null,
         generation: this.#state.generation + 1,
       });
     });
@@ -187,7 +196,11 @@ export function isStopped(): boolean {
  * Start debugging: the selected launch configuration, else the only one,
  * else the default configuration of a debugger for the active file's language.
  */
-export async function startDebugging(folder: string | null, activeLanguage: string | null, options: { noDebug?: boolean; pick?: (configs: HostDebugConfiguration[]) => Promise<HostDebugConfiguration | null> } = {}) {
+export async function startDebugging(
+  folder: string | null,
+  activeLanguage: string | null,
+  options: { noDebug?: boolean; pick?: (configs: HostDebugConfiguration[]) => Promise<HostDebugConfiguration | null> } = {},
+) {
   let listed;
   try {
     listed = await debugService.listConfigurations(folder);
@@ -275,7 +288,11 @@ export async function editBreakpoint(path: string, line: number, kind: "conditio
   const labels = {
     condition: { title: "Conditional Breakpoint", message: `Break on line ${line} when the expression is true.`, placeholder: "e.g. count > 10" },
     hitCondition: { title: "Hit Count Breakpoint", message: `Break on line ${line} when the hit count condition is met.`, placeholder: "e.g. >= 5" },
-    logMessage: { title: "Logpoint", message: `Log a message when line ${line} is reached. Use {expression} to interpolate.`, placeholder: "e.g. value is {value}" },
+    logMessage: {
+      title: "Logpoint",
+      message: `Log a message when line ${line} is reached. Use {expression} to interpolate.`,
+      placeholder: "e.g. value is {value}",
+    },
   }[kind];
   const value = await showPrompt({ ...labels, defaultValue: existing?.[kind] ?? "" });
   if (value === null) return;

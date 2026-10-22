@@ -4,15 +4,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "fs";
 import { isAbsolute, join, relative, resolve } from "path";
 import { homedir } from "os";
 import type { LumenRPC } from "../shared/types.ts";
-import {
-  readDirTree,
-  readTextFile,
-  writeTextFile,
-  createFile,
-  createDirectory,
-  deletePath,
-  renamePath,
-} from "./fs.ts";
+import { readDirTree, readTextFile, writeTextFile, createFile, createDirectory, deletePath, renamePath } from "./fs.ts";
 import { gitCommit, gitDiscard, gitShowHead, gitStage, gitStatus, gitUnstage } from "./git.ts";
 import { watchWorkspace } from "./watcher.ts";
 import { detectLanguage, jsonSchemaAssociations, setContributedLanguages } from "./language.ts";
@@ -236,8 +228,7 @@ const rpc = defineMainRPC<LumenRPC>({
 
       searchInFiles: async ({ root, query, ...options }) => await fsWorker.call("searchInFiles", root, query, options),
 
-      replaceInFiles: async ({ root, query, replacement, ...options }) =>
-        await fsWorker.call("replaceInFiles", root, query, replacement, options),
+      replaceInFiles: async ({ root, query, replacement, ...options }) => await fsWorker.call("replaceInFiles", root, query, replacement, options),
 
       searchFilesByName: async ({ root, query, maxResults }) => ({
         files: await fsWorker.call("searchFilesByName", root, query, maxResults ?? 100),
@@ -282,8 +273,7 @@ const rpc = defineMainRPC<LumenRPC>({
         locations: await lspWorker.call("getReferences", path, line, character),
       }),
 
-      lspRename: async ({ path, line, character, newName }) =>
-        await lspWorker.call("getRenameEdits", path, line, character, newName),
+      lspRename: async ({ path, line, character, newName }) => await lspWorker.call("getRenameEdits", path, line, character, newName),
 
       lspFormat: async ({ path, tabSize, insertSpaces }) => ({
         edits: await lspWorker.call("getFormatEdits", path, tabSize, insertSpaces),
@@ -450,7 +440,10 @@ const rpc = defineMainRPC<LumenRPC>({
 
       extensionsInstallFolder: async ({ path, copy }) => {
         const folder =
-          path ?? (await dialog.showOpenDialog({ title: "Install Extension from Location", defaultPath: workspaceRoot ?? homedir(), properties: ["openDirectory"] }))[0];
+          path ??
+          (
+            await dialog.showOpenDialog({ title: "Install Extension from Location", defaultPath: workspaceRoot ?? homedir(), properties: ["openDirectory"] })
+          )[0];
         if (!folder) return { cancelled: true };
         return await installExtension(async () => extensionManager.installFolder(folder, { copy }));
       },
@@ -494,7 +487,15 @@ const rpc = defineMainRPC<LumenRPC>({
             const latest = await latestVersion(namespace, name);
             if (!latest || compareVersions(latest, extension.manifest.version) <= 0) return null;
             const manifest = extension.manifest;
-            return { namespace, name, version: latest, displayName: manifest.displayName, description: manifest.description, publisher: manifest.publisher, iconUrl: extension.iconUrl };
+            return {
+              namespace,
+              name,
+              version: latest,
+              displayName: manifest.displayName,
+              description: manifest.description,
+              publisher: manifest.publisher,
+              iconUrl: extension.iconUrl,
+            };
           }),
         );
         return { updates: updates.filter((entry) => entry !== null) };

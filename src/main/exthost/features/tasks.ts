@@ -2,7 +2,17 @@ import type { HostFeature } from "./contract.ts";
 import { NOT_HANDLED } from "./contract.ts";
 import * as T from "../types.ts";
 import { TASK_COMMAND_IDS } from "../../../shared/tasks-wire.ts";
-import { CustomExecution, ProcessExecution, ShellExecution, ShellQuoting, Task, TaskGroup, TaskPanelKind, TaskRevealKind, TaskScope } from "../../tasks/task-types.ts";
+import {
+  CustomExecution,
+  ProcessExecution,
+  ShellExecution,
+  ShellQuoting,
+  Task,
+  TaskGroup,
+  TaskPanelKind,
+  TaskRevealKind,
+  TaskScope,
+} from "../../tasks/task-types.ts";
 import { allTasks, executeTask, killAllTasks, runTaskCommand, tasksState, terminateRun } from "../../tasks/engine.ts";
 import type { TaskProvider } from "../../tasks/engine.ts";
 

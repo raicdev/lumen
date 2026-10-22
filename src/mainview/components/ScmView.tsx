@@ -105,7 +105,9 @@ function Section({
   return (
     <div className="scm-section">
       <div className="scm-section-header" onClick={() => setOpen((v) => !v)}>
-        <span className={`chevron${open ? " open" : ""}`}><ChevronRight size={14} /></span>
+        <span className={`chevron${open ? " open" : ""}`}>
+          <ChevronRight size={14} />
+        </span>
         <span className="scm-section-title">{title}</span>
         <span className="scm-actions">
           {actions.map((action) => (

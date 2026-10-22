@@ -90,7 +90,10 @@ function parse(source: string, start: number, variables: SnippetVariables, stop:
       i = inner.end + 1;
     } else if (next === "|") {
       const end = source.indexOf("|}", i + 1);
-      const options = source.slice(i + 1, end < 0 ? source.length : end).split(/(?<!\\),/).map((option) => option.replace(/\\(.)/g, "$1"));
+      const options = source
+        .slice(i + 1, end < 0 ? source.length : end)
+        .split(/(?<!\\),/)
+        .map((option) => option.replace(/\\(.)/g, "$1"));
       parts.push({ kind: "field", index: Number(name), text: options[0] ?? "" });
       i = end < 0 ? source.length : end + 2;
     } else if (next === "/") {

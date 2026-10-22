@@ -3,7 +3,16 @@ import { ChevronRight } from "lucide-react";
 import { WithCodicons } from "../components/Codicon";
 import type { ExtraPanelTab } from "../components/Panel";
 import { basename } from "../lib/paths";
-import { editorOpenerById, featureApi, featureExplorerSections, featurePanelTabs, featureSidebarViews, featureStatusItems, featureViewId, parseFeatureEditorTab } from "./registry";
+import {
+  editorOpenerById,
+  featureApi,
+  featureExplorerSections,
+  featurePanelTabs,
+  featureSidebarViews,
+  featureStatusItems,
+  featureViewId,
+  parseFeatureEditorTab,
+} from "./registry";
 import { useFeaturesVersion } from "./store";
 import type { FeatureIcon } from "./types";
 
@@ -111,7 +120,14 @@ export function FeatureStatusItems({ side }: { side: "left" | "right" }) {
         const style = { color: item.color?.() };
         const title = item.tooltip?.();
         return item.command ? (
-          <button key={item.id} type="button" className="status-btn status-ext" title={title} style={style} onClick={() => featureApi(item.area).executeCommand(item.command!)}>
+          <button
+            key={item.id}
+            type="button"
+            className="status-btn status-ext"
+            title={title}
+            style={style}
+            onClick={() => featureApi(item.area).executeCommand(item.command!)}
+          >
             <WithCodicons text={text} />
           </button>
         ) : (

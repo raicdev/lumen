@@ -33,7 +33,10 @@ export function addRecentFolder(path: string): void {
 }
 
 export function removeRecentFolder(path: string): void {
-  write(RECENT_KEY, recentFolders().filter((p) => p !== path));
+  write(
+    RECENT_KEY,
+    recentFolders().filter((p) => p !== path),
+  );
 }
 
 export function clearRecentFolders(): void {

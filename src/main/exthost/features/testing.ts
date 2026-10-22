@@ -69,7 +69,15 @@ export const testingFeature: HostFeature = {
     DeclarationCoverage,
   },
 
-  commands: ["testing.runAll", "testing.debugAll", "testing.coverageAll", "testing.cancelRun", "testing.refreshTests", "testing.startContinuousRun", "testing.stopContinuousRun"],
+  commands: [
+    "testing.runAll",
+    "testing.debugAll",
+    "testing.coverageAll",
+    "testing.cancelRun",
+    "testing.refreshTests",
+    "testing.startContinuousRun",
+    "testing.stopContinuousRun",
+  ],
 
   /**
    * testing/* menus: `{ item }` is the `TestItem`, `{ item, run, message }` VS Code's
