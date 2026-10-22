@@ -1,0 +1,68 @@
+/* ── Tabs ── */
+
+.tabs::-webkit-scrollbar {
+  height: 3px;
+}
+
+.tab {
+  gap: 6px;
+  padding: 0 6px 0 10px;
+  min-width: 0;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.tab.preview .tab-name {
+  font-style: italic;
+}
+
+.tab-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tab.drop-target {
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+
+.tab.active::after {
+  background: var(--vscode-tab-activeBorderTop);
+}
+
+.tab-close {
+  opacity: 1;
+  visibility: hidden;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close,
+.tab.dirty .tab-close {
+  visibility: visible;
+}
+
+.tab-close .tab-dirty-dot {
+  display: none;
+  font-size: 10px;
+}
+
+.tab.dirty .tab-close .tab-close-x {
+  display: none;
+}
+
+.tab.dirty .tab-close .tab-dirty-dot {
+  display: inline;
+}
+
+.tab.dirty .tab-close:hover .tab-close-x {
+  display: inline;
+}
+
+.tab.dirty .tab-close:hover .tab-dirty-dot {
+  display: none;
+}
+
+.tab-close-x {
+  font-size: 15px;
+  line-height: 1;
+}

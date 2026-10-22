@@ -26,7 +26,7 @@ export type LumenConfig = {
     entry: string;
     /** HTML shell that is copied next to the bundle. */
     html: string;
-    /** Extra stylesheets copied as-is. */
+    /** Stylesheets placed next to the bundle under their own names, with their `@import`s inlined. */
     styles?: string[];
     /** Extra files/directories copied into the assets directory. */
     assets?: string[];
@@ -92,8 +92,20 @@ async function buildView(config: LumenConfig, outDir: string, minify: boolean): 
   }
 
   await copyFile(join(ROOT, config.view.html), join(outDir, basename(config.view.html)));
-  for (const style of config.view.styles ?? []) {
-    await copyFile(join(ROOT, style), join(outDir, basename(style)));
+  const styles = config.view.styles ?? [];
+  if (styles.length > 0) {
+    try {
+      await esbuild.build({
+        entryPoints: styles.map((style) => join(ROOT, style)),
+        outdir: outDir,
+        entryNames: "[name]",
+        bundle: true,
+        minify,
+        logLevel: "error",
+      });
+    } catch {
+      fail("stylesheet build failed");
+    }
   }
   for (const asset of config.view.assets ?? []) {
     const from = join(ROOT, asset);

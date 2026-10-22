@@ -1,0 +1,51 @@
+.app.zen .editor-area .editor-host {
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Menu check marks */
+.menu-item {
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.menu-check {
+  width: 18px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-accel {
+  margin-left: 24px;
+}
+
+.menu-item:disabled {
+  opacity: 0.4;
+}
+
+/* Command center */
+.toolbar-search span {
+  text-align: center;
+}
+
+/* Activity bar badges */
+.activity-badge {
+  position: absolute;
+  right: 3px;
+  bottom: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--vscode-activityBarBadge-background);
+  color: var(--vscode-activityBarBadge-foreground);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}

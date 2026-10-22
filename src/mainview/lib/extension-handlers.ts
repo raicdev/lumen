@@ -62,7 +62,7 @@ export function createExtensionHandlers(bridge: ExtensionBridge): { [K in keyof 
       if (options.modal) {
         const buttons = items.map((label, index) => ({ label, role: index === 0 ? ("primary" as const) : ("default" as const), value: String(index) }));
         buttons.push({ label: "Cancel", role: "default", value: "cancel" });
-        const choice = await showDialog({ title: options.source ?? (kind === "error" ? "Error" : kind === "warning" ? "Warning" : "Information"), message, detail: options.detail, buttons });
+        const choice = await showDialog({ title: options.source ?? (kind === "error" ? "Error" : kind === "warning" ? "Warning" : "Information"), message, detail: options.detail, buttons, kind });
         return choice === null || choice === "cancel" ? null : Number(choice);
       }
       return await notify(kind, message, items, options.source);

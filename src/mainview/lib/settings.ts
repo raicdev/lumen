@@ -52,6 +52,8 @@ export type Settings = {
   "workbench.welcomePage.hiddenCategories": string[];
   /** Color theme: Lumen Dark / Lumen Light or a theme an extension contributes (its id or label). */
   "workbench.colorTheme": string;
+  /** modern: rounded floating parts (modern.css); legacy: the flat look underneath. */
+  "workbench.style": "modern" | "legacy";
   /** File icon theme contributed by an extension (id or label); empty = Lumen's built-in icons. */
   "workbench.iconTheme": string;
   /** Product icon theme contributed by an extension (id or label); empty = default. */
@@ -100,6 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
   "workbench.welcomePage.walkthroughs.openOnInstall": true,
   "workbench.welcomePage.hiddenCategories": [],
   "workbench.colorTheme": "Lumen Dark",
+  "workbench.style": "modern",
   "workbench.iconTheme": "",
   "workbench.productIconTheme": "",
   "terminal.integrated.fontSize": 13,
@@ -172,6 +175,13 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     category: "Workbench",
     label: "Color Theme",
     description: "The color theme of the window: Lumen Dark, Lumen Light or a theme from an extension. Also: Preferences: Color Theme (Ctrl+K Ctrl+T).",
+  },
+  {
+    key: "workbench.style",
+    category: "Workbench",
+    label: "Style",
+    description: "modern: the side bars, editor area and panel float as rounded cards, with softer dialogs and controls. legacy: the flat, square look. Also: View > Appearance > Modern Style.",
+    options: ["modern", "legacy"],
   },
   { key: "workbench.iconTheme", category: "Workbench", label: "File Icon Theme", description: "The file icon theme from an extension (empty uses Lumen's icons). Also: Preferences: File Icon Theme." },
   { key: "workbench.productIconTheme", category: "Workbench", label: "Product Icon Theme", description: "The product icon theme from an extension (empty uses the default). Also: Preferences: Product Icon Theme." },

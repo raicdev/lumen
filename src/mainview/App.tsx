@@ -10,6 +10,7 @@ import { isWebviewTab, useWebviews, webviewIdOf, webviewService, webviewTabPath,
 import { ContainerIcon, ViewContainerView, WebviewSlot } from "./components/WebviewSlot";
 import { isTerminalTab, terminalIdOf, terminalService, terminalTabPath } from "./lib/terminals";
 import { showDialog, showPrompt, showAbout } from "./lib/dialog";
+import { COMPAT_GRADES, compatGrade } from "./lib/compat";
 import { notify, toast } from "./lib/toast";
 import { extensionService, useExtensions } from "./lib/extensions";
 import { treeService, useTreeViews } from "./lib/trees";
@@ -1798,9 +1799,10 @@ export function App() {
       const name = extension.manifest.displayName ?? extension.manifest.name;
       const level = extension.compat?.level;
       if (extension.kind === "vscode" && level && level !== "full") {
+        const grade = compatGrade(extension.compat);
         void notify(
-          level === "limited" ? "warning" : "info",
-          `${name} was converted from a VS Code extension. Compatibility: ${level === "limited" ? "limited — core features it needs are missing in Lumen" : "partial — some features it uses are missing"}.`,
+          grade === "limited" || grade === "low" ? "warning" : "info",
+          `${name} was converted from a VS Code extension. Compatibility: ${COMPAT_GRADES[grade].label.toLowerCase()} — ${COMPAT_GRADES[grade].text}`,
           ["Show Compatibility"],
           "Extensions",
         ).then((choice) => {
@@ -2550,6 +2552,13 @@ export function App() {
         run: toggleSetting("workbench.statusBar.visible"),
       },
       {
+        id: "workbench.action.toggleModernStyle",
+        title: "Toggle Modern Style",
+        category: "View",
+        checked: () => getSettings()["workbench.style"] === "modern",
+        run: () => updateSetting("workbench.style", getSettings()["workbench.style"] === "modern" ? "legacy" : "modern"),
+      },
+      {
         id: "editor.action.toggleMinimap",
         title: "Toggle Minimap",
         category: "View",
@@ -2701,7 +2710,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.2.0", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.2.1", platform: navigator.platform }));
           await showAbout(info);
         },
       },

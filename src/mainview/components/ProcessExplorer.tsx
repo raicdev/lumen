@@ -1,4 +1,4 @@
-import { CircleX, Pause, Play, Puzzle, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleX, Pause, Play, Puzzle, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ProcessRow } from "../../shared/types";
 import { showDialog } from "../lib/dialog";
@@ -32,8 +32,13 @@ function formatCpu(cpu: number | null): string {
   return cpu === null ? "—" : `${cpu.toFixed(1)}%`;
 }
 
-/** Rows in tree order (children by memory, largest first), with their depth. */
-function treeOrder(rows: ProcessRow[]): { row: ProcessRow; depth: number }[] {
+type TreeEntry = { row: ProcessRow; depth: number; descendants: number; collapsed: boolean };
+
+/**
+ * Rows in tree order (children by memory, largest first), with their depth.
+ * The descendants of a collapsed row are left out.
+ */
+function treeOrder(rows: ProcessRow[], isCollapsed: (row: ProcessRow) => boolean): TreeEntry[] {
   const children = new Map<string | null, ProcessRow[]>();
   for (const row of rows) {
     const list = children.get(row.parent) ?? [];
@@ -44,13 +49,23 @@ function treeOrder(rows: ProcessRow[]): { row: ProcessRow; depth: number }[] {
     // Threads first: they are part of the parent process, not children of it.
     list.sort((a, b) => Number(b.kind === "thread") - Number(a.kind === "thread") || b.memory - a.memory);
   }
-  const out: { row: ProcessRow; depth: number }[] = [];
+  const countDescendants = (row: ProcessRow): number =>
+    (children.get(row.id) ?? []).reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+  const out: TreeEntry[] = [];
   const visit = (row: ProcessRow, depth: number) => {
-    out.push({ row, depth });
+    const descendants = countDescendants(row);
+    const collapsed = descendants > 0 && isCollapsed(row);
+    out.push({ row, depth, descendants, collapsed });
+    if (collapsed) return;
     for (const child of children.get(row.id) ?? []) visit(child, depth + 1);
   };
   for (const root of children.get(null) ?? []) visit(root, 0);
   return out;
+}
+
+/** Terminals start collapsed: the shell's own process tree (node, compilers, ...) is deep and noisy. */
+function collapsedByDefault(row: ProcessRow): boolean {
+  return row.kind === "terminal";
 }
 
 /**
@@ -79,12 +94,15 @@ export function ProcessExplorer({ open, onClose }: Props) {
   const [rows, setRows] = useState<ProcessRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
+  /** Rows the user opened or closed; the others follow collapsedByDefault. */
+  const [toggled, setToggled] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     if (!open) return;
     setRows([]);
     setError(null);
     setPaused(false);
+    setToggled(new Map());
   }, [open]);
 
   useEffect(() => {
@@ -123,8 +141,13 @@ export function ProcessExplorer({ open, onClose }: Props) {
 
   const ordered = useMemo(() => {
     const byId = new Map(rows.map((row) => [row.id, row]));
-    return treeOrder(rows).map((entry) => ({ ...entry, category: categoryOf(entry.row, byId), extension: extensionOf(entry.row, byId) }));
-  }, [rows]);
+    const isCollapsed = (row: ProcessRow) => toggled.get(row.id) ?? collapsedByDefault(row);
+    return treeOrder(rows, isCollapsed).map((entry) => ({ ...entry, category: categoryOf(entry.row, byId), extension: extensionOf(entry.row, byId) }));
+  }, [rows, toggled]);
+
+  const toggle = (entry: TreeEntry) => setToggled((map) => new Map(map).set(entry.row.id, !entry.collapsed));
+  /** Open or close every row with children (the app row stays open, or nothing would be listed). */
+  const setAll = (collapsed: boolean) => setToggled(new Map(rows.filter((row) => row.parent !== null).map((row) => [row.id, collapsed])));
 
   const summary = useMemo(() => {
     const byId = new Map(rows.map((row) => [row.id, row]));
@@ -184,6 +207,12 @@ export function ProcessExplorer({ open, onClose }: Props) {
               </span>
             ))}
           </div>
+          <button type="button" className="icon-btn" title="Expand All" onClick={() => setAll(false)}>
+            <ChevronsUpDown size={16} />
+          </button>
+          <button type="button" className="icon-btn" title="Collapse All" onClick={() => setAll(true)}>
+            <ChevronsDownUp size={16} />
+          </button>
           <button
             type="button"
             className="icon-btn"
@@ -209,37 +238,58 @@ export function ProcessExplorer({ open, onClose }: Props) {
               </tr>
             </thead>
             <tbody>
-              {ordered.map(({ row, depth, category, extension }) => (
-                <tr
-                  key={row.id}
-                  className={`process-kind-${row.kind === "thread" ? "thread" : category}`}
-                  title={row.commandLine || undefined}
-                >
-                  <td>
-                    <div className="process-name" style={{ paddingLeft: depth * 18 }}>
-                      <span className="process-dot" />
-                      {row.label}
-                      {row.extension && (
-                        <span className="process-extension" title={`Started for or rendered by the extension ${row.extension}`}>
-                          <Puzzle size={11} />
-                          {row.extension}
-                        </span>
+              {ordered.map((entry) => {
+                const { row, depth, descendants, collapsed, category, extension } = entry;
+                return (
+                  <tr
+                    key={row.id}
+                    className={`process-kind-${row.kind === "thread" ? "thread" : category}`}
+                    title={row.commandLine || undefined}
+                  >
+                    <td>
+                      <div className="process-name" style={{ paddingLeft: depth * 16 }}>
+                        {descendants ? (
+                          <button
+                            type="button"
+                            className="process-twisty"
+                            aria-expanded={!collapsed}
+                            title={collapsed ? "Expand" : "Collapse"}
+                            onClick={() => toggle(entry)}
+                          >
+                            {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                        ) : (
+                          <span className="process-twisty" />
+                        )}
+                        <span className="process-dot" />
+                        {row.label}
+                        {collapsed && (
+                          <span className="process-hidden-count" title={`${descendants} more process${descendants === 1 ? "" : "es"} inside`}>
+                            +{descendants}
+                          </span>
+                        )}
+                        {row.extension && (
+                          <span className="process-extension" title={`Started for or rendered by the extension ${row.extension}`}>
+                            <Puzzle size={11} />
+                            {row.extension}
+                          </span>
+                        )}
+                        {!row.extension && extension && <span className="process-extension-inherited">via {extension}</span>}
+                      </div>
+                    </td>
+                    <td className="num muted">{row.pid ?? ""}</td>
+                    <td className="num">{row.kind === "thread" ? "" : formatCpu(row.cpu)}</td>
+                    <td className="num">{formatBytes(row.memory)}</td>
+                    <td className="shortcut-actions">
+                      {row.pid !== null && row.kind !== "app" && (
+                        <button type="button" className="icon-btn" title="End Process" onClick={() => void endProcess(row)}>
+                          <CircleX size={14} />
+                        </button>
                       )}
-                      {!row.extension && extension && <span className="process-extension-inherited">via {extension}</span>}
-                    </div>
-                  </td>
-                  <td className="num muted">{row.pid ?? ""}</td>
-                  <td className="num">{row.kind === "thread" ? "" : formatCpu(row.cpu)}</td>
-                  <td className="num">{formatBytes(row.memory)}</td>
-                  <td className="shortcut-actions">
-                    {row.pid !== null && row.kind !== "app" && (
-                      <button type="button" className="icon-btn" title="End Process" onClick={() => void endProcess(row)}>
-                        <CircleX size={14} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <p className="process-note">

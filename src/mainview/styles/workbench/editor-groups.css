@@ -1,0 +1,187 @@
+.editor-area > .editor-group {
+  flex: 1;
+}
+
+.editor-split-sash {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  background: var(--border-soft);
+}
+
+.editor-split-sash.sash-row {
+  width: 1px;
+  cursor: col-resize;
+}
+
+.editor-split-sash.sash-column {
+  height: 1px;
+  cursor: row-resize;
+}
+
+/* Wider invisible grab area around the 1px line */
+.editor-split-sash::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.editor-split-sash.sash-column::after {
+  inset: -3px 0;
+}
+
+.editor-split-sash:hover {
+  background: var(--vscode-sash-hoverBorder);
+}
+
+.editor-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.editor-group .editor-host {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Only the focused group highlights its active tab */
+.editor-group:not(.active):not(.single) .tab.active {
+  color: var(--text-dim);
+}
+
+.editor-group:not(.active):not(.single) .tab.active::after {
+  background: transparent;
+}
+
+/* Drop target over a group while dragging a tab / file / terminal */
+.editor-drop-target {
+  position: absolute;
+  inset: 0;
+  z-index: 260;
+}
+
+.editor-drop-highlight {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--vscode-focusBorder);
+  border-radius: 4px;
+  background: var(--vscode-editorGroup-dropBackground);
+  pointer-events: none;
+  transition: all 0.08s ease;
+}
+
+.editor-drop-highlight.zone-center {
+  inset: 4px;
+}
+
+.editor-drop-highlight.zone-left {
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: calc(50% - 4px);
+}
+
+.editor-drop-highlight.zone-right {
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: calc(50% - 4px);
+}
+
+.editor-drop-highlight.zone-top {
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  height: calc(50% - 4px);
+}
+
+.editor-drop-highlight.zone-bottom {
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: calc(50% - 4px);
+}
+
+.tabs.external-drop {
+  background: var(--vscode-editorGroup-dropBackground);
+  box-shadow: inset 0 -2px 0 var(--vscode-focusBorder);
+}
+
+.panel-container.terminal-drop {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+
+/* Groups are placed absolutely from the layout (no re-mount on split) */
+.editor-grid {
+  position: relative;
+}
+
+.editor-grid-cell {
+  position: absolute;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-grid-cell > .editor-group {
+  flex: 1;
+}
+
+.editor-grid > .editor-split-sash {
+  position: absolute;
+  z-index: 6;
+}
+
+.editor-grid > .editor-split-sash.sash-row {
+  width: 1px;
+  margin-left: -0.5px;
+}
+
+.editor-grid > .editor-split-sash.sash-column {
+  height: 1px;
+  margin-top: -0.5px;
+}
+
+/* Empty editor group kept in the layout */
+.empty-group {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+
+.empty-group-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+
+.empty-group-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.empty-group-hint svg {
+  opacity: 0.5;
+  margin-bottom: 6px;
+}
+
+.empty-group-hint p {
+  margin: 0;
+}
+
+.editor-group.active .empty-group {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 35%, transparent);
+}

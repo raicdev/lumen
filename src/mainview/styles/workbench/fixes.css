@@ -1,0 +1,22 @@
+/* fixes */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.welcome-columns {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.welcome-columns section {
+  min-width: 0;
+}
+
+.scm-message {
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.status-lsp {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}

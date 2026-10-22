@@ -19,7 +19,7 @@ import { getSettings, onSettingsChange } from "./settings";
 
 /**
  * The active color theme: workbench colors as `--vscode-*` CSS variables on
- * the document (Lumen's own variables are defined from them in index.css),
+ * the document (Lumen's own variables are defined from them in styles/core/tokens.css),
  * TextMate token colors for the editor (a Highlighter over the theme's
  * tokenColors) and the semantic token colors.
  */

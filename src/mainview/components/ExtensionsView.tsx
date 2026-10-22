@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ExtensionDescription, MarketplaceExtension } from "../../shared/extensions";
 import { api } from "../lib/rpc";
+import { COMPAT_GRADES, compatClass, compatGrade } from "../lib/compat";
 import { showContextMenu } from "../lib/context-menu";
 import { contributedMenuItems, showContributedMenu } from "../features/menus-walkthroughs/menus";
 
@@ -43,20 +44,12 @@ export function ExtensionIcon({ url, name, size = 36 }: { url?: string; name: st
 
 export function CompatBadge({ extension }: { extension: ExtensionDescription }) {
   if (extension.kind !== "vscode") return null;
-  const level = extension.compat?.level ?? "partial";
-  const label = level === "full" ? "VS Code · compatible" : level === "partial" ? "VS Code · partial" : "VS Code · limited";
   return (
-    <span className={`ext-badge compat-${level}`} title="Converted from a VS Code extension by the transpiler — open the details for the compatibility report">
-      {label}
+    <span className={`ext-badge ${compatClass(extension.compat)}`} title="Converted from a VS Code extension by the transpiler — open the details for the compatibility report">
+      VS Code · {COMPAT_GRADES[compatGrade(extension.compat)].badge}
     </span>
   );
 }
-
-const COMPAT_LEVELS = {
-  full: { label: "Supported", text: "Everything this extension uses works in Lumen." },
-  partial: { label: "Partially supported", text: "It works, but some of the features it uses are missing or limited in Lumen." },
-  limited: { label: "Limited", text: "Core features it relies on are not available in Lumen; it may not work." },
-} as const;
 
 /** The VS Code logo (Simple Icons, CC0). */
 function VscodeLogo({ size }: { size: number }) {
@@ -74,22 +67,23 @@ function nameList(names: string[], max = 5): string {
 
 /**
  * A VS Code extension's compatibility, as a colored VS Code logo next to its
- * name (green: supported, yellow: partial, red: limited). Hovering shows what
+ * name (green: supported; yellow-green, yellow or orange: mostly, half or barely
+ * supported; red: limited). Hovering shows what
  * is missing; the details page has the full report.
  */
 export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   if (extension.kind !== "vscode") return null;
   const report = extension.compat;
-  const level = report?.level ?? "partial";
-  const info = COMPAT_LEVELS[level];
+  const color = compatClass(report);
+  const info = COMPAT_GRADES[compatGrade(report)];
   const unsupportedApis = report?.apis.filter((api) => api.status === "unsupported").map((api) => api.name) ?? [];
   const partialApis = report?.apis.filter((api) => api.status === "partial").map((api) => api.name) ?? [];
   const contributions = report?.contributions.filter((c) => c.status !== "supported").map((c) => (c.status === "partial" ? `${c.name} (partial)` : c.name)) ?? [];
 
   const card = anchor && (
     <div
-      className={`ext-compat-card compat-${level}`}
+      className={`ext-compat-card ${color}`}
       role="tooltip"
       style={{ top: anchor.bottom + 6, left: Math.max(8, Math.min(anchor.left - 8, window.innerWidth - 328)) }}
     >
@@ -98,6 +92,11 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
         VS Code extension · {info.label}
       </div>
       <p>{report ? info.text : "Not analyzed yet: open the details to check it."}</p>
+      {report?.coverage !== undefined && report.level !== "full" && (
+        <p>
+          <b>Works:</b> {report.coverage}% of the APIs and contribution points it uses
+        </p>
+      )}
       {unsupportedApis.length > 0 && (
         <p>
           <b>Not available:</b> {nameList(unsupportedApis)}
@@ -124,7 +123,7 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
 
   return (
     <span
-      className={`ext-compat-icon compat-${level}`}
+      className={`ext-compat-icon ${color}`}
       // An empty title keeps the row's tooltip (the extension id) from covering the card.
       title=""
       aria-label={`VS Code extension: ${info.label}`}

@@ -165,10 +165,16 @@ export function SettingsEditor({ open, onClose }: Props) {
     return [...ids].sort();
   }, [extensions]);
 
+  // Only on open: onClose is a new function on every App render (any settings change),
+  // and must not clear the search or move the focus.
   useEffect(() => {
     if (!open) return;
     setQuery("");
     requestAnimationFrame(() => inputRef.current?.focus());
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -233,11 +239,16 @@ export function SettingsEditor({ open, onClose }: Props) {
     setActiveCategory(current ?? toc.find((entry) => entry.category)?.category ?? null);
   };
 
+  // Back to the top only when a different list is shown. toc is rebuilt on every settings change,
+  // so it must not trigger this: changing a value would jump the list to the top.
   useEffect(() => {
     if (!open) return;
     pickedCategory.current = null;
     bodyRef.current?.scrollTo({ top: 0 });
-    syncActiveCategory();
+  }, [open, query, modifiedOnly, language]);
+
+  useEffect(() => {
+    if (open) syncActiveCategory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, toc]);
 

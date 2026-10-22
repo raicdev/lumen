@@ -14,7 +14,7 @@ If you need something they do not offer, put it in "followups" in your answer.
 | --- | --- |
 | `src/main/exthost/features/<area>.ts` | `export const <camelArea>Feature: HostFeature` (extension host worker) |
 | `src/mainview/features/<area>.tsx` | `export const <camelArea>View: ViewFeature` (window, React) |
-| `src/mainview/features/feature-<area>.css` | styles; linked from index.html and copied by the build. **Do not `import` css from a .tsx** (esbuild would emit `index.css`, which the build overwrites) |
+| `src/mainview/features/feature-<area>.css` | styles; `@import` it from `src/mainview/index.css` (the build inlines it). **Do not `import` css from a .tsx** (esbuild would emit `index.css`, which the build overwrites) |
 | `src/shared/extension-support/<area>.ts` | `export const <camelArea>Support: AreaSupport`: the support table changes (see below) |
 | `test/<area>.test.ts` | your tests (`pnpm test` runs `test/*.test.ts`) |
 

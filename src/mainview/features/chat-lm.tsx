@@ -9,7 +9,7 @@ import { createStore, refreshFeatures, useStore } from "./store";
 import type { ViewFeature, ViewFeatureApi } from "./types";
 import { MenuActions } from "./menus-walkthroughs/MenuActions";
 
-/** Window side of the "chat-lm" area: the Chat side bar view. Its styles go to feature-chat-lm.css (linked from index.html). */
+/** Window side of the "chat-lm" area: the Chat side bar view. Its styles go to feature-chat-lm.css (imported by index.css). */
 
 /** A participant's `iconPath` as the host sends it (see exthost/features/chat-lm/types.ts). */
 type ParticipantIcon = { url: string; dark?: string } | { codicon: string; color?: string };

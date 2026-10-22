@@ -1,0 +1,43 @@
+/* ── Terminal panel ── */
+
+.panel-resizer {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.panel-resizer:hover,
+.panel-resizer.dragging {
+  background: var(--border);
+}
+
+.panel-resizer[hidden] {
+  display: none !important;
+}
+
+.status-btn {
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  color: color-mix(in srgb, var(--vscode-statusBar-foreground) 70%, transparent);
+  font-size: 11px;
+  background: transparent;
+}
+
+.status-btn:hover,
+.status-btn.active {
+  color: var(--vscode-statusBar-foreground);
+  background: color-mix(in srgb, var(--vscode-statusBar-foreground) 6%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-statusBar-foreground) 15%, transparent);
+}
+
+/* main column must stack editor + terminal */
+.main {
+  min-height: 0;
+}
+
+.editor-host {
+  flex: 1 1 auto;
+}

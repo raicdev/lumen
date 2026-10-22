@@ -1,0 +1,62 @@
+/* ── Explorer decorations ── */
+
+.file-tree:focus {
+  outline: none;
+}
+
+.file-tree:focus .tree-item.selected {
+  outline: 1px solid var(--vscode-list-focusOutline);
+  outline-offset: -1px;
+}
+
+.tree-item.selected {
+  background: var(--bg-hover);
+}
+
+.tree-item .name {
+  flex: 1;
+}
+
+.tree-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.tree-dot {
+  font-size: 7px;
+  margin-left: 4px;
+}
+
+.git-modified {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground) !important;
+}
+
+.git-added,
+.git-untracked {
+  color: var(--vscode-gitDecoration-untrackedResourceForeground) !important;
+}
+
+.git-deleted {
+  color: var(--vscode-gitDecoration-deletedResourceForeground) !important;
+}
+
+.git-renamed {
+  color: var(--vscode-gitDecoration-renamedResourceForeground) !important;
+}
+
+.git-conflict {
+  color: var(--vscode-gitDecoration-conflictingResourceForeground) !important;
+}
+
+.problem-error {
+  color: var(--vscode-list-errorForeground) !important;
+}
+
+.problem-warning {
+  color: var(--vscode-list-warningForeground) !important;
+}
+
+.outline-tree {
+  padding-top: 4px;
+}

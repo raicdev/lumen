@@ -6,7 +6,7 @@ import type { ViewFeature, ViewFeatureApi } from "./types";
  * Window side of the "authentication" area: the Accounts entry (status bar,
  * right) that lists the signed-in accounts of the registered authentication
  * providers, signs out, revokes the access of extensions and answers pending
- * sign-in requests. Its styles go to feature-authentication.css (linked from index.html).
+ * sign-in requests. Its styles go to feature-authentication.css (imported by index.css).
  */
 
 const state = createStore<AuthenticationState>({ accounts: [], pending: [] });

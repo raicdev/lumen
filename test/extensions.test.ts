@@ -188,6 +188,63 @@ test("a stored report is re-rated against the current API table", () => {
   assert.equal(report.level, "full");
 });
 
+test("an extension whose APIs are all unsupported is limited, not partial", () => {
+  const manifest = { name: "gone", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, contributes: { commands: [{ command: "a", title: "A" }] } };
+  const unsupported = (name: string) => ({ name, status: "unsupported" as const, count: 1, note: "not part of Lumen's API" });
+  const stale = {
+    transpilerVersion: 1,
+    rewrittenImports: 1,
+    filesScanned: 1,
+    filesRewritten: 1,
+    apis: [unsupported("window.someFutureApi"), unsupported("workspace.anotherFutureApi")],
+    contributions: [],
+    warnings: [],
+    level: "partial" as const,
+  };
+  assert.equal(refreshReport(stale, manifest).level, "limited");
+  // One working API is enough for partial.
+  const mixed = { ...stale, apis: [...stale.apis, { name: "commands.registerCommand", status: "supported" as const, count: 1 }] };
+  assert.equal(refreshReport(mixed, manifest).level, "partial");
+});
+
+test("partial extensions are graded by how much of what they use works", () => {
+  const manifest = { name: "graded", publisher: "test", version: "1.0.0", engines: { vscode: "^1.90.0", lumen: "^0.1.0" }, contributes: { commands: [{ command: "a", title: "A" }] } };
+  const supported = ["commands.registerCommand", "window.showInformationMessage", "window.showQuickPick", "workspace.getConfiguration"];
+  const missing = ["window.someFutureApi", "workspace.anotherFutureApi", "env.yetAnotherApi", "languages.notThereYet", "tasks.neverHeardOf"];
+  const rate = (working: number, broken: number) =>
+    refreshReport(
+      {
+        transpilerVersion: 1,
+        rewrittenImports: 1,
+        filesScanned: 1,
+        filesRewritten: 1,
+        apis: [
+          ...supported.slice(0, working).map((name) => ({ name, status: "supported" as const, count: 1 })),
+          ...missing.slice(0, broken).map((name) => ({ name, status: "unsupported" as const, count: 3 })),
+        ],
+        contributions: [],
+        warnings: [],
+        level: "partial" as const,
+      },
+      manifest,
+    );
+  // The commands contribution point counts as one more working entry.
+  const high = rate(4, 1);
+  assert.equal(high.coverage, 83);
+  assert.equal(high.partialGrade, "high");
+  const medium = rate(1, 2);
+  assert.equal(medium.coverage, 50);
+  assert.equal(medium.partialGrade, "medium");
+  const low = rate(1, 5);
+  assert.equal(low.coverage, 29);
+  assert.equal(low.partialGrade, "low");
+  // Full and limited extensions carry no grade, even when a stored report had one.
+  const full = refreshReport({ ...rate(4, 0), partialGrade: "low" }, manifest);
+  assert.equal(full.level, "full");
+  assert.equal(full.partialGrade, undefined);
+  assert.equal(full.coverage, 100);
+});
+
 test("readZip reads the entries of a package", () => {
   const entries = readZip(SAMPLE_VSIX());
   assert.equal(entries.length, 4);

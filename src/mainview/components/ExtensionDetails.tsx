@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CompatReport, ExtensionDescription, ExtensionManifest, MarketplaceCompat, MarketplaceDetails, MarketplaceExtension, SupportLevel } from "../../shared/extensions";
 import { renderMarkdown } from "../lib/markdown";
 import { api } from "../lib/rpc";
+import { COMPAT_GRADES, compatClass, compatGrade } from "../lib/compat";
 import { normalizeKeybinding } from "../lib/extensions";
 import { CompatBadge, ExtensionIcon, type ExtensionAction, type ExtensionTarget } from "./ExtensionsView";
 
@@ -36,17 +37,15 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
   if (!report) return <div className="ext-details-empty">No compatibility report was recorded for this extension.</div>;
   const order: SupportLevel[] = ["unsupported", "partial", "supported"];
   const apis = [...report.apis].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || a.name.localeCompare(b.name));
-  const summary =
-    report.level === "full"
-      ? "Everything this extension uses is available in Lumen."
-      : report.level === "partial"
-        ? "The extension runs, but some of the features it uses are missing or limited in Lumen."
-        : "Core parts of this extension (views, webviews, debugging, …) are not available in Lumen; it may do little or nothing.";
+  const grade = COMPAT_GRADES[compatGrade(report)];
   return (
     <div className="ext-compat">
-      <div className={`ext-compat-summary compat-${report.level}`}>
-        <strong>{report.level === "full" ? "Compatible" : report.level === "partial" ? "Partially compatible" : "Limited"}</strong>
-        <span>{summary}</span>
+      <div className={`ext-compat-summary ${compatClass(report)}`}>
+        <strong>{grade.label}</strong>
+        <span>
+          {grade.text}
+          {report.coverage !== undefined && report.level !== "full" && ` ${report.coverage}% of the APIs and contribution points it uses work.`}
+        </span>
       </div>
       <p className="ext-compat-note">{note}</p>
       {report.warnings.length > 0 && (
@@ -264,7 +263,7 @@ function MarkdownDoc({ source, empty }: { source: string | null | undefined; emp
   const html = useMemo(() => (source ? renderMarkdown(source) : ""), [source]);
   if (source === undefined) {
     return (
-      <div className="ext-details-empty">
+      <div className="ext-details-empty ext-details-loading">
         <LoaderCircle size={13} className="codicon spin" /> Loading…
       </div>
     );
@@ -301,7 +300,7 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
 
   if (result === "loading") {
     return (
-      <div className="ext-details-empty">
+      <div className="ext-details-empty ext-details-loading">
         <LoaderCircle size={13} className="codicon spin" /> Loading…
       </div>
     );
@@ -320,7 +319,7 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
   }
   if (result === "checking") {
     return (
-      <div className="ext-details-empty">
+      <div className="ext-details-empty ext-details-loading">
         <LoaderCircle size={13} className="codicon spin" /> Downloading and analyzing the package…
       </div>
     );
@@ -529,7 +528,7 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
             ) : listing ? (
               <div className="ext-details-empty">Could not load the package manifest from Open VSX.</div>
             ) : (
-              <div className="ext-details-empty">
+              <div className="ext-details-empty ext-details-loading">
                 <LoaderCircle size={13} className="codicon spin" /> Loading…
               </div>
             ))}

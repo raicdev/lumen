@@ -7,7 +7,7 @@ import { featureApi } from "./registry";
 /**
  * Window side of the "languages-extra" area: the call / type hierarchy panel,
  * and (editor.ts) inline values, debug hover and document drop / paste edits.
- * Its styles go to feature-languages-extra.css (linked from index.html); the
+ * Its styles go to feature-languages-extra.css (imported by index.css); the
  * host side is src/main/exthost/features/languages-extra.ts.
  */
 

@@ -1,0 +1,103 @@
+/* ── lucide icons ── */
+
+.icon-btn svg,
+.activity-btn svg,
+.window-btn svg,
+.status-btn svg,
+.panel-row svg,
+.menu-check svg {
+  flex-shrink: 0;
+}
+
+.chevron {
+  display: inline-grid !important;
+  place-items: center;
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.1s ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.search-expand {
+  display: grid;
+  place-items: center;
+  width: 18px;
+}
+
+.search-expand.open {
+  transform: rotate(90deg);
+}
+
+.symbol-icon,
+.severity-icon,
+.crumb-sep,
+.terminal-glyph,
+.folder-type-icon {
+  flex-shrink: 0;
+}
+
+.crumb-sep {
+  padding: 0;
+  margin: 0 1px;
+  color: var(--text-muted);
+}
+
+.terminal-glyph {
+  color: var(--text-dim);
+}
+
+.terminal-tab-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.tab-close {
+  width: 20px;
+  height: 20px;
+}
+
+.tab-close-x {
+  display: block;
+}
+
+.tab.dirty .tab-close .tab-close-x {
+  display: none;
+}
+
+.tab.dirty .tab-close:hover .tab-close-x {
+  display: block;
+}
+
+.menu-check {
+  display: inline-flex;
+  align-items: center;
+}
+
+.scm-commit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.search-toggle {
+  display: inline-grid;
+  place-items: center;
+}
+
+.status-bar .status-btn svg {
+  opacity: 0.9;
+}
+
+.toolbar-search svg {
+  flex-shrink: 0;
+}
+
+.menu-label {
+  white-space: nowrap;
+}

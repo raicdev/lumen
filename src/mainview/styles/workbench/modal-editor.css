@@ -1,0 +1,54 @@
+/* ── Modal editor part (workbench.editor.useModal) ── */
+
+/* Below the palette (100) and dialogs, above the workbench and its webviews (40). */
+.modal-overlay.modal-editor-overlay {
+  z-index: 90;
+}
+
+.modal-editor-part {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, calc(100% - 64px));
+  height: min(760px, calc(100% - 64px));
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.modal-editor-part.maximized {
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+}
+
+.modal-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-elevated);
+  flex: none;
+}
+
+.modal-editor-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.modal-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.modal-editor-body > .editor-group {
+  flex: 1;
+  min-width: 0;
+}

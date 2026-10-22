@@ -1,0 +1,73 @@
+/* ── Welcome ── */
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.welcome[hidden],
+.editor-root[hidden] {
+  display: none !important;
+}
+
+.welcome-tagline {
+  margin: 6px 0 2px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.primary-btn,
+.secondary-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 12.5px;
+  transition: 0.12s ease;
+}
+
+.primary-btn {
+  background: var(--bg-active);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.primary-btn:hover {
+  background: color-mix(in srgb, var(--bg-active) 88%, var(--text));
+  border-color: var(--accent-hi);
+}
+
+.secondary-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.secondary-btn:hover {
+  border-color: var(--accent-hi);
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.welcome-keys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  text-align: left;
+}
+
+.welcome-keys div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.welcome-keys span {
+  margin-left: 2px;
+}

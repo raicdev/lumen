@@ -1,0 +1,96 @@
+/* ── Welcome page ── */
+
+.welcome {
+  place-items: start center;
+  overflow: auto;
+}
+
+.welcome-page {
+  width: min(860px, calc(100% - 64px));
+  padding: 9vh 0 40px;
+}
+
+.welcome-hero h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.welcome-hero .welcome-tagline {
+  margin: 4px 0 36px;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.welcome-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+}
+
+.welcome-columns h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.welcome-columns section h2:not(:first-child) {
+  margin-top: 28px;
+}
+
+.welcome-link {
+  display: block;
+  padding: 3px 0;
+  color: var(--vscode-textLink-foreground);
+  font-size: 13px;
+  text-align: left;
+}
+
+.welcome-link:hover {
+  text-decoration: underline;
+}
+
+.welcome-recent {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.welcome-recent .welcome-link {
+  flex-shrink: 0;
+}
+
+.welcome-recent .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.welcome-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.welcome-key {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.welcome-key:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

@@ -45,6 +45,8 @@ type Context = {
   extensionProcesses: Map<number, string>;
   /** Renderer pid → what its frames show: an extension, or Lumen's own window. */
   renderers: Map<number, string[]>;
+  /** WebView2 processes of Lumen's own windows (not of another app started in a terminal, such as `lumen dev`). */
+  ownWebviews: Set<number>;
 };
 
 const APP_WINDOW = "\0window";
@@ -54,7 +56,7 @@ function describe(info: ProcessInfo, context: Context): Pick<ProcessRow, "label"
   const terminal = context.terminals.get(info.pid);
   if (terminal) return { label: `Terminal: ${terminal}`, kind: "terminal", extension: null };
   const name = info.name.toLowerCase();
-  if (name === "msedgewebview2.exe") {
+  if (name === "msedgewebview2.exe" && context.ownWebviews.has(info.pid)) {
     const shows = context.renderers.get(info.pid) ?? [];
     const extensions = shows.filter((entry) => entry !== APP_WINDOW);
     const label = webviewLabel(info.commandLine);
@@ -62,6 +64,7 @@ function describe(info: ProcessInfo, context: Context): Pick<ProcessRow, "label"
     return { label: shows.includes(APP_WINDOW) ? `${label} (Lumen window)` : label, kind: "webview", extension: null };
   }
   const extension = context.extensionProcesses.get(info.pid) ?? null;
+  if (name === "msedgewebview2.exe") return { label: webviewLabel(info.commandLine), kind: "process", extension };
   if (name === "openconsole.exe" || name === "conhost.exe") return { label: "Console host", kind: "process", extension };
   return { label: info.name.replace(/\.exe$/i, ""), kind: "process", extension };
 }
@@ -96,6 +99,21 @@ function attachConsoleHosts(rows: ProcessRow[], tree: ProcessInfo[]): void {
     best.parent = terminal.id;
     best.kind = "terminal";
   }
+}
+
+/**
+ * Lumen's WebView2 processes: started by the app itself, or by one of those
+ * (the browser process starts the renderers, GPU, …). WebView2 processes
+ * deeper in the tree belong to whatever started them, e.g. an app run from a
+ * terminal. `tree` lists parents first.
+ */
+function ownWebviews(tree: ProcessInfo[]): Set<number> {
+  const own = new Set<number>();
+  for (const info of tree) {
+    if (info.name.toLowerCase() !== "msedgewebview2.exe" || info.parentPid === null) continue;
+    if (info.parentPid === process.pid || own.has(info.parentPid)) own.add(info.pid);
+  }
+  return own;
 }
 
 /** What each WebView2 renderer shows: the extensions whose webview origin its frames load, or the window itself. */
@@ -143,6 +161,7 @@ export async function listProcesses(options: {
       [...options.extensionProcesses(known)].map(([pid, id]) => [pid, names.get(id.toLowerCase()) ?? id]),
     ),
     renderers: rendererOwners(frames, options.extensions),
+    ownWebviews: ownWebviews(tree),
   };
 
   const rows: ProcessRow[] = tree.map((info) => ({

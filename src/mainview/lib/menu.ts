@@ -99,6 +99,7 @@ export const APP_MENU: MenuGroup[] = [
       submenu("Appearance", [
         cmd("workbench.action.toggleFullScreen", "Full Screen"),
         cmd("workbench.action.toggleZenMode", "Zen Mode"),
+        cmd("workbench.action.toggleModernStyle", "Modern Style"),
         sep,
         cmd("workbench.action.toggleSidebarVisibility", "Primary Side Bar"),
         cmd("workbench.action.toggleAuxiliaryBar", "Secondary Side Bar"),

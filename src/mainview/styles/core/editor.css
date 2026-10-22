@@ -1,0 +1,170 @@
+/* ── Main / Tabs / Editor ── */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.tabs {
+  height: var(--tabs-h);
+  min-height: var(--tabs-h);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tabs:empty {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  min-width: 100px;
+  max-width: 180px;
+  border-right: 1px solid var(--vscode-tab-border);
+  color: var(--vscode-tab-inactiveForeground);
+  background: var(--vscode-tab-inactiveBackground);
+  position: relative;
+  transition: 0.1s ease;
+}
+
+.tab:hover {
+  color: var(--text-dim);
+  background: var(--vscode-tab-hoverBackground);
+}
+
+.tab.active {
+  color: var(--vscode-tab-activeForeground);
+  background: var(--tab-active);
+}
+
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--vscode-tab-activeBorderTop);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tab-close {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  opacity: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.editor-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-root {
+  position: absolute;
+  inset: 0;
+}
+
+.editor-root .cm-editor {
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.editor-root .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor-root .cm-scroller {
+  font-family: var(--font-mono) !important;
+}
+
+/* Gutters stick to the edges while the code scrolls horizontally underneath,
+   so they need an opaque background (line numbers on the left, minimap on the right). */
+.editor-root .cm-gutters {
+  background: var(--vscode-editorGutter-background) !important;
+  border-right: 1px solid var(--border-soft) !important;
+  color: var(--text-muted);
+}
+
+.editor-root .cm-gutters.cm-minimap-gutter {
+  border-right: none !important;
+  border-left: 1px solid var(--border-soft) !important;
+  z-index: 200;
+}
+
+.editor-root .cm-activeLineGutter {
+  background: var(--bg-hover) !important;
+  color: var(--text-dim);
+}
+
+.editor-root .cm-activeLine {
+  background: var(--vscode-editor-lineHighlightBackground) !important;
+}
+
+.editor-root .cm-selectionBackground,
+.editor-root .cm-content ::selection {
+  background: var(--selection) !important;
+}
+
+.editor-root .cm-cursor {
+  border-left-color: var(--text) !important;
+  border-left-width: 1.5px !important;
+}
+
+.editor-root .cm-tooltip {
+  background: var(--vscode-editorHoverWidget-background) !important;
+  border: 1px solid var(--vscode-editorHoverWidget-border) !important;
+  border-radius: 4px !important;
+  box-shadow: var(--shadow) !important;
+  color: var(--vscode-editorHoverWidget-foreground) !important;
+  font-family: var(--font-ui) !important;
+}
+
+.editor-root .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--vscode-editorSuggestWidget-selectedBackground) !important;
+  color: var(--vscode-editorSuggestWidget-selectedForeground) !important;
+}
+
+.editor-root .cm-diagnostic-error {
+  border-bottom: 1px solid var(--danger);
+}
+
+.editor-root .cm-diagnostic-warning {
+  border-bottom: 1px solid var(--warning);
+}

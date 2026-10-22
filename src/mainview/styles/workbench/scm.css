@@ -1,0 +1,144 @@
+/* Source control */
+.scm-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
+.scm-commit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.scm-message {
+  resize: none;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  user-select: text;
+}
+
+.scm-message:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.scm-commit-btn {
+  height: 28px;
+  background: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.scm-commit-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+  border-color: var(--vscode-button-hoverBackground);
+}
+
+.scm-commit-btn:disabled {
+  opacity: 0.5;
+}
+
+.scm-error {
+  margin: 0 12px 8px;
+  color: var(--danger);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.scm-section-header,
+.scm-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scm-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.scm-section-header .chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.scm-section-title {
+  flex: 1;
+}
+
+.scm-row {
+  padding-left: 28px;
+}
+
+.scm-row:hover,
+.scm-section-header:hover {
+  background: var(--bg-hover);
+}
+
+.scm-name {
+  flex-shrink: 0;
+  font-size: 12.5px;
+}
+
+.scm-name.deleted {
+  text-decoration: line-through;
+}
+
+.scm-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.scm-actions {
+  display: none;
+  gap: 1px;
+}
+
+.scm-row:hover .scm-actions,
+.scm-section-header:hover .scm-actions {
+  display: flex;
+}
+
+.scm-actions .icon-btn {
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+}
+
+.scm-letter {
+  width: 12px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 10.5px;
+  line-height: 17px;
+  text-align: center;
+  font-weight: 500;
+}

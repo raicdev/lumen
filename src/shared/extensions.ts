@@ -120,7 +120,13 @@ export type CompatReport = {
   warnings: string[];
   /** Summary: everything used is supported / some features missing / core features missing. */
   level: "full" | "partial" | "limited";
+  /** Share (0–100) of the distinct APIs and contribution points it uses that work in Lumen; partial ones count half. */
+  coverage?: number;
+  /** With level "partial": how much of it works, by coverage (high: most of it, medium: about half, low: little). */
+  partialGrade?: PartialGrade;
 };
+
+export type PartialGrade = "high" | "medium" | "low";
 
 export type ExtensionSource =
   | { type: "openvsx"; namespace: string; name: string }

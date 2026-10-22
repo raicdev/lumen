@@ -1,0 +1,81 @@
+:root {
+  --bg: var(--vscode-editor-background);
+  --bg-panel: var(--vscode-sideBar-background);
+  --bg-elevated: var(--vscode-editorWidget-background);
+  --bg-hover: var(--vscode-list-hoverBackground);
+  --bg-active: var(--vscode-list-inactiveSelectionBackground);
+  --border: var(--vscode-panel-border);
+  --border-soft: var(--vscode-sideBarSectionHeader-border);
+  --text: var(--vscode-foreground);
+  --text-dim: var(--vscode-descriptionForeground);
+  --text-muted: var(--vscode-disabledForeground);
+  --accent: var(--vscode-editorLineNumber-foreground);
+  --accent-hi: var(--vscode-editorCursor-foreground);
+  --danger: var(--vscode-editorError-foreground);
+  --warning: var(--vscode-editorWarning-foreground);
+  --info: var(--vscode-editorInfo-foreground);
+  --success: var(--vscode-testing-iconPassed);
+  --tab-active: var(--vscode-tab-activeBackground);
+  --selection: var(--vscode-editor-selectionBackground);
+  --shadow: 0 8px 24px var(--vscode-widget-shadow);
+  --radius: 4px;
+  --font-ui: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", "IBM Plex Mono", ui-monospace, monospace;
+  --toolbar-h: 36px;
+  --activity-w: 48px;
+  --sidebar-w: 260px;
+  --statusbar-h: 22px;
+  --tabs-h: 35px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* The open list of a <select> is drawn from these (and the select's font), not from the select's own colors. */
+option,
+optgroup {
+  background-color: var(--vscode-dropdown-listBackground, var(--vscode-dropdown-background));
+  color: var(--vscode-dropdown-foreground);
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-dim);
+}

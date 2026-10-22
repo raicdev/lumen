@@ -1,0 +1,57 @@
+/* ── Command palette ── */
+
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding-top: 10vh;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.palette-overlay[hidden] {
+  display: none !important;
+}
+
+.palette {
+  width: min(520px, calc(100% - 32px));
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--vscode-quickInput-background);
+  color: var(--vscode-quickInput-foreground);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.palette-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+}
+
+.palette-input-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 14px;
+  user-select: text;
+}
+
+.palette-results {
+  max-height: 340px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.palette-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--text-muted);
+}

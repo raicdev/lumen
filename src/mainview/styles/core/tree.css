@@ -1,0 +1,16 @@
+/* ── Empty tree ── */
+
+.tree-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tree-empty button {
+  margin-top: 8px;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

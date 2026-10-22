@@ -31,7 +31,7 @@ import type { ExtensionGrammar, ExtensionInstallResult } from "../shared/types.t
 import type { ExtensionDescription } from "../shared/extensions.ts";
 import type { MarketplaceExtension } from "../shared/extensions.ts";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.2.1";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 
@@ -596,7 +596,7 @@ app.on("ready", () => {
     rpc,
     // The view draws its own title bar + menu bar (see TitleBar.tsx).
     frame: false,
-    // Matches --bg in index.css so the window never flashes white on open.
+    // Matches --bg in styles/core/tokens.css so the window never flashes white on open.
     backgroundColor: "#111113",
     // Unsaved-changes protection: the shell asks before the window goes away.
     closeGuard: async () => {

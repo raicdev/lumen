@@ -184,14 +184,27 @@
   white-space: nowrap;
 }
 
+/* Partial VS Code extensions by how much of them works: yellow-green, yellow, orange. */
+.compat-partial {
+  --compat-partial: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.compat-partial.compat-grade-high {
+  --compat-partial: color-mix(in srgb, var(--vscode-charts-green) 55%, var(--vscode-gitDecoration-modifiedResourceForeground));
+}
+
+.compat-partial.compat-grade-low {
+  --compat-partial: color-mix(in srgb, var(--vscode-errorForeground) 55%, var(--vscode-gitDecoration-modifiedResourceForeground));
+}
+
 .ext-badge.compat-full {
   border-color: color-mix(in srgb, var(--vscode-charts-green) 30%, transparent);
   color: var(--vscode-charts-green);
 }
 
 .ext-badge.compat-partial {
-  border-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 30%, transparent);
-  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  border-color: color-mix(in srgb, var(--compat-partial) 30%, transparent);
+  color: var(--compat-partial);
 }
 
 .ext-badge.compat-limited {
@@ -354,6 +367,12 @@
   margin: 0;
 }
 
+/* A spinner and its text on one line. */
+.ext-details-empty.ext-details-loading {
+  flex-direction: row;
+  align-items: center;
+}
+
 .ext-table {
   width: 100%;
   border-collapse: collapse;
@@ -435,7 +454,7 @@
 }
 
 .ext-compat-summary.compat-partial {
-  border-left-color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  border-left-color: var(--compat-partial);
 }
 
 .ext-compat-summary.compat-limited {
@@ -1473,7 +1492,7 @@
 
 .ext-compat-icon.compat-partial,
 .ext-compat-card.compat-partial .ext-compat-card-title svg {
-  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  color: var(--compat-partial);
 }
 
 .ext-compat-icon.compat-limited,

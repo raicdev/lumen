@@ -1,0 +1,15 @@
+/* ── Sidebar views ── */
+
+.sidebar {
+  min-width: 170px;
+  max-width: 600px;
+}
+
+.sidebar-header {
+  min-height: 35px;
+  padding: 0 8px 0 16px;
+}
+
+.sidebar-actions .icon-btn {
+  font-size: 14px;
+}

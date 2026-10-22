@@ -227,13 +227,39 @@ function walkScripts(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function summarize(report: Omit<CompatReport, "level">): CompatReport["level"] {
+type Rating = Pick<CompatReport, "level" | "coverage" | "partialGrade">;
+
+/** Coverage at or above which a partial extension mostly works / about half of it works. */
+const PARTIAL_HIGH = 75;
+const PARTIAL_MEDIUM = 40;
+
+/** Share (0–100) of what an extension uses that works: distinct APIs and contribution points, partial ones counting half. */
+function coverageOf(report: Pick<CompatReport, "apis" | "contributions">): number {
+  const used = [...report.apis, ...report.contributions];
+  if (!used.length) return 100;
+  const score = used.reduce((sum, entry) => sum + (entry.status === "supported" ? 1 : entry.status === "partial" ? 0.5 : 0), 0);
+  return Math.round((score / used.length) * 100);
+}
+
+function summarize(report: Omit<CompatReport, keyof Rating>): Rating {
+  const level = levelOf(report);
+  const coverage = coverageOf(report);
+  // partialGrade is always set (undefined too), so it replaces the grade of a stored report.
+  if (level !== "partial") return { level, coverage, partialGrade: undefined };
+  const partialGrade = coverage >= PARTIAL_HIGH ? "high" : coverage >= PARTIAL_MEDIUM ? "medium" : "low";
+  return { level, coverage, partialGrade };
+}
+
+function levelOf(report: Omit<CompatReport, keyof Rating>): CompatReport["level"] {
   const usedUnsupported = report.apis.filter((api) => api.status === "unsupported");
   const coreMissing =
     usedUnsupported.some((api) => CORE_UNSUPPORTED.test(api.name)) ||
     report.contributions.some((c) => c.status === "unsupported" && CORE_CONTRIBUTIONS.has(c.name)) ||
     report.warnings.some((w) => w.startsWith("This is a web extension"));
   if (coreMissing) return "limited";
+  // Nothing it uses works: the code only calls missing APIs (or, without code, only missing contribution points).
+  const used = report.apis.length ? report.apis : report.contributions;
+  if (used.length && used.every((entry) => entry.status === "unsupported")) return "limited";
   const anyGap =
     usedUnsupported.length > 0 ||
     report.apis.some((api) => api.status === "partial") ||
@@ -296,7 +322,7 @@ export function transpileExtension(sourceDir: string, target?: string, options: 
     contributions,
     warnings,
   };
-  const report: CompatReport = { ...partialReport, level: summarize(partialReport) };
+  const report: CompatReport = { ...partialReport, ...summarize(partialReport) };
   if (write) {
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
     writeFileSync(join(dir, "lumen-compat.json"), JSON.stringify(report, null, 2), "utf8");
@@ -318,7 +344,7 @@ export function refreshReport(report: CompatReport, manifest: ExtensionManifest)
   // e.g. "onDebug… is never raised" goes away once Lumen raises the event.
   const warnings = [...manifestWarnings, ...report.warnings.filter((warning) => !MANIFEST_WARNING.test(warning))];
   const partialReport = { ...report, apis, contributions, warnings };
-  return { ...partialReport, level: summarize(partialReport) };
+  return { ...partialReport, ...summarize(partialReport) };
 }
 
 /** Unpack a .vsix into `target` and transpile it there. */
@@ -334,7 +360,8 @@ export function formatReport(manifest: ExtensionManifest, report: CompatReport, 
   const id = `${manifest.publisher ?? "unknown"}.${manifest.name}`;
   lines.push(`${manifest.displayName ?? manifest.name} (${id}@${manifest.version})`);
   if (location) lines.push(`  → ${location}`);
-  lines.push(`  compatibility: ${report.level}`);
+  const grade = report.partialGrade ? ` (${report.partialGrade})` : "";
+  lines.push(`  compatibility: ${report.level}${grade}${report.coverage !== undefined ? `, ${report.coverage}% of what it uses works` : ""}`);
   lines.push(`  ${report.rewrittenImports} import(s) rewritten in ${report.filesRewritten} of ${report.filesScanned} script(s)`);
   const by = (status: SupportLevel) => report.apis.filter((api) => api.status === status);
   for (const status of ["unsupported", "partial"] as const) {
