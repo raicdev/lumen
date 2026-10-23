@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import type { GitFileStatus, GitStatus } from "../../shared/types";
 import { ExtensionScm } from "../features/scm-panel";
 import { FileIcon } from "./FileIcon";
+import { t } from "../lib/i18n";
 
 type Props = {
   status: GitStatus | null;
@@ -21,19 +22,19 @@ type Props = {
 export function gitDecoration(code: string): { letter: string; className: string; title: string } | null {
   switch (code) {
     case "M":
-      return { letter: "M", className: "git-modified", title: "Modified" };
+      return { letter: "M", className: "git-modified", title: t("Modified") };
     case "A":
-      return { letter: "A", className: "git-added", title: "Index Added" };
+      return { letter: "A", className: "git-added", title: t("Index Added") };
     case "D":
-      return { letter: "D", className: "git-deleted", title: "Deleted" };
+      return { letter: "D", className: "git-deleted", title: t("Deleted") };
     case "R":
-      return { letter: "R", className: "git-renamed", title: "Renamed" };
+      return { letter: "R", className: "git-renamed", title: t("Renamed") };
     case "C":
-      return { letter: "C", className: "git-renamed", title: "Copied" };
+      return { letter: "C", className: "git-renamed", title: t("Copied") };
     case "U":
-      return { letter: "!", className: "git-conflict", title: "Conflict" };
+      return { letter: "!", className: "git-conflict", title: t("Conflict") };
     case "?":
-      return { letter: "U", className: "git-untracked", title: "Untracked" };
+      return { letter: "U", className: "git-untracked", title: t("Untracked") };
     default:
       return null;
   }
@@ -136,10 +137,10 @@ function GitScm(props: Props) {
   const { status } = props;
   const [message, setMessage] = useState("");
 
-  if (!props.workspaceRoot) return <div className="tree-empty">Open a folder to use source control.</div>;
-  if (!status) return <div className="tree-empty">Loading…</div>;
+  if (!props.workspaceRoot) return <div className="tree-empty">{t("Open a folder to use source control.")}</div>;
+  if (!status) return <div className="tree-empty">{t("Loading…")}</div>;
   if (!status.isRepo) {
-    return <div className="tree-empty">The folder currently open doesn't have a git repository.</div>;
+    return <div className="tree-empty">{t("The folder currently open doesn't have a git repository.")}</div>;
   }
 
   const staged = status.files.filter((file) => file.index !== " " && file.index !== "?");
@@ -155,7 +156,7 @@ function GitScm(props: Props) {
       <div className="scm-commit">
         <textarea
           className="scm-message"
-          placeholder={`Message (Ctrl+Enter to commit on "${status.branch ?? "HEAD"}")`}
+          placeholder={t('Message (Ctrl+Enter to commit on "{0}")', status.branch ?? "HEAD")}
           value={message}
           rows={Math.min(8, Math.max(2, message.split("\n").length))}
           onChange={(e) => setMessage(e.target.value)}
@@ -167,16 +168,16 @@ function GitScm(props: Props) {
           }}
         />
         <button type="button" className="primary-btn scm-commit-btn" disabled={!message.trim() || props.busy} onClick={() => void commit()}>
-          <Check size={15} /> Commit
+          <Check size={15} /> {t("Commit")}
         </button>
       </div>
       {status.error && <div className="scm-error">{status.error}</div>}
-      {!status.files.length && <div className="tree-empty">No changes.</div>}
+      {!status.files.length && <div className="tree-empty">{t("No changes.")}</div>}
       {staged.length > 0 && (
         <Section
-          title="Staged Changes"
+          title={t("Staged Changes")}
           count={staged.length}
-          actions={[{ label: <Minus size={15} />, title: "Unstage All Changes", run: () => props.onUnstage(staged) }]}
+          actions={[{ label: <Minus size={15} />, title: t("Unstage All Changes"), run: () => props.onUnstage(staged) }]}
         >
           {staged.map((file) => (
             <FileRow
@@ -185,8 +186,8 @@ function GitScm(props: Props) {
               code={file.index}
               onOpen={() => props.onOpenChanges(file)}
               actions={[
-                { label: <ExternalLink size={14} />, title: "Open File", run: () => props.onOpen(file) },
-                { label: <Minus size={15} />, title: "Unstage Changes", run: () => props.onUnstage([file]) },
+                { label: <ExternalLink size={14} />, title: t("Open File"), run: () => props.onOpen(file) },
+                { label: <Minus size={15} />, title: t("Unstage Changes"), run: () => props.onUnstage([file]) },
               ]}
             />
           ))}
@@ -194,11 +195,11 @@ function GitScm(props: Props) {
       )}
       {changes.length > 0 && (
         <Section
-          title="Changes"
+          title={t("Changes")}
           count={changes.length}
           actions={[
-            { label: <Undo2 size={15} />, title: "Discard All Changes", run: () => props.onDiscard(changes) },
-            { label: <Plus size={15} />, title: "Stage All Changes", run: () => props.onStage(changes) },
+            { label: <Undo2 size={15} />, title: t("Discard All Changes"), run: () => props.onDiscard(changes) },
+            { label: <Plus size={15} />, title: t("Stage All Changes"), run: () => props.onStage(changes) },
           ]}
         >
           {changes.map((file) => (
@@ -208,9 +209,9 @@ function GitScm(props: Props) {
               code={file.index === "?" ? "?" : file.worktree}
               onOpen={() => props.onOpenChanges(file)}
               actions={[
-                { label: <ExternalLink size={14} />, title: "Open File", run: () => props.onOpen(file) },
-                { label: <Undo2 size={15} />, title: "Discard Changes", run: () => props.onDiscard([file]) },
-                { label: <Plus size={15} />, title: "Stage Changes", run: () => props.onStage([file]) },
+                { label: <ExternalLink size={14} />, title: t("Open File"), run: () => props.onOpen(file) },
+                { label: <Undo2 size={15} />, title: t("Discard Changes"), run: () => props.onDiscard([file]) },
+                { label: <Plus size={15} />, title: t("Stage Changes"), run: () => props.onStage([file]) },
               ]}
             />
           ))}

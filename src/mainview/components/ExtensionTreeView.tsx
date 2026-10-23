@@ -10,6 +10,7 @@ import { treeService, useTree, useTreeViews, TREE_DRAG_TYPE, type TreeState, typ
 import { WithCodicons } from "./Codicon";
 import { FileIcon } from "./FileIcon";
 import { themeColorReference } from "../lib/theme";
+import { t } from "../lib/i18n";
 
 /**
  * A tree view of an extension (window.registerTreeDataProvider /
@@ -137,7 +138,7 @@ export function ViewTitleActions({ view }: { view: ContributedView }) {
         <ActionButton key={action.command} action={action} onRun={() => treeService.runCommand(action.command)} />
       ))}
       {tree?.showCollapseAll && (
-        <button type="button" className="icon-btn view-action" title="Collapse All" onClick={() => treeService.collapseAll(view.id)}>
+        <button type="button" className="icon-btn view-action" title={t("Collapse All")} onClick={() => treeService.collapseAll(view.id)}>
           <ChevronsDownUp size={14} />
         </button>
       )}
@@ -145,7 +146,7 @@ export function ViewTitleActions({ view }: { view: ContributedView }) {
         <button
           type="button"
           className="icon-btn view-action"
-          title="More Actions…"
+          title={t("More Actions…")}
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             showActionMenu(rect.left, rect.bottom + 2, overflow, (action) => treeService.runCommand(action.command));
@@ -468,11 +469,11 @@ export function ExtensionTreeView({ view }: { view: ContributedView }) {
       {welcome.length > 0 ? (
         <Welcome contents={welcome} />
       ) : state.missing ? (
-        <div className="ext-empty">There is no data provider registered that can provide view data.</div>
+        <div className="ext-empty">{t("There is no data provider registered that can provide view data.")}</div>
       ) : !rootLoaded ? (
         state.loading.has("") && (
           <div className="ext-empty">
-            <Loader size={13} className="codicon spin" /> Loading…
+            <Loader size={13} className="codicon spin" /> {t("Loading…")}
           </div>
         )
       ) : null}

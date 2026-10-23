@@ -1,5 +1,6 @@
 import type { UpdateState } from "../../shared/types";
 import { api } from "./rpc";
+import { t } from "./i18n";
 import { getSettings, isUserSetting, onSettingsChange } from "./settings";
 import { notify, showProgress, toast } from "./toast";
 
@@ -28,7 +29,7 @@ function openReleasePage(url: string): void {
 /** Help > Check for Updates. */
 export function checkForUpdates(): void {
   if (getSettings()["update.mode"] === "none") {
-    void notify("info", "Updates are turned off (update.mode is none).");
+    void notify("info", t("Updates are turned off (update.mode is none)."));
     return;
   }
   void api().request.updateCheck({});
@@ -40,7 +41,7 @@ export async function restartToUpdate(): Promise<void> {
   const result = await api()
     .request.updateInstall({})
     .catch(() => ({ ok: true, error: undefined }));
-  if (!result.ok && result.error) void notify("error", `Could not install the update: ${result.error}`);
+  if (!result.ok && result.error) void notify("error", t("Could not install the update: {0}", result.error));
 }
 
 /** Show a background check's news once; what Check for Updates finds always. */
@@ -55,33 +56,33 @@ async function show(next: UpdateState): Promise<void> {
   if (next.kind !== "downloading" || !next.manual) showProgress(PROGRESS_ID, { done: true });
   switch (next.kind) {
     case "checking":
-      if (next.manual) toast("Checking for updates…");
+      if (next.manual) toast(t("Checking for updates…"));
       return;
     case "upToDate":
-      if (next.manual) void notify("info", "There are currently no updates available.");
+      if (next.manual) void notify("info", t("There are currently no updates available."));
       return;
     case "available": {
       if (!firstTime(next, `available:${next.release.version}`)) return;
-      const choice = await notify("info", `Lumen ${next.release.version} is available. Download it from the release page.`, ["Download", "Later"]);
+      const choice = await notify("info", t("Lumen {0} is available. Download it from the release page.", next.release.version), [t("Download"), t("Later")]);
       if (choice === 0) openReleasePage(next.release.url);
       return;
     }
     case "downloading":
-      if (next.manual) showProgress(PROGRESS_ID, { title: `Downloading Lumen ${next.release.version}`, percent: next.percent ?? undefined });
+      if (next.manual) showProgress(PROGRESS_ID, { title: t("Downloading Lumen {0}", next.release.version), percent: next.percent ?? undefined });
       return;
     case "ready": {
       if (!firstTime(next, `ready:${next.release.version}`)) return;
-      const choice = await notify("info", `Lumen ${next.release.version} has been downloaded. Restart Lumen to update.`, [
-        "Restart to Update",
-        "Release Notes",
-        "Later",
+      const choice = await notify("info", t("Lumen {0} has been downloaded. Restart Lumen to update.", next.release.version), [
+        t("Restart to Update"),
+        t("Release Notes"),
+        t("Later"),
       ]);
       if (choice === 0) await restartToUpdate();
       else if (choice === 1) openReleasePage(next.release.url);
       return;
     }
     case "error":
-      if (next.manual) void notify("error", `Could not update Lumen: ${next.message}`);
+      if (next.manual) void notify("error", t("Could not update Lumen: {0}", next.message));
       else console.warn("[update]", next.message);
       return;
   }

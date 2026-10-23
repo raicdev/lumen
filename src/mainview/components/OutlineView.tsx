@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DocumentSymbol } from "../../shared/types";
 import { symbolPathAt } from "../lib/symbols";
 import { SymbolIcon } from "./SymbolIcon";
+import { t } from "../lib/i18n";
 
 type Props = {
   symbols: DocumentSymbol[] | null;
@@ -84,8 +85,8 @@ export function OutlineView({ symbols, cursorLine, onReveal, collapseToken }: Pr
     setCollapsed({ token: collapseToken, set: current });
   }
 
-  if (symbols === null) return <div className="tree-empty">The active editor cannot provide outline information.</div>;
-  if (!symbols.length) return <div className="tree-empty">No symbols found in document.</div>;
+  if (symbols === null) return <div className="tree-empty">{t("The active editor cannot provide outline information.")}</div>;
+  if (!symbols.length) return <div className="tree-empty">{t("No symbols found in document.")}</div>;
 
   const activePath = cursorLine === null ? [] : symbolPathAt(symbols, cursorLine - 1);
   const toggle = (symbol: DocumentSymbol) =>

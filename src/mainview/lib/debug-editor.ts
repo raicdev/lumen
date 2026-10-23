@@ -7,6 +7,7 @@ import { lineNumberMenuItems } from "../features/menus-walkthroughs/editor";
 const withSeparator = (items: ContextMenuItem[]): ContextMenuItem[] => (items.length ? [{ type: "separator" }, ...items] : []);
 import { breakpointsFor, debugUi, editBreakpoint, moveBreakpoints, samePath, setBreakpointEnabled, toggleBreakpoint } from "./debug-ui";
 import { debugService } from "./debug";
+import { t } from "./i18n";
 
 /**
  * Debugging in the editor: a breakpoint gutter left of the line numbers
@@ -62,10 +63,10 @@ function markerFor(bp: HostDebugBreakpoint): BreakpointMarker {
   const unverified = bp.enabled && bp.verified === false && debugService.getSnapshot().sessions.some((s) => s.state !== "terminated");
   const className = `cm-bp cm-bp-${kind}${bp.enabled ? "" : " cm-bp-disabled"}${unverified ? " cm-bp-unverified" : ""}`;
   const title = [
-    bp.logMessage ? `Logpoint: ${bp.logMessage}` : bp.condition ? `Condition: ${bp.condition}` : "Breakpoint",
-    bp.hitCondition ? `Hit count: ${bp.hitCondition}` : "",
-    bp.enabled ? "" : "(disabled)",
-    unverified ? `(unverified${bp.message ? `: ${bp.message}` : ""})` : "",
+    bp.logMessage ? t("Logpoint: {0}", bp.logMessage) : bp.condition ? t("Condition: {0}", bp.condition) : t("Breakpoint"),
+    bp.hitCondition ? t("Hit count: {0}", bp.hitCondition) : "",
+    bp.enabled ? "" : t("(disabled)"),
+    unverified ? (bp.message ? t("(unverified: {0})", bp.message) : t("(unverified)")) : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -146,12 +147,12 @@ export function debugEditorExtension(getPath: () => string | null): Extension {
           const existing = breakpointsFor(path).find((bp) => bp.line === line);
           const e = event as MouseEvent;
           void showContextMenu(e.clientX, e.clientY, [
-            existing ? { type: "item", label: "Remove Breakpoint", action: "toggle" } : { type: "item", label: "Add Breakpoint", action: "toggle" },
-            ...(existing ? [{ type: "item" as const, label: existing.enabled ? "Disable Breakpoint" : "Enable Breakpoint", action: "enable" }] : []),
+            existing ? { type: "item", label: t("Remove Breakpoint"), action: "toggle" } : { type: "item", label: t("Add Breakpoint"), action: "toggle" },
+            ...(existing ? [{ type: "item" as const, label: existing.enabled ? t("Disable Breakpoint") : t("Enable Breakpoint"), action: "enable" }] : []),
             { type: "separator" },
-            { type: "item", label: existing?.condition ? "Edit Condition…" : "Add Conditional Breakpoint…", action: "condition" },
-            { type: "item", label: existing?.hitCondition ? "Edit Hit Count…" : "Add Hit Count Breakpoint…", action: "hitCondition" },
-            { type: "item", label: existing?.logMessage ? "Edit Logpoint…" : "Add Logpoint…", action: "logMessage" },
+            { type: "item", label: existing?.condition ? t("Edit Condition…") : t("Add Conditional Breakpoint…"), action: "condition" },
+            { type: "item", label: existing?.hitCondition ? t("Edit Hit Count…") : t("Add Hit Count Breakpoint…"), action: "hitCondition" },
+            { type: "item", label: existing?.logMessage ? t("Edit Logpoint…") : t("Add Logpoint…"), action: "logMessage" },
             // VS Code shows the extensions' editor/lineNumber/context entries here too.
             ...withSeparator(lineNumberMenuItems(path, line)),
           ]).then((action) => {

@@ -5,6 +5,7 @@ import { showContextMenu } from "../lib/context-menu";
 import { FILE_DRAG_TYPE, TAB_DRAG_TYPE } from "./EditorDropTarget";
 import { useFeaturesVersion } from "../features/store";
 import { resourceTabLabel } from "../features/menus-walkthroughs/state";
+import { t } from "../lib/i18n";
 
 export type TabInfo = {
   path: string;
@@ -139,13 +140,13 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
             e.preventDefault();
             if (tab.path.startsWith("terminal:")) {
               void showContextMenu(e.clientX, e.clientY, [
-                { type: "item", label: "Move Terminal into Panel", action: "terminal-move-to-panel" },
-                { type: "item", label: "Split Right", action: "split-right" },
-                { type: "item", label: "Split Down", action: "split-down" },
-                { type: "item", label: "Rename…", action: "terminal-rename" },
+                { type: "item", label: t("Move Terminal into Panel"), action: "terminal-move-to-panel" },
+                { type: "item", label: t("Split Right"), action: "split-right" },
+                { type: "item", label: t("Split Down"), action: "split-down" },
+                { type: "item", label: t("Rename…"), action: "terminal-rename" },
                 { type: "separator" },
-                { type: "item", label: "Close (Kill Terminal)", action: "close" },
-                { type: "item", label: "Close Others", action: "close-others", disabled: tabs.length < 2 },
+                { type: "item", label: t("Close (Kill Terminal)"), action: "close" },
+                { type: "item", label: t("Close Others"), action: "close-others", disabled: tabs.length < 2 },
               ]).then((action) => {
                 if (action) onAction(action as TabAction, tab.path);
               });
@@ -153,23 +154,23 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
             }
             const untitled = tab.path.startsWith("untitled:");
             void showContextMenu(e.clientX, e.clientY, [
-              { type: "item", label: "Close", action: "close" },
-              { type: "item", label: "Close Others", action: "close-others", disabled: tabs.length < 2 },
-              { type: "item", label: "Close to the Right", action: "close-right", disabled: index === tabs.length - 1 },
-              { type: "item", label: "Close Saved", action: "close-saved" },
-              { type: "item", label: "Close All", action: "close-all" },
+              { type: "item", label: t("Close"), action: "close" },
+              { type: "item", label: t("Close Others"), action: "close-others", disabled: tabs.length < 2 },
+              { type: "item", label: t("Close to the Right"), action: "close-right", disabled: index === tabs.length - 1 },
+              { type: "item", label: t("Close Saved"), action: "close-saved" },
+              { type: "item", label: t("Close All"), action: "close-all" },
               { type: "separator" },
-              { type: "item", label: "Reopen Editor With…", action: "reopen-with" },
+              { type: "item", label: t("Reopen Editor With…"), action: "reopen-with" },
               { type: "separator" },
-              { type: "item", label: "Split Right", action: "split-right" },
-              { type: "item", label: "Split Down", action: "split-down" },
+              { type: "item", label: t("Split Right"), action: "split-right" },
+              { type: "item", label: t("Split Down"), action: "split-down" },
               { type: "separator" },
-              { type: "item", label: "Copy Path", action: "copy-path", disabled: untitled },
-              { type: "item", label: "Copy Relative Path", action: "copy-relative-path", disabled: untitled },
+              { type: "item", label: t("Copy Path"), action: "copy-path", disabled: untitled },
+              { type: "item", label: t("Copy Relative Path"), action: "copy-relative-path", disabled: untitled },
               { type: "separator" },
-              { type: "item", label: "Reveal in Explorer View", action: "reveal-in-sidebar", disabled: untitled },
-              { type: "item", label: "Reveal in File Explorer", action: "reveal", disabled: untitled },
-              ...(tab.preview ? [{ type: "separator" as const }, { type: "item" as const, label: "Keep Open", action: "keep-open" }] : []),
+              { type: "item", label: t("Reveal in Explorer View"), action: "reveal-in-sidebar", disabled: untitled },
+              { type: "item", label: t("Reveal in File Explorer"), action: "reveal", disabled: untitled },
+              ...(tab.preview ? [{ type: "separator" as const }, { type: "item" as const, label: t("Keep Open"), action: "keep-open" }] : []),
             ]).then((action) => {
               if (action) onAction(action as TabAction, tab.path);
             });
@@ -181,7 +182,7 @@ export function TabBar({ tabs, activePath, onSelect, onClose, onPin, onAction, o
           <button
             className="tab-close"
             type="button"
-            title={tab.dirty ? "Unsaved changes — close" : "Close (Ctrl+W)"}
+            title={tab.dirty ? t("Unsaved changes — close") : t("Close (Ctrl+W)")}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();

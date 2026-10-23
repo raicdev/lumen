@@ -6,6 +6,7 @@ import { FileIcon } from "./FileIcon";
 import { showContextMenu, type ContextMenuItem } from "../lib/context-menu";
 import { getSettings, updateSetting, useSettings } from "../lib/settings";
 import { useFeaturePanelTabs } from "../features/components";
+import { t } from "../lib/i18n";
 
 export type PanelTab = "problems" | "terminal" | "references" | "output" | `view:${string}`;
 
@@ -75,7 +76,7 @@ function FileGroup({ path, root, count, children }: { path: string; root: string
 
 function ProblemsView({ diagnostics, root, onOpen }: { diagnostics: Map<string, Diagnostic[]>; root: string | null; onOpen: Props["onOpenLocation"] }) {
   const files = [...diagnostics].filter(([, list]) => list.some((d) => d.severity !== "hint"));
-  if (!files.length) return <div className="panel-empty">No problems have been detected in the workspace.</div>;
+  if (!files.length) return <div className="panel-empty">{t("No problems have been detected in the workspace.")}</div>;
   return (
     <div className="panel-list">
       {files.map(([path, list]) => {
@@ -87,7 +88,7 @@ function ProblemsView({ diagnostics, root, onOpen }: { diagnostics: Map<string, 
                 <SeverityIcon severity={d.severity} />
                 <span className="panel-row-text">{d.message.split("\n")[0]}</span>
                 <span className="panel-row-meta">
-                  {d.source ? `${d.source}${d.code != null ? `(${d.code})` : ""} ` : ""}[Ln {d.startLine + 1}, Col {d.startCharacter + 1}]
+                  {d.source ? `${d.source}${d.code != null ? `(${d.code})` : ""} ` : ""}[{t("Ln {0}, Col {1}", d.startLine + 1, d.startCharacter + 1)}]
                 </span>
               </button>
             ))}
@@ -99,18 +100,22 @@ function ProblemsView({ diagnostics, root, onOpen }: { diagnostics: Map<string, 
 }
 
 function ReferencesView({ references, root, onOpen }: { references: ReferencesResult | null; root: string | null; onOpen: Props["onOpenLocation"] }) {
-  if (!references) return <div className="panel-empty">Run “Go to References” (Shift+F12) on a symbol.</div>;
-  if (!references.locations.length) return <div className="panel-empty">No references found for “{references.title}”.</div>;
+  if (!references) return <div className="panel-empty">{t("Run “Go to References” (Shift+F12) on a symbol.")}</div>;
+  if (!references.locations.length) return <div className="panel-empty">{t("No references found for “{0}”.", references.title)}</div>;
   const groups = new Map<string, ReferenceLocation[]>();
   for (const location of references.locations) {
     const list = groups.get(location.path) ?? [];
     list.push(location);
     groups.set(location.path, list);
   }
+  // The symbol stays bold wherever the translation puts it.
+  const [summaryBefore, summaryAfter = ""] = t("{0} references to {1} in {2} files", references.locations.length, "\u0000", groups.size).split("\u0000");
   return (
     <div className="panel-list">
       <div className="panel-summary">
-        {references.locations.length} references to <strong>{references.title}</strong> in {groups.size} files
+        {summaryBefore}
+        <strong>{references.title}</strong>
+        {summaryAfter}
       </div>
       {[...groups].map(([path, list]) => (
         <FileGroup key={path} path={path} root={root} count={list.length}>
@@ -146,14 +151,14 @@ function OutputActions({ onSelect, onClear }: { onSelect: (name: string) => void
   if (!channels.length) return null;
   return (
     <>
-      <select className="output-select" title="Output channel" value={activeOutput?.name ?? ""} onChange={(e) => onSelect(e.target.value)}>
+      <select className="output-select" title={t("Output channel")} value={activeOutput?.name ?? ""} onChange={(e) => onSelect(e.target.value)}>
         {channels.map((channel) => (
           <option key={channel.name} value={channel.name}>
             {channel.name}
           </option>
         ))}
       </select>
-      <button type="button" className="icon-btn" title="Clear Output" onClick={() => activeOutput && onClear(activeOutput.name)}>
+      <button type="button" className="icon-btn" title={t("Clear Output")} onClick={() => activeOutput && onClear(activeOutput.name)}>
         <Eraser size={15} strokeWidth={1.75} />
       </button>
     </>
@@ -168,7 +173,7 @@ function OutputView() {
     const el = ref.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [active?.text, active?.name]);
-  if (!outputs.length) return <div className="panel-empty">Extensions write their output here (and the extension host its log).</div>;
+  if (!outputs.length) return <div className="panel-empty">{t("Extensions write their output here (and the extension host its log).")}</div>;
   return (
     <pre
       ref={ref}
@@ -188,10 +193,10 @@ export function Panel(props: Props) {
   // Panel tabs of feature plug-ins (src/mainview/features) sit with the extensions' ones.
   const extraTabs = [...props.extraTabs, ...useFeaturePanelTabs()];
   const tabs: { id: PanelTab; label: string; badge?: number }[] = [
-    { id: "problems", label: "Problems", badge: problemCount },
-    { id: "references", label: "References" },
-    { id: "output", label: "Output" },
-    { id: "terminal", label: "Terminal" },
+    { id: "problems", label: t("Problems"), badge: problemCount },
+    { id: "references", label: t("References") },
+    { id: "output", label: t("Output") },
+    { id: "terminal", label: t("Terminal") },
     ...extraTabs.map(({ id, label, badge }) => ({ id, label, badge })),
   ];
   // Tabs the user hid; the active one stays until another tab is opened.
@@ -214,7 +219,7 @@ export function Panel(props: Props) {
         ? [
             {
               type: "item" as const,
-              label: `Hide '${tab.label}'`,
+              label: t("Hide '{0}'", tab.label),
               action: "hideTab",
               disabled: lastShown || hidden.has(tab.id),
               run: () => setTabHidden(tab.id, true),
@@ -233,19 +238,19 @@ export function Panel(props: Props) {
           run: () => setTabHidden(entry.id, shown),
         };
       }),
-      { type: "item", label: "Reset Panel Tabs", action: "resetTabs", disabled: !hidden.size, run: () => updateSetting("workbench.panel.hidden", []) },
+      { type: "item", label: t("Reset Panel Tabs"), action: "resetTabs", disabled: !hidden.size, run: () => updateSetting("workbench.panel.hidden", []) },
       { type: "separator" },
     ];
   };
   const headerMenu = (x: number, y: number, tab?: (typeof tabs)[number]) =>
     void showContextMenu(x, y, [
       ...tabItems(tab),
-      { type: "item", label: "Move Panel Left", action: "left", disabled: props.position === "left" },
-      { type: "item", label: "Move Panel Right", action: "right", disabled: props.position === "right" },
-      { type: "item", label: "Move Panel to Bottom", action: "bottom", disabled: props.position === "bottom" },
+      { type: "item", label: t("Move Panel Left"), action: "left", disabled: props.position === "left" },
+      { type: "item", label: t("Move Panel Right"), action: "right", disabled: props.position === "right" },
+      { type: "item", label: t("Move Panel to Bottom"), action: "bottom", disabled: props.position === "bottom" },
       { type: "separator" },
-      { type: "item", label: props.maximized ? "Restore Panel Size" : "Maximize Panel Size", action: "maximize" },
-      { type: "item", label: "Hide Panel", action: "close" },
+      { type: "item", label: props.maximized ? t("Restore Panel Size") : t("Maximize Panel Size"), action: "maximize" },
+      { type: "item", label: t("Hide Panel"), action: "close" },
     ]).then((action) => {
       if (action === "maximize") props.onToggleMaximize();
       else if (action === "close") props.onClose();
@@ -261,7 +266,7 @@ export function Panel(props: Props) {
     <div className={`panel panel-${props.position}`}>
       <div
         className="panel-header"
-        title="Drag to dock the panel on another side"
+        title={t("Drag to dock the panel on another side")}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData(PANEL_DRAG_TYPE, "panel");
@@ -306,7 +311,7 @@ export function Panel(props: Props) {
           <button
             type="button"
             className="icon-btn"
-            title="Move Panel… (or drag the panel header)"
+            title={t("Move Panel… (or drag the panel header)")}
             onClick={(e) => {
               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
               headerMenu(rect.left, rect.bottom + 2);
@@ -314,10 +319,15 @@ export function Panel(props: Props) {
           >
             <Ellipsis size={16} />
           </button>
-          <button type="button" className="icon-btn" title={props.maximized ? "Restore Panel Size" : "Maximize Panel Size"} onClick={props.onToggleMaximize}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={props.maximized ? t("Restore Panel Size") : t("Maximize Panel Size")}
+            onClick={props.onToggleMaximize}
+          >
             {props.maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button type="button" className="icon-btn" title="Close Panel" onClick={props.onClose}>
+          <button type="button" className="icon-btn" title={t("Close Panel")} onClick={props.onClose}>
             <X size={16} />
           </button>
         </div>

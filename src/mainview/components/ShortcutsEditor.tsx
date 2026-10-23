@@ -2,6 +2,7 @@ import { Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { ModalEditorTitleActions } from "../features/menus-walkthroughs/MenuActions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { commandLabel, DEFAULT_KEYBINDINGS, type Command, type Keybinding } from "../lib/commands";
+import { t } from "../lib/i18n";
 import { keyFromEvent } from "../lib/keybindings";
 
 type Props = {
@@ -81,26 +82,28 @@ export function ShortcutsEditor({ open, onClose, commands, bindings, overrides, 
 
   return (
     <div className="modal-overlay settings-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="settings-editor shortcuts-editor" role="dialog" aria-label="Keyboard Shortcuts">
+      <div className="settings-editor shortcuts-editor" role="dialog" aria-label={t("Keyboard Shortcuts")}>
         <div className="settings-header">
-          <h2>Keyboard Shortcuts</h2>
+          <h2>{t("Keyboard Shortcuts")}</h2>
           <input
             ref={inputRef}
             className="settings-search"
             type="text"
-            placeholder="Type to search in keybindings"
+            placeholder={t("Type to search in keybindings")}
             spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <ModalEditorTitleActions activeEditor="workbench.editor.keybindings" />
-          <button type="button" className="icon-btn" title="Close (Esc)" onClick={onClose}>
+          <button type="button" className="icon-btn" title={t("Close (Esc)")} onClick={onClose}>
             <X size={16} />
           </button>
         </div>
         {recording && (
           <div className="shortcut-recorder">
-            Press desired key combination{pending.length < 2 ? " (a second key makes a chord)" : ""}, then Enter. Esc cancels.
+            {pending.length < 2
+              ? t("Press desired key combination (a second key makes a chord), then Enter. Esc cancels.")
+              : t("Press desired key combination, then Enter. Esc cancels.")}
             <kbd>{pending.join(" ") || "…"}</kbd>
           </div>
         )}
@@ -108,9 +111,9 @@ export function ShortcutsEditor({ open, onClose, commands, bindings, overrides, 
           <table className="shortcuts-table">
             <thead>
               <tr>
-                <th>Command</th>
-                <th>Keybinding</th>
-                <th>Source</th>
+                <th>{t("Command")}</th>
+                <th>{t("Keybinding")}</th>
+                <th>{t("Source")}</th>
                 <th />
               </tr>
             </thead>
@@ -125,12 +128,12 @@ export function ShortcutsEditor({ open, onClose, commands, bindings, overrides, 
                       <div className="setting-key">{command.id}</div>
                     </td>
                     <td>{keys.length ? keys.map((key) => <kbd key={key}>{key}</kbd>) : <span className="muted">—</span>}</td>
-                    <td className="muted">{custom ? "User" : isDefault ? "Default" : ""}</td>
+                    <td className="muted">{custom ? t("User") : isDefault ? t("Default") : ""}</td>
                     <td className="shortcut-actions">
                       <button
                         type="button"
                         className="icon-btn"
-                        title="Change Keybinding"
+                        title={t("Change Keybinding")}
                         onClick={() => {
                           setPending([]);
                           setRecording(command.id);
@@ -142,7 +145,7 @@ export function ShortcutsEditor({ open, onClose, commands, bindings, overrides, 
                         <button
                           type="button"
                           className="icon-btn"
-                          title="Reset Keybinding"
+                          title={t("Reset Keybinding")}
                           onClick={() => {
                             const next = { ...overrides };
                             delete next[command.id];
@@ -156,7 +159,7 @@ export function ShortcutsEditor({ open, onClose, commands, bindings, overrides, 
                         <button
                           type="button"
                           className="icon-btn"
-                          title="Remove Keybinding"
+                          title={t("Remove Keybinding")}
                           onClick={() => onChangeOverrides({ ...overrides, [command.id]: "" })}
                         >
                           <Trash2 size={14} />

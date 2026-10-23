@@ -16,7 +16,7 @@ import { TerminalManager, terminalProfiles } from "./terminal.ts";
 import { killProcess, listProcesses } from "./process-explorer.ts";
 import { forwardToRunningInstance, instanceSocketPath, serveInstance } from "./single-instance.ts";
 import { UpdateService } from "./updates.ts";
-import { CompatCache, ExtensionManager, analyzeVsix, compareVersions, userDataDir } from "./extensions/manager.ts";
+import { CompatCache, ExtensionManager, analyzeVsix, compareVersions, setDisplayLanguage, userDataDir } from "./extensions/manager.ts";
 import { ExtensionHostClient, openExternal } from "./extensions/host-client.ts";
 import { downloadFromMarketplace, latestVersion, marketplaceDetails, searchMarketplace } from "./extensions/marketplace.ts";
 import { WebviewResourceServer } from "./extensions/webview-server.ts";
@@ -27,7 +27,7 @@ import { showFatalError } from "./crash-log.ts";
 import { BackupStore } from "./backups.ts";
 import { WindowSessionStore, type WindowEntry } from "./window-sessions.ts";
 
-const APP_VERSION = "0.3.0-beta.6";
+const APP_VERSION = "0.3.0-beta.7";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 
@@ -759,6 +759,11 @@ function windowRpc(w: AppWindow) {
           }
         },
         backupList: () => ({ backups: backups.list(w.id, w.legacyBackups) }),
+
+        setDisplayLanguage: ({ language }) => {
+          setDisplayLanguage(language);
+          return { ok: true };
+        },
 
         updateConfigure: ({ mode, channel }) => {
           // A beta build keeps getting betas unless the user chose a channel.

@@ -4,6 +4,7 @@ import type { Diagnostic, TextRange } from "../../shared/types";
 import type { HostCodeAction } from "../../shared/extensions";
 import { extensionService } from "./extensions";
 import { showContextMenu, type ContextMenuItem } from "./context-menu";
+import { t } from "./i18n";
 
 /**
  * Code actions from extensions (languages.registerCodeActionsProvider): a
@@ -106,7 +107,7 @@ class LightbulbMarker extends GutterMarker {
     const el = document.createElement("div");
     el.className = "cm-code-action-lightbulb";
     el.textContent = "💡";
-    el.title = this.actions.length === 1 ? this.actions[0]!.title : "Show Code Actions";
+    el.title = this.actions.length === 1 ? this.actions[0]!.title : t("Show Code Actions");
     el.addEventListener("mousedown", (event) => event.preventDefault());
     el.addEventListener("click", (event) => {
       event.preventDefault();

@@ -4,6 +4,7 @@ import { APP_MENU, runMenuItem, type MenuItem } from "../lib/menu";
 import type { Command } from "../lib/commands";
 import { showContextMenu } from "../lib/context-menu";
 import { contributedMenuItems } from "../features/menus-walkthroughs/menus";
+import { isTranslated, t } from "../lib/i18n";
 
 type Props = {
   commands: Map<string, Command>;
@@ -35,20 +36,20 @@ function resolveItems(items: MenuItem[], commands: Map<string, Command>, keys: M
   const shown = items.filter((item) => item.type !== "contributed" || contributedItems(item.menu).length > 0);
   return shown.map((item): ResolvedItem => {
     if (item.type === "separator") return { kind: "separator" };
-    if (item.type === "contributed") return { kind: "item", item, label: `${item.label} ›`, checked: false, disabled: false };
+    if (item.type === "contributed") return { kind: "item", item, label: `${t(item.label)} ›`, checked: false, disabled: false };
     if (item.type === "submenu") {
       const children = resolveItems(item.items, commands, keys);
       const disabled = !children.some((child) => child.kind === "item" && !child.disabled);
-      return { kind: "item", item, label: item.label, checked: false, disabled, children };
+      return { kind: "item", item, label: t(item.label), checked: false, disabled, children };
     }
     if (item.type === "role") {
-      return { kind: "item", item, label: item.label, accelerator: item.accelerator, checked: false, disabled: false };
+      return { kind: "item", item, label: t(item.label), accelerator: item.accelerator, checked: false, disabled: false };
     }
     const command = commands.get(item.command);
     return {
       kind: "item",
       item,
-      label: item.label ?? command?.title ?? item.command,
+      label: t(item.label ?? command?.title ?? item.command),
       accelerator: keys.get(item.command),
       checked: command?.checked?.() ?? false,
       disabled: !command || command.enabled?.() === false,
@@ -65,6 +66,9 @@ function nextItemIndex(items: ResolvedItem[], from: number, step: 1 | -1): numbe
   }
   return -1;
 }
+
+/** A top-level menu's name; translated ones keep the Alt+letter as a mnemonic, e.g. "ファイル(F)". */
+const menuBarLabel = (label: string) => (isTranslated(label) ? `${t(label)}(${label[0]!.toUpperCase()})` : label);
 
 /** Keeps focus where it was (usually the editor) when clicking menu chrome. */
 const keepFocus = (e: React.MouseEvent) => e.preventDefault();
@@ -232,7 +236,7 @@ function MenuBar({ commands, keys }: { commands: Map<string, Command>; keys: Map
               if (openIndex !== null && openIndex !== index) open(index);
             }}
           >
-            {group.label}
+            {menuBarLabel(group.label)}
           </button>
           {openIndex === index && (
             <div className="menu-dropdown" role="menu" data-lumen-no-drag onMouseDown={keepFocus}>
@@ -290,7 +294,7 @@ function WindowControls() {
   const controls = window.__lumen?.window;
   return (
     <div className="window-controls">
-      <button type="button" className="window-btn" title="Minimize" onMouseDown={keepFocus} onClick={() => controls?.minimize()}>
+      <button type="button" className="window-btn" title={t("Minimize")} onMouseDown={keepFocus} onClick={() => controls?.minimize()}>
         <Minus size={16} strokeWidth={1.25} />
       </button>
       <button
@@ -298,13 +302,13 @@ function WindowControls() {
         className="window-btn"
         // Registered with the OS as the real maximize button (snap layouts).
         data-lumen-maximize-button
-        title={maximized ? "Restore" : "Maximize"}
+        title={maximized ? t("Restore") : t("Maximize")}
         onMouseDown={keepFocus}
         onClick={() => controls?.toggleMaximize()}
       >
         {maximized ? <Copy size={14} strokeWidth={1.25} /> : <Square size={13} strokeWidth={1.25} />}
       </button>
-      <button type="button" className="window-btn close" title="Close" onMouseDown={keepFocus} onClick={() => controls?.close()}>
+      <button type="button" className="window-btn close" title={t("Close")} onMouseDown={keepFocus} onClick={() => controls?.close()}>
         <X size={17} strokeWidth={1.25} />
       </button>
     </div>
@@ -340,7 +344,7 @@ export function TitleBar({ commands, keys, centerLabel, onCommandCenter }: Props
         <MenuBar commands={commands} keys={keys} />
       </div>
       <div className="titlebar-center">
-        <button id="btn-command-palette" className="toolbar-search" type="button" title="Search files (Ctrl+P)" onClick={onCommandCenter}>
+        <button id="btn-command-palette" className="toolbar-search" type="button" title={t("Search files (Ctrl+P)")} onClick={onCommandCenter}>
           <Search size={14} />
           <span>{centerLabel}</span>
         </button>

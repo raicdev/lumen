@@ -1,11 +1,14 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./lib/rpc"; // initialize the Lumen Shell bridge
+import { startDisplayLanguage } from "./lib/i18n";
 import { reloadConfiguredColorTheme } from "./lib/theme";
 import { startUpdates } from "./lib/updates";
 import "./lib/ui-style"; // modern / legacy look (workbench.style)
 import "./lib/tooltip"; // the workbench's own tooltips in place of the browser's
 
+// First, so the main process reads extension manifests in the display language.
+startDisplayLanguage();
 // Lumen Dark is in place already; a configured theme from an extension follows once it is read.
 void reloadConfiguredColorTheme();
 startUpdates();

@@ -11,6 +11,8 @@ export type HostInit = {
   appRoot: string;
   appName: string;
   appVersion: string;
+  /** Display language (env.language; English when left out): picks l10n bundles. */
+  language?: string;
   /** Language ids → labels known to Lumen (languages.getLanguages). */
   languages: string[];
   /** Port and secret path prefix of the webview server (asWebviewUri, cspSource). */

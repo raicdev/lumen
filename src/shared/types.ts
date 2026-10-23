@@ -596,6 +596,11 @@ export type LumenRPC = {
         params: Record<string, never>;
         response: { backups: DocumentBackup[] };
       };
+      /** The view's display language (sent at startup): extension manifests and l10n bundles are read in it. */
+      setDisplayLanguage: {
+        params: { language: string };
+        response: { ok: boolean };
+      };
       /** `update.mode` or `update.channel` changed (also sent once at startup): schedules the background checks. */
       updateConfigure: {
         /** `channel` null: the user did not choose one (the channel of the running build). */

@@ -6,6 +6,7 @@ import { extensionService } from "../lib/extensions";
 import { showDialog } from "../lib/dialog";
 import { toast } from "../lib/toast";
 import { FileIcon } from "./FileIcon";
+import { t } from "../lib/i18n";
 
 type Props = {
   workspaceRoot: string | null;
@@ -30,6 +31,11 @@ type Props = {
   /** Called after Replace All so the explorer can refresh. */
   onReplaced: () => void;
 };
+
+/** One of four messages, by whether each count is one (English singular / plural). */
+function countMessage(a: number, b: number, messages: [string, string, string, string], ...args: unknown[]): string {
+  return t(messages[(a === 1 ? 0 : 2) + (b === 1 ? 0 : 1)]!, ...args);
+}
 
 function Toggle({ active, title, label, onClick }: { active: boolean; title: string; label: ReactNode; onClick: () => void }) {
   return (
@@ -117,13 +123,19 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
           const files = new Set(all.map((m) => m.path)).size;
           setMeta(
             all.length
-              ? `${all.length}${truncated ? "+" : ""} result${all.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
-              : "No results found.",
+              ? countMessage(
+                  truncated ? 2 : all.length,
+                  files,
+                  ["{0} result in {1} file", "{0} result in {1} files", "{0} results in {1} file", "{0} results in {1} files"],
+                  `${all.length}${truncated ? "+" : ""}`,
+                  files,
+                )
+              : t("No results found."),
           );
         } catch {
           if (current !== generation.current) return;
           setMatches([]);
-          setMeta("Search failed");
+          setMeta(t("Search failed"));
         } finally {
           if (current === generation.current) setSearching(false);
         }
@@ -132,7 +144,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
     return () => clearTimeout(timer);
   }, [query, caseSensitive, wholeWord, regex, include, exclude, searchKey, workspaceRoot, providerRoots, version]);
 
-  if (!workspaceRoot && !providerRoots.length) return <div className="tree-empty">Open a folder to search</div>;
+  if (!workspaceRoot && !providerRoots.length) return <div className="tree-empty">{t("Open a folder to search")}</div>;
 
   const groups = new Map<string, SearchMatch[]>();
   for (const m of matches) {
@@ -158,15 +170,27 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
     // Exactly the files listed: a capped search never widens into files nobody saw.
     const paths = [...new Set(targetMatches.map((m) => m.path))];
     const choice = await showDialog({
-      title: "Replace All",
-      message: `Replace ${targetMatches.length} occurrence${targetMatches.length === 1 ? "" : "s"} across ${paths.length} file${paths.length === 1 ? "" : "s"} with “${replacement}”?`,
+      title: t("Replace All"),
+      message: countMessage(
+        targetMatches.length,
+        paths.length,
+        [
+          "Replace {0} occurrence across {1} file with “{2}”?",
+          "Replace {0} occurrence across {1} files with “{2}”?",
+          "Replace {0} occurrences across {1} file with “{2}”?",
+          "Replace {0} occurrences across {1} files with “{2}”?",
+        ],
+        targetMatches.length,
+        paths.length,
+        replacement,
+      ),
       detail:
         truncated && !only
-          ? `The search stopped after ${matches.length} results: only the files listed are changed. Narrow the search to replace the rest.`
-          : "Files open in an editor are changed there and can be undone; other files are written now.",
+          ? t("The search stopped after {0} results: only the files listed are changed. Narrow the search to replace the rest.", matches.length)
+          : t("Files open in an editor are changed there and can be undone; other files are written now."),
       buttons: [
-        { label: "Replace", role: "primary", value: "replace" },
-        { label: "Cancel", role: "default", value: "cancel" },
+        { label: t("Replace"), role: "primary", value: "replace" },
+        { label: t("Cancel"), role: "default", value: "cancel" },
       ],
     });
     if (choice !== "replace") return;
@@ -179,15 +203,25 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
     const provided =
       providerRoots.length && onDisk.length ? await extensionService.call("providerReplaceFiles", providerRoots, query, replacement, options, onDisk) : none;
     if (result.error || provided.error) {
-      toast(result.error ?? provided.error ?? "Replace failed", "error");
+      toast(result.error ?? provided.error ?? t("Replace failed"), "error");
       return;
     }
     const replacements = open.replacements + result.replacements + provided.replacements;
     const files = open.files + result.files + provided.files;
     const failed = result.failed ?? [];
     toast(
-      `Replaced ${replacements} occurrence${replacements === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}` +
-        (failed.length ? `. Could not write ${failed.map((path) => path.split(/[\\/]/).pop()).join(", ")}` : ""),
+      countMessage(
+        replacements,
+        files,
+        [
+          "Replaced {0} occurrence in {1} file",
+          "Replaced {0} occurrence in {1} files",
+          "Replaced {0} occurrences in {1} file",
+          "Replaced {0} occurrences in {1} files",
+        ],
+        replacements,
+        files,
+      ) + (failed.length ? t(". Could not write {0}", failed.map((path) => path.split(/[\\/]/).pop()).join(", ")) : ""),
       failed.length ? "error" : "success",
     );
     onReplaced();
@@ -201,7 +235,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
           <button
             type="button"
             className={`search-expand chevron${showReplace ? " open" : ""}`}
-            title="Toggle Replace"
+            title={t("Toggle Replace")}
             onClick={() => setShowReplace((v) => !v)}
           >
             <ChevronRight size={14} />
@@ -211,7 +245,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Search"
+                placeholder={t("Search")}
                 spellCheck={false}
                 autoComplete="off"
                 value={query}
@@ -220,16 +254,16 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                   if (e.key === "Enter") setVersion((v) => v + 1);
                 }}
               />
-              <Toggle active={caseSensitive} title="Match Case (Alt+C)" label={<CaseSensitive size={16} />} onClick={() => setCaseSensitive((v) => !v)} />
-              <Toggle active={wholeWord} title="Match Whole Word (Alt+W)" label={<WholeWord size={16} />} onClick={() => setWholeWord((v) => !v)} />
-              <Toggle active={regex} title="Use Regular Expression (Alt+R)" label={<Regex size={15} />} onClick={() => setRegex((v) => !v)} />
+              <Toggle active={caseSensitive} title={t("Match Case (Alt+C)")} label={<CaseSensitive size={16} />} onClick={() => setCaseSensitive((v) => !v)} />
+              <Toggle active={wholeWord} title={t("Match Whole Word (Alt+W)")} label={<WholeWord size={16} />} onClick={() => setWholeWord((v) => !v)} />
+              <Toggle active={regex} title={t("Use Regular Expression (Alt+R)")} label={<Regex size={15} />} onClick={() => setRegex((v) => !v)} />
             </div>
             {showReplace && (
               <div className="search-field">
                 <input
                   ref={replaceRef}
                   type="text"
-                  placeholder="Replace"
+                  placeholder={t("Replace")}
                   spellCheck={false}
                   autoComplete="off"
                   value={replacement}
@@ -241,7 +275,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                 <button
                   type="button"
                   className="search-toggle"
-                  title="Replace All (Ctrl+Alt+Enter)"
+                  title={t("Replace All (Ctrl+Alt+Enter)")}
                   disabled={!matches.length || !resultsCurrent}
                   onClick={() => void replaceAll()}
                 >
@@ -252,29 +286,29 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
           </div>
         </div>
         <div className="search-details-toggle">
-          <button type="button" className="icon-btn" title="Toggle Search Details" onClick={() => setShowDetails((v) => !v)}>
+          <button type="button" className="icon-btn" title={t("Toggle Search Details")} onClick={() => setShowDetails((v) => !v)}>
             <Ellipsis size={16} />
           </button>
         </div>
         {showDetails && (
           <div className="search-details">
             <label>
-              files to include
-              <input type="text" spellCheck={false} placeholder="e.g. src/**, *.ts" value={include} onChange={(e) => setInclude(e.target.value)} />
+              {t("files to include")}
+              <input type="text" spellCheck={false} placeholder={t("e.g. src/**, *.ts")} value={include} onChange={(e) => setInclude(e.target.value)} />
             </label>
             <label>
-              files to exclude
-              <input type="text" spellCheck={false} placeholder="e.g. *.test.ts, docs/" value={exclude} onChange={(e) => setExclude(e.target.value)} />
+              {t("files to exclude")}
+              <input type="text" spellCheck={false} placeholder={t("e.g. *.test.ts, docs/")} value={exclude} onChange={(e) => setExclude(e.target.value)} />
             </label>
           </div>
         )}
         <div className="search-meta">
-          <span>{searching ? "Searching…" : meta}</span>
+          <span>{searching ? t("Searching…") : meta}</span>
           {groups.size > 0 && (
             <button
               type="button"
               className="icon-btn"
-              title={collapsed.size ? "Expand All" : "Collapse All"}
+              title={collapsed.size ? t("Expand All") : t("Collapse All")}
               onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(groups.keys()))}
             >
               {collapsed.size ? <ChevronsUpDown size={15} /> : <ListCollapse size={15} />}
@@ -318,7 +352,7 @@ export function SearchView({ workspaceRoot, providerRoots, focusToken, replaceTo
                   <button
                     type="button"
                     className="icon-btn search-file-replace"
-                    title="Replace All in File"
+                    title={t("Replace All in File")}
                     onClick={(e) => {
                       e.stopPropagation();
                       void replaceAll([path]);

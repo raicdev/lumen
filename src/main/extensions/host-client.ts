@@ -7,7 +7,7 @@ import type { HostInit, HostToMain, MainToHost } from "../exthost/protocol.ts";
 import { workerEntry } from "../workers.ts";
 import { languageIds } from "../language.ts";
 import { killTree } from "../tasks/process.ts";
-import { ExtensionManager, userDataDir } from "./manager.ts";
+import { ExtensionManager, getDisplayLanguage, userDataDir } from "./manager.ts";
 import type { WebviewResourceServer } from "./webview-server.ts";
 
 /**
@@ -129,6 +129,7 @@ export class ExtensionHostClient {
       appRoot: dirname(fileURLToPath(import.meta.url)),
       appName: this.#options.appName,
       appVersion: this.#options.appVersion,
+      language: getDisplayLanguage(),
       languages: languageIds(),
       webviewPort,
       webviewToken: this.#options.webviews.token,

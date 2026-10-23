@@ -1,4 +1,5 @@
 import type { FocusContext } from "./keybindings";
+import { t } from "./i18n";
 
 /**
  * Workbench commands: one registry drives the command palette, the menu bar,
@@ -206,6 +207,12 @@ export function rememberCommand(id: string): void {
   }
 }
 
+/** "Category: Title" in the display language. */
 export function commandLabel(command: Command): string {
+  return command.category ? `${t(command.category)}: ${t(command.title)}` : t(command.title);
+}
+
+/** "Category: Title" in English (the command palette matches it too when the display language is another). */
+export function englishCommandLabel(command: Command): string {
   return command.category ? `${command.category}: ${command.title}` : command.title;
 }

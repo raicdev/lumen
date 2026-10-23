@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleX, Pau
 import { useEffect, useMemo, useState } from "react";
 import type { ProcessRow } from "../../shared/types";
 import { showDialog } from "../lib/dialog";
+import { t } from "../lib/i18n";
 import { api } from "../lib/rpc";
 
 type Props = {
@@ -187,52 +188,52 @@ export function ProcessExplorer({ open, onClose }: Props) {
   const endProcess = async (row: ProcessRow) => {
     if (row.pid === null) return;
     const choice = await showDialog({
-      title: "End Process",
-      message: `End "${row.label}" (PID ${row.pid}) and the processes it started?`,
+      title: t("End Process"),
+      message: t('End "{0}" (PID {1}) and the processes it started?', row.label, row.pid),
       detail:
         row.kind === "webview"
-          ? "Lumen's window is drawn by WebView2: ending this process can leave the window blank until it is reloaded."
-          : "Unsaved work in that process is lost.",
+          ? t("Lumen's window is drawn by WebView2: ending this process can leave the window blank until it is reloaded.")
+          : t("Unsaved work in that process is lost."),
       buttons: [
-        { label: "Cancel", value: "cancel" },
-        { label: "End Process", value: "end", role: "danger" },
+        { label: t("Cancel"), value: "cancel" },
+        { label: t("End Process"), value: "end", role: "danger" },
       ],
     });
     if (choice !== "end") return;
     const result = await api().request.processKill({ pid: row.pid });
-    if (!result.ok) setError(result.error ?? "could not end the process");
+    if (!result.ok) setError(result.error ?? t("could not end the process"));
   };
 
   if (!open) return null;
 
   return (
     <div className="modal-overlay settings-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="settings-editor process-explorer" role="dialog" aria-label="Process Explorer">
+      <div className="settings-editor process-explorer" role="dialog" aria-label={t("Process Explorer")}>
         <div className="settings-header">
-          <h2>Process Explorer</h2>
+          <h2>{t("Process Explorer")}</h2>
           <div className="process-summary">
             <span>
-              Memory <strong>{formatBytes(summary.memory)}</strong>
+              {t("Memory")} <strong>{formatBytes(summary.memory)}</strong>
             </span>
             <span>
               CPU <strong>{formatCpu(summary.cpu)}</strong>
             </span>
             {CATEGORIES.map((category) => (
               <span key={category.id} className={`process-chip process-kind-${category.id}`}>
-                {category.label} {formatBytes(summary.totals.get(category.id) ?? 0)}
+                {t(category.label)} {formatBytes(summary.totals.get(category.id) ?? 0)}
               </span>
             ))}
           </div>
-          <button type="button" className="icon-btn" title="Expand All" onClick={() => setAll(false)}>
+          <button type="button" className="icon-btn" title={t("Expand All")} onClick={() => setAll(false)}>
             <ChevronsUpDown size={16} />
           </button>
-          <button type="button" className="icon-btn" title="Collapse All" onClick={() => setAll(true)}>
+          <button type="button" className="icon-btn" title={t("Collapse All")} onClick={() => setAll(true)}>
             <ChevronsDownUp size={16} />
           </button>
-          <button type="button" className="icon-btn" title={paused ? "Resume Updates" : "Pause Updates"} onClick={() => setPaused((value) => !value)}>
+          <button type="button" className="icon-btn" title={paused ? t("Resume Updates") : t("Pause Updates")} onClick={() => setPaused((value) => !value)}>
             {paused ? <Play size={16} /> : <Pause size={16} />}
           </button>
-          <button type="button" className="icon-btn" title="Close (Esc)" onClick={onClose}>
+          <button type="button" className="icon-btn" title={t("Close (Esc)")} onClick={onClose}>
             <X size={16} />
           </button>
         </div>
@@ -241,10 +242,10 @@ export function ProcessExplorer({ open, onClose }: Props) {
           <table className="shortcuts-table process-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>{t("Name")}</th>
                 <th className="num">PID</th>
                 <th className="num">CPU</th>
-                <th className="num">Memory</th>
+                <th className="num">{t("Memory")}</th>
                 <th />
               </tr>
             </thead>
@@ -262,7 +263,7 @@ export function ProcessExplorer({ open, onClose }: Props) {
                             type="button"
                             className="process-twisty"
                             aria-expanded={!collapsed}
-                            title={collapsed ? "Expand" : "Collapse"}
+                            title={collapsed ? t("Expand") : t("Collapse")}
                             onClick={() => toggle(entry)}
                           >
                             {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -273,30 +274,30 @@ export function ProcessExplorer({ open, onClose }: Props) {
                         <span className="process-dot" />
                         {row.label}
                         {collapsed && (
-                          <span className="process-hidden-count" title={`${descendants} more process${descendants === 1 ? "" : "es"} inside`}>
+                          <span
+                            className="process-hidden-count"
+                            title={descendants === 1 ? t("1 more process inside") : t("{0} more processes inside", descendants)}
+                          >
                             +{descendants}
                           </span>
                         )}
                         {row.extension && (
-                          <span className="process-extension" title={`Started for or rendered by the extension ${row.extension}`}>
+                          <span className="process-extension" title={t("Started for or rendered by the extension {0}", row.extension)}>
                             <Puzzle size={11} />
                             {row.extension}
                           </span>
                         )}
-                        {!row.extension && extension && <span className="process-extension-inherited">via {extension}</span>}
+                        {!row.extension && extension && <span className="process-extension-inherited">{t("via {0}", extension)}</span>}
                       </div>
                     </td>
                     <td className="num muted">{row.pid ?? ""}</td>
-                    <td className="num" title={nested ? `Own: ${formatCpu(row.cpu)}` : undefined}>
+                    <td className="num" title={nested ? t("Own: {0}", formatCpu(row.cpu)) : undefined}>
                       {row.kind === "thread" ? "" : formatCpu(total.cpu)}
                     </td>
                     <td
                       className="num"
                       title={
-                        nested
-                          ? `Own: ${formatBytes(row.memory)}
-Nested processes: ${formatBytes(total.memory - row.memory)}`
-                          : undefined
+                        nested ? `${t("Own: {0}", formatBytes(row.memory))}\n${t("Nested processes: {0}", formatBytes(total.memory - row.memory))}` : undefined
                       }
                     >
                       {formatBytes(total.memory)}
@@ -304,7 +305,7 @@ Nested processes: ${formatBytes(total.memory - row.memory)}`
                     </td>
                     <td className="shortcut-actions">
                       {row.pid !== null && row.kind !== "app" && (
-                        <button type="button" className="icon-btn" title="End Process" onClick={() => void endProcess(row)}>
+                        <button type="button" className="icon-btn" title={t("End Process")} onClick={() => void endProcess(row)}>
                           <CircleX size={14} />
                         </button>
                       )}
@@ -315,9 +316,9 @@ Nested processes: ${formatBytes(total.memory - row.memory)}`
             </tbody>
           </table>
           <p className="process-note">
-            Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). A row with processes nested in it shows
-            them added in, with its own share after it. JS heap rows are parts of Lumen's own process (worker threads) and are not added to the total. Task
-            Manager lists Lumen's WebView2 processes as a separate "WebView2 Manager" group; they are shown here under Lumen.
+            {t(
+              "Memory is each process's private working set on Windows, as in Task Manager (resident memory elsewhere). A row with processes nested in it shows them added in, with its own share after it. JS heap rows are parts of Lumen's own process (worker threads) and are not added to the total. Task Manager lists Lumen's WebView2 processes as a separate \"WebView2 Manager\" group; they are shown here under Lumen.",
+            )}
           </p>
         </div>
       </div>

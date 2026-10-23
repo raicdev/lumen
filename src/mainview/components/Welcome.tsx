@@ -10,6 +10,7 @@ import {
   useWalkthroughProgress,
   useWalkthroughs,
 } from "../features/menus-walkthroughs/state";
+import { t } from "../lib/i18n";
 
 type Props = {
   recent: string[];
@@ -51,7 +52,7 @@ function Walkthroughs({ onOpen }: { onOpen: (key: string) => void }) {
   const visible = walkthroughs.filter((walkthrough) => !hidden.has(walkthrough.key.toLowerCase()));
   return (
     <>
-      <h2>Walkthroughs</h2>
+      <h2>{t("Walkthroughs")}</h2>
       <div className="welcome-walkthroughs">
         {visible.map((walkthrough) => {
           const { done, total } = progressOf(progress, walkthrough);
@@ -66,7 +67,7 @@ function Walkthroughs({ onOpen }: { onOpen: (key: string) => void }) {
                   ) : null}
                   {done === total && total > 0 && <CircleCheck size={13} />}
                   {walkthrough.title}
-                  {walkthrough.featured && <span className="welcome-walkthrough-featured">Featured</span>}
+                  {walkthrough.featured && <span className="welcome-walkthrough-featured">{t("Featured")}</span>}
                 </span>
                 {walkthrough.description && <span className="muted welcome-walkthrough-description">{walkthrough.description}</span>}
                 <span className="welcome-walkthrough-bar" aria-hidden="true">
@@ -76,8 +77,8 @@ function Walkthroughs({ onOpen }: { onOpen: (key: string) => void }) {
               <button
                 type="button"
                 className="welcome-walkthrough-hide"
-                title="Hide"
-                aria-label={`Hide ${walkthrough.title}`}
+                title={t("Hide")}
+                aria-label={t("Hide {0}", walkthrough.title)}
                 onClick={() => hideWalkthrough(walkthrough)}
               >
                 <X size={12} />
@@ -87,7 +88,7 @@ function Walkthroughs({ onOpen }: { onOpen: (key: string) => void }) {
         })}
       </div>
       <button type="button" className="welcome-link welcome-walkthroughs-more" onClick={() => void pickWalkthrough()}>
-        More…
+        {t("More…")}
       </button>
     </>
   );
@@ -111,18 +112,18 @@ export function Welcome({ recent, keys, onRun, onOpenRecent }: Props) {
       <div className="welcome-page">
         <header className="welcome-hero">
           <h1>Lumen</h1>
-          <p className="welcome-tagline">Editing evolved</p>
+          <p className="welcome-tagline">{t("Editing evolved")}</p>
         </header>
         <div className="welcome-columns">
           <section>
-            <h2>Start</h2>
+            <h2>{t("Start")}</h2>
             {START.map((item) => (
               <button key={item.id} type="button" className="welcome-link" onClick={() => onRun(item.id)}>
-                {item.label}
+                {t(item.label)}
               </button>
             ))}
-            <h2>Recent</h2>
-            {!recent.length && <p className="muted">You have no recent folders.</p>}
+            <h2>{t("Recent")}</h2>
+            {!recent.length && <p className="muted">{t("You have no recent folders.")}</p>}
             {recent.slice(0, 6).map((path) => (
               <div key={path} className="welcome-recent">
                 <button type="button" className="welcome-link" onClick={() => onOpenRecent(path)}>
@@ -133,7 +134,7 @@ export function Welcome({ recent, keys, onRun, onOpenRecent }: Props) {
             ))}
             {recent.length > 6 && (
               <button type="button" className="welcome-link" onClick={() => onRun("workbench.action.openRecent")}>
-                More…
+                {t("More…")}
               </button>
             )}
             <Walkthroughs
@@ -144,11 +145,11 @@ export function Welcome({ recent, keys, onRun, onOpenRecent }: Props) {
             />
           </section>
           <section>
-            <h2>Shortcuts</h2>
+            <h2>{t("Shortcuts")}</h2>
             <div className="welcome-keys">
               {HELP.map((item) => (
                 <button key={item.id} type="button" className="welcome-key" onClick={() => onRun(item.id)}>
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                   {keys.get(item.id) && <kbd>{keys.get(item.id)}</kbd>}
                 </button>
               ))}

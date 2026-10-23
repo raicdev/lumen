@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ContributedView } from "../lib/extensions";
+import { t } from "../lib/i18n";
 import { useTreeViews } from "../lib/trees";
 import { webviewService, type WebviewInfo } from "../lib/webviews";
 import { WithCodicons } from "./Codicon";
@@ -81,7 +82,7 @@ export function ViewContainerView({ views, webviews, alwaysHeaders = false }: { 
             )}
             {open &&
               (view.type === "webview" ? (
-                <WebviewSlot slotKey={`view:${view.id}`} placeholder={webview ? undefined : "Loading…"} />
+                <WebviewSlot slotKey={`view:${view.id}`} placeholder={webview ? undefined : t("Loading…")} />
               ) : (
                 <ExtensionTreeView view={view} />
               ))}

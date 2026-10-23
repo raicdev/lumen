@@ -4,6 +4,7 @@ import { api } from "./rpc";
 import { onColorThemeChange, themeColor } from "./theme";
 import { ShellIntegrationParser, type ShellIntegrationEvent } from "../../shared/terminal-integration";
 import { encodeSpawnSpec, type TerminalSpawnSpec } from "../../shared/terminal-spawn";
+import { t } from "./i18n";
 
 /**
  * Integrated terminals (VS Code style): any number of PTY-backed instances,
@@ -194,7 +195,7 @@ class TerminalService {
       instance.exitCode = code;
       this.emitEvent({ type: "exited", id: instance.id, code });
       instance.term.writeln("");
-      instance.term.writeln(`\x1b[90m[process exited with code ${code ?? "?"} — press Enter to restart]\x1b[0m`);
+      instance.term.writeln(`\x1b[90m${t("[process exited with code {0} — press Enter to restart]", code ?? "?")}\x1b[0m`);
       this.emit();
     });
   }
@@ -512,7 +513,7 @@ class TerminalService {
         this.emitEvent({ type: "started", id: instance.id, pid: (result as { pid?: number }).pid, shell: result.shell });
       } catch (error) {
         console.error("Failed to start terminal", error);
-        instance.term.writeln("\x1b[31mFailed to start the shell.\x1b[0m");
+        instance.term.writeln(`\x1b[31m${t("Failed to start the shell.")}\x1b[0m`);
       } finally {
         instance.starting = null;
       }

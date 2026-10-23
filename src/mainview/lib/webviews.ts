@@ -7,6 +7,7 @@ import { contributedMenuItems } from "../features/menus-walkthroughs/menus";
 import { activeColorTheme, onColorThemeChange, themeVariables } from "./theme";
 import { themeBodyClass } from "../../shared/color-theme";
 import { webviewFindAction, type WebviewFindAction, type WebviewTheme } from "../../shared/webview-document";
+import { t } from "./i18n";
 
 /** The active color theme as webview pages get it. */
 function webviewTheme(): WebviewTheme {
@@ -525,11 +526,11 @@ class WebviewService {
     const own: ContextMenuItem[] = context.preventDefaultContextMenuItems
       ? []
       : [
-          { type: "item", label: "Cut", action: "cut", disabled: !menu.editable || !menu.selection, run: () => edit("cut") },
-          { type: "item", label: "Copy", action: "copy", disabled: !menu.selection, run: () => edit("copy") },
+          { type: "item", label: t("Cut"), action: "cut", disabled: !menu.editable || !menu.selection, run: () => edit("cut") },
+          { type: "item", label: t("Copy"), action: "copy", disabled: !menu.selection, run: () => edit("copy") },
           {
             type: "item",
-            label: "Paste",
+            label: t("Paste"),
             action: "paste",
             disabled: !menu.editable,
             run: () =>

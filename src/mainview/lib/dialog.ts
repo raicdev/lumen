@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type DialogButton = {
   label: string;
   role?: "primary" | "danger" | "default";
@@ -57,7 +59,7 @@ function openShell(options: {
   overlay.className = "modal-overlay dialog-overlay";
   overlay.innerHTML = `
     <div class="modal dialog dialog-${options.icon}" role="dialog" aria-modal="true" aria-labelledby="${id}-title" aria-describedby="${id}-body">
-      <button type="button" class="dialog-close" aria-label="Close" tabindex="-1">${icon("close", 14)}</button>
+      <button type="button" class="dialog-close" aria-label="${escapeAttr(t("Close"))}" tabindex="-1">${icon("close", 14)}</button>
       <div class="dialog-header">
         <div class="dialog-icon">${icon(options.icon, 18)}</div>
         <h2 class="modal-title" id="${id}-title">${escapeHtml(options.title)}</h2>
@@ -188,9 +190,9 @@ export function showPrompt(options: { title: string; message: string; defaultVal
         placeholder="${escapeAttr(options.placeholder ?? "")}" />
     `;
     const footer = `
-      <span class="dialog-hint"><kbd>Enter</kbd> to confirm · <kbd>Esc</kbd> to cancel</span>
-      <button type="button" class="modal-btn default" data-act="cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" data-act="ok">OK</button>
+      <span class="dialog-hint">${t("{0} to confirm · {1} to cancel", "<kbd>Enter</kbd>", "<kbd>Esc</kbd>")}</span>
+      <button type="button" class="modal-btn default" data-act="cancel">${escapeHtml(t("Cancel"))}</button>
+      <button type="button" class="modal-btn primary" data-act="ok">${escapeHtml(t("OK"))}</button>
     `;
     const { overlay, finish } = openShell({
       title: options.title,
@@ -230,9 +232,9 @@ export function showPrompt(options: { title: string; message: string; defaultVal
 export function showAbout(info: { name: string; version: string; platform: string }) {
   return showDialog({
     title: `${info.name} ${info.version}`,
-    message: "A fast, luminous code editor.",
-    detail: `Built with Lumen Shell · Node.js · TypeScript\nPlatform: ${info.platform}\n\nKeyboard: Ctrl+P palette · Ctrl+Shift+F search · Ctrl+S save`,
-    buttons: [{ label: "Close", role: "primary", value: "ok" }],
+    message: t("A fast, luminous code editor."),
+    detail: `${t("Built with Lumen Shell · Node.js · TypeScript")}\n${t("Platform: {0}", info.platform)}\n\n${t("Keyboard: Ctrl+P palette · Ctrl+Shift+F search · Ctrl+S save")}`,
+    buttons: [{ label: t("Close"), role: "primary", value: "ok" }],
     defaultValue: "ok",
     kind: "info",
   });

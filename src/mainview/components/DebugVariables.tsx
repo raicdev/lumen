@@ -5,6 +5,7 @@ import { debugService } from "../lib/debug";
 import { debugMenuLookup, debugUi } from "../lib/debug-ui";
 import { showContextMenu, type ContextMenuItem } from "../lib/context-menu";
 import { contributedMenuItems } from "../features/menus-walkthroughs/menus";
+import { t } from "../lib/i18n";
 
 /** A variable's value, colored like VS Code (strings, numbers, booleans, null). */
 export function DebugValue({ value, type }: { value: string; type?: string }) {
@@ -73,11 +74,11 @@ export function VariableNode({ sessionId, variable, depth, generation, defaultOp
     // Scopes (variables roots) have no contributed menu.
     const contributed = watch || container ? contributedMenuItems(watch ? "debug/watch/context" : "debug/variables/context", lookup, [context]) : [];
     const own: ContextMenuItem[] = [
-      { type: "item", label: "Copy Value", action: "copy" },
+      { type: "item", label: t("Copy Value"), action: "copy" },
       ...(variable.evaluateName
         ? [
-            { type: "item" as const, label: "Copy as Expression", action: "copyExpr" },
-            { type: "item" as const, label: "Add to Watch", action: "watch" },
+            { type: "item" as const, label: t("Copy as Expression"), action: "copyExpr" },
+            { type: "item" as const, label: t("Add to Watch"), action: "watch" },
           ]
         : []),
     ];

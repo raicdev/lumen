@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { ExtensionDescription } from "../../shared/extensions";
+import type { LocaleSetting } from "../../shared/i18n";
 
 /**
  * User settings (VS Code style keys), persisted in localStorage and observable
@@ -66,6 +67,8 @@ export type Settings = {
   "update.mode": "default" | "manual" | "none";
   /** stable: releases only; beta: pre-releases as well. */
   "update.channel": "stable" | "beta";
+  /** Display language of the window and of extensions; auto follows the system. Applies after a reload. */
+  locale: LocaleSetting;
 };
 
 export type SettingKey = keyof Settings;
@@ -113,6 +116,7 @@ export const DEFAULT_SETTINGS: Settings = {
   "terminal.integrated.defaultProfile": "",
   "update.mode": "default",
   "update.channel": "stable",
+  locale: "auto",
 };
 
 type SchemaEntry = {
@@ -272,6 +276,14 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
     description:
       "stable: update to releases only. beta: also update to beta pre-releases, which come before a release and may have bugs. Unless set, a beta build of Lumen follows the beta channel.",
     options: ["stable", "beta"],
+  },
+  {
+    key: "locale",
+    category: "Application",
+    label: "Display Language",
+    description:
+      "The language of Lumen and of extensions that are translated. auto: the language of the system. Takes effect after the window reloads. Also: Configure Display Language.",
+    options: ["auto", "en", "ja"],
   },
 ];
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fuzzyMatch, fuzzyMatchPath } from "../lib/fuzzy";
-import { commandLabel, type Command } from "../lib/commands";
+import { commandLabel, englishCommandLabel, type Command } from "../lib/commands";
+import { t } from "../lib/i18n";
 import { SymbolIcon } from "./SymbolIcon";
 import { WithCodicons } from "./Codicon";
 import { isCtrlHeld } from "../lib/keybindings";
@@ -64,6 +65,9 @@ export type QuickInputRequest =
       /** A title bar button was pressed (QuickInputButton.index). */
       onButton?: (index: number) => void;
     };
+
+/** A match in a command's English name: its positions are not the translated label's, so nothing is highlighted. */
+const englishMatch = (match: ReturnType<typeof fuzzyMatch>) => (match ? { ...match, indices: [] } : null);
 
 export type FlatSymbol = { symbol: DocumentSymbol; container: string };
 
@@ -300,7 +304,7 @@ export function QuickInput(props: Props) {
 
     if (request.kind === "input") {
       const message = decodeValidation(request.validation)?.message ?? request.options.prompt;
-      const hint = "Press 'Enter' to confirm your input or 'Escape' to cancel";
+      const hint = t("Press 'Enter' to confirm your input or 'Escape' to cancel");
       return [{ id: "hint", label: message ? `${message}` : hint, description: message ? hint : undefined, run: () => {} }];
     }
 
@@ -328,11 +332,11 @@ export function QuickInput(props: Props) {
 
     if (mode === "help") {
       return [
-        { prefix: "", label: "Go to File" },
-        { prefix: ">", label: "Show and Run Commands" },
-        { prefix: ":", label: "Go to Line / Column" },
-        { prefix: "@", label: "Go to Symbol in Editor" },
-        { prefix: "#", label: "Go to Symbol in Workspace" },
+        { prefix: "", label: t("Go to File") },
+        { prefix: ">", label: t("Show and Run Commands") },
+        { prefix: ":", label: t("Go to Line / Column") },
+        { prefix: "@", label: t("Go to Symbol in Editor") },
+        { prefix: "#", label: t("Go to Symbol in Workspace") },
       ].map((entry) => ({
         id: entry.prefix || "files",
         label: entry.prefix ? `${entry.prefix}  ${entry.label}` : `…  ${entry.label}`,
@@ -345,12 +349,12 @@ export function QuickInput(props: Props) {
       const match = /^:\s*(\d+)?(?:[:,]\s*(\d+))?/.exec(value);
       const line = match?.[1] ? Number(match[1]) : null;
       const column = match?.[2] ? Number(match[2]) : 1;
-      if (props.lineCount === null) return [{ id: "none", label: "Open a text editor first to go to a line.", run: () => {} }];
+      if (props.lineCount === null) return [{ id: "none", label: t("Open a text editor first to go to a line."), run: () => {} }];
       if (!line) {
         return [
           {
             id: "hint",
-            label: `Current Line: ${props.currentLine ?? 1}. Type a line number between 1 and ${props.lineCount} to navigate to.`,
+            label: t("Current Line: {0}. Type a line number between 1 and {1} to navigate to.", props.currentLine ?? 1, props.lineCount),
             run: () => {},
           },
         ];
@@ -359,7 +363,7 @@ export function QuickInput(props: Props) {
       return [
         {
           id: "goto",
-          label: `Go to line ${target}${column > 1 ? `, character ${column}` : ""}`,
+          label: column > 1 ? t("Go to line {0}, character {1}", target, column) : t("Go to line {0}", target),
           run: () => props.onGotoLine(target, column),
         },
       ];
@@ -367,8 +371,8 @@ export function QuickInput(props: Props) {
 
     if (mode === "symbols") {
       const query = value.slice(1).trim();
-      if (symbols === null) return [{ id: "loading", label: "Loading symbols…", run: () => {} }];
-      if (!symbols.length) return [{ id: "none", label: "No symbols found in this editor.", run: () => {} }];
+      if (symbols === null) return [{ id: "loading", label: t("Loading symbols…"), run: () => {} }];
+      if (!symbols.length) return [{ id: "none", label: t("No symbols found in this editor."), run: () => {} }];
       return symbols
         .map((entry) => ({ entry, match: fuzzyMatch(query, entry.symbol.name) }))
         .filter((item) => item.match)
@@ -388,8 +392,8 @@ export function QuickInput(props: Props) {
     }
 
     if (mode === "workspaceSymbols") {
-      if (workspaceSymbols === null) return [{ id: "loading", label: "Searching symbols…", run: () => {} }];
-      if (!workspaceSymbols.length) return [{ id: "none", label: "No matching symbols.", run: () => {} }];
+      if (workspaceSymbols === null) return [{ id: "loading", label: t("Searching symbols…"), run: () => {} }];
+      if (!workspaceSymbols.length) return [{ id: "none", label: t("No matching symbols."), run: () => {} }];
       return workspaceSymbols.slice(0, 300).map((symbol) => ({
         id: `workspace-symbol:${symbol.id}`,
         label: symbol.name,
@@ -404,8 +408,12 @@ export function QuickInput(props: Props) {
       const query = value.slice(1).trim();
       const recent = props.recentCommands;
       const scored = props.commands
-        .map((command) => ({ command, label: commandLabel(command) }))
-        .map((entry) => ({ ...entry, match: fuzzyMatch(query, entry.label) }))
+        .map((command) => ({ command, label: commandLabel(command), english: englishCommandLabel(command) }))
+        // A translated command is also found by its English name (shown beside it), as in VS Code.
+        .map((entry) => ({
+          ...entry,
+          match: fuzzyMatch(query, entry.label) ?? (entry.english !== entry.label ? englishMatch(fuzzyMatch(query, entry.english)) : null),
+        }))
         .filter((entry) => entry.match);
       if (query) scored.sort((a, b) => b.match!.score - a.match!.score);
       else {
@@ -415,16 +423,17 @@ export function QuickInput(props: Props) {
         };
         scored.sort((a, b) => rank(a.command.id) - rank(b.command.id) || a.label.localeCompare(b.label));
       }
-      return scored.slice(0, 400).map(({ command, label, match }, index) => ({
+      return scored.slice(0, 400).map(({ command, label, english, match }, index) => ({
         id: command.id,
         label,
+        description: english !== label ? english : undefined,
         indices: match!.indices,
         hint: props.keys.get(command.id),
         separator:
           !query && index === 0 && recent.includes(command.id)
-            ? "recently used"
+            ? t("recently used")
             : !query && recent.includes(scored[index - 1]?.command.id ?? "") && !recent.includes(command.id)
-              ? "other commands"
+              ? t("other commands")
               : undefined,
         run: () => props.onRunCommand(command.id),
       }));
@@ -443,12 +452,12 @@ export function QuickInput(props: Props) {
         indices: match!.indices.filter((i) => i >= rel.length - basename(path).length).map((i) => i - (rel.length - basename(path).length)),
         description: rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "",
         icon: <FileIcon name={basename(path)} />,
-        separator: index === 0 ? "recently opened" : undefined,
+        separator: index === 0 ? t("recently opened") : undefined,
         run: () => props.onOpenFile(path),
       }));
     if (!root) return recentRows;
     if (!query) return recentRows;
-    if (files === null) return [...recentRows, { id: "loading", label: "Searching files…", run: () => {} }];
+    if (files === null) return [...recentRows, { id: "loading", label: t("Searching files…"), run: () => {} }];
     const seen = new Set(props.recentEditors.map((path) => relativeTo(root, path)));
     const fileRows = files
       .filter((rel) => !seen.has(rel))
@@ -465,7 +474,7 @@ export function QuickInput(props: Props) {
           indices: match!.indices.filter((i) => i >= offset).map((i) => i - offset),
           description: rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "",
           icon: <FileIcon name={name} />,
-          separator: index === 0 && recentRows.length ? "file results" : undefined,
+          separator: index === 0 && recentRows.length ? t("file results") : undefined,
           run: () => props.onOpenFile(joinPath(root, rel)),
         };
       });
@@ -575,8 +584,8 @@ export function QuickInput(props: Props) {
         : request.kind === "input"
           ? (request.options.placeholder ?? "")
           : request.kind === "editors"
-            ? "Select an editor"
-            : "Search files by name (append : to go to line, @ to go to symbol, or # for workspace symbols)";
+            ? t("Select an editor")
+            : t("Search files by name (append : to go to line, @ to go to symbol, or # for workspace symbols)");
   const title = request.kind === "hostPick" ? request.pick.title : request.kind === "input" ? request.options.title : undefined;
   const multi = request.kind === "hostPick" && request.pick.canPickMany;
   const busy = request.kind === "hostPick" && request.pick.busy;
@@ -596,7 +605,7 @@ export function QuickInput(props: Props) {
         if (e.target === e.currentTarget) dismiss();
       }}
     >
-      <div className="palette" role="dialog" aria-label={title ?? "Quick open"}>
+      <div className="palette" role="dialog" aria-label={title ?? t("Quick open")}>
         {hasTitlebar && (
           <div className="palette-titlebar">
             <span className="palette-titlebar-left">{backButton && <QuickButton button={backButton} onClick={() => triggerButton(backButton.index)} />}</span>
@@ -615,7 +624,7 @@ export function QuickInput(props: Props) {
             <input
               type="checkbox"
               className="palette-check-all"
-              title="Toggle all"
+              title={t("Toggle all")}
               checked={checked.size > 0 && checked.size === rows.length}
               onChange={(e) => setChecked(e.target.checked ? new Set(rows.flatMap((row) => (row.itemIndex === undefined ? [] : [row.itemIndex]))) : new Set())}
             />
@@ -667,7 +676,7 @@ export function QuickInput(props: Props) {
         </div>
         {busy && <div className="palette-busy" />}
         <div className="palette-results" ref={listRef}>
-          {!rows.length && <div className="palette-empty">No matching results</div>}
+          {!rows.length && <div className="palette-empty">{t("No matching results")}</div>}
           {rows.map((row, index) => (
             <div key={`${row.id}:${index}`}>
               {row.separator && row.separator.trim() && <div className="quick-separator">{row.separator}</div>}
@@ -704,9 +713,9 @@ export function QuickInput(props: Props) {
         </div>
         {multi && (
           <div className="palette-footer">
-            <span>{checked.size} selected</span>
+            <span>{t("{0} selected", checked.size)}</span>
             <button type="button" className="palette-ok" onMouseDown={(e) => e.preventDefault()} onClick={() => accept(undefined)}>
-              OK
+              {t("OK")}
             </button>
           </div>
         )}

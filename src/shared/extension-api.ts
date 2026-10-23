@@ -170,7 +170,7 @@ const BASE_API_SUPPORT: Record<string, Entry> = {
   "extensions.onDidChange": "supported",
 
   /* l10n */
-  "l10n.t": ["supported", "Lumen's display language is English"],
+  "l10n.t": "supported",
   "l10n.bundle": "supported",
   "l10n.uri": "supported",
 

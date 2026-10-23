@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { DropSide } from "../lib/editor-grid";
+import { t } from "../lib/i18n";
 
 /** An editor tab being dragged: `{ path, groupId }` as JSON. */
 export const TAB_DRAG_TYPE = "application/x-lumen-tab";
@@ -68,7 +69,7 @@ export function EditorDropTarget({ accepts, onDrop }: Props) {
     >
       {zone && (
         <div className={`editor-drop-highlight zone-${zone}`}>
-          <span className="dock-label">{LABEL[zone]}</span>
+          <span className="dock-label">{t(LABEL[zone])}</span>
         </div>
       )}
     </div>

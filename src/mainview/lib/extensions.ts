@@ -33,6 +33,7 @@ import { matchesSelector } from "../../shared/glob";
 import { setFileSystemSchemes } from "../../shared/file-systems";
 import { dispatchHostMessage, notifyHostReady } from "../features/registry";
 import { customEditorContributions, type CustomEditorContribution } from "../../shared/extensions";
+import { t } from "./i18n";
 
 /**
  * The view's side of extensions: talks to the extension host (through the
@@ -1028,14 +1029,18 @@ class ExtensionService {
         const now = Date.now();
         this.#crashes = [...this.#crashes.filter((at) => now - at < CRASH_WINDOW_MS), now];
         if (this.#crashes.length <= AUTO_RESTARTS) {
-          void notify("error", `The extension host terminated unexpectedly (${message.error}). It is being restarted.`);
+          void notify("error", t("The extension host terminated unexpectedly ({0}). It is being restarted.", message.error));
           void this.restart();
           return;
         }
         void notify(
           "error",
-          `The extension host terminated unexpectedly ${this.#crashes.length} times in the last few minutes (${message.error}). Disable recently installed extensions, then restart it.`,
-          ["Restart Extension Host"],
+          t(
+            "The extension host terminated unexpectedly {0} times in the last few minutes ({1}). Disable recently installed extensions, then restart it.",
+            this.#crashes.length,
+            message.error,
+          ),
+          [t("Restart Extension Host")],
         ).then((choice) => {
           if (choice === 0) void this.restart();
         });

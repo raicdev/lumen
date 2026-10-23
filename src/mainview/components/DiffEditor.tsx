@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { diffEditorExtensions } from "../lib/editor";
 import { offsetOf } from "../lib/text-edits";
 import type { TextRange } from "../../shared/types";
+import { t } from "../lib/i18n";
 
 export type DiffContent = { content: string; language: string; readOnly?: boolean } | { error: string };
 
@@ -96,13 +97,13 @@ export function DiffEditor({ original, modified, language, readOnly, initialSele
     <div className="editor-diff">
       <div className="editor-diff-toolbar">
         <span className="editor-diff-title" title={modified}>
-          {readOnly ? "Read-only comparison" : "Editable comparison"}
+          {readOnly ? t("Read-only comparison") : t("Editable comparison")}
         </span>
         <span className="editor-diff-spacer" />
-        <button type="button" title="Previous change (Shift+F7)" onClick={() => go(goToPreviousChunk)}>
+        <button type="button" title={t("Previous change (Shift+F7)")} onClick={() => go(goToPreviousChunk)}>
           <ChevronUp size={14} />
         </button>
-        <button type="button" title="Next change (F7)" onClick={() => go(goToNextChunk)}>
+        <button type="button" title={t("Next change (F7)")} onClick={() => go(goToNextChunk)}>
           <ChevronDown size={14} />
         </button>
       </div>

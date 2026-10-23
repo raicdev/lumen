@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PANEL_DRAG_TYPE, type PanelPosition } from "./Panel";
 import { TERMINAL_DRAG_TYPE } from "./TerminalView";
+import { t } from "../lib/i18n";
 
 /** A terminal editor tab being dragged (back into the panel). */
 export const EDITOR_TERMINAL_DRAG_TYPE = "application/x-lumen-editor-terminal";
@@ -55,7 +56,7 @@ export function DockOverlay({ kind, panelPosition, onDrop }: Props) {
             onDrop(zone, e.dataTransfer);
           }}
         >
-          <span className="dock-label">{LABELS[zone]}</span>
+          <span className="dock-label">{t(LABELS[zone])}</span>
         </div>
       ))}
     </div>

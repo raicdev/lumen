@@ -16,6 +16,10 @@ import {
   type Settings,
 } from "../lib/settings";
 import { extensionService, useExtensions, type ContributedSetting } from "../lib/extensions";
+import { localeLabel, t } from "../lib/i18n";
+
+/** How a choice of a built-in setting reads in the dropdown (`locale` shows language names). */
+const optionLabel = (key: SettingKey, option: string) => (key === "locale" ? localeLabel(option) : option);
 
 /** A setting contributed by an extension (contributes.configuration). */
 function ExtensionSettingRow({ setting }: { setting: ContributedSetting }) {
@@ -94,7 +98,7 @@ function ExtensionSettingRow({ setting }: { setting: ContributedSetting }) {
         <span className="setting-category">{setting.title}: </span>
         <strong>{label}</strong>
         {modified && (
-          <button type="button" className="setting-reset" title="Reset to default" onClick={() => set(undefined)}>
+          <button type="button" className="setting-reset" title={t("Reset to default")} onClick={() => set(undefined)}>
             <RotateCcw size={13} />
           </button>
         )}
@@ -119,7 +123,7 @@ type TocEntry = { category: string; label: string; count: number; child?: boolea
 /** Category table of contents: core categories, then each extension's settings under "Extensions". */
 function SettingsToc({ entries, active, onSelect }: { entries: TocEntry[]; active: string | null; onSelect: (category: string) => void }) {
   return (
-    <nav className="settings-toc" aria-label="Setting categories">
+    <nav className="settings-toc" aria-label={t("Setting categories")}>
       {entries.map((entry) =>
         entry.category ? (
           <button
@@ -193,7 +197,9 @@ export function SettingsEditor({ open, onClose }: Props) {
     const map = new Map<string, typeof SETTINGS_SCHEMA>();
     for (const entry of SETTINGS_SCHEMA) {
       if (modifiedOnly && scopedSettings[entry.key] === scopedDefaults[entry.key]) continue;
-      const haystack = `${entry.key} ${entry.label} ${entry.description} ${entry.category}`.toLowerCase();
+      // English and the display language both find a setting.
+      const haystack =
+        `${entry.key} ${entry.label} ${entry.description} ${entry.category} ${t(entry.label)} ${t(entry.description)} ${t(entry.category)}`.toLowerCase();
       if (q && !q.split(/\s+/).every((word) => haystack.includes(word))) continue;
       const list = map.get(entry.category) ?? [];
       list.push(entry);
@@ -218,9 +224,9 @@ export function SettingsEditor({ open, onClose }: Props) {
   }, [query, modifiedOnly, extensions]);
 
   const toc = useMemo(() => {
-    const entries: TocEntry[] = [...groups].map(([category, list]) => ({ category, label: category, count: list.length }));
+    const entries: TocEntry[] = [...groups].map(([category, list]) => ({ category, label: t(category), count: list.length }));
     if (extensionGroups.size) {
-      entries.push({ category: "", label: "Extensions", count: 0 });
+      entries.push({ category: "", label: t("Extensions"), count: 0 });
       for (const [category, list] of extensionGroups) {
         entries.push({ category, label: category.replace(/^Extensions › /, ""), count: list.length, child: true });
       }
@@ -273,22 +279,22 @@ export function SettingsEditor({ open, onClose }: Props) {
 
   return (
     <div className="modal-overlay settings-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="settings-editor" role="dialog" aria-label="Settings">
+      <div className="settings-editor" role="dialog" aria-label={t("Settings")}>
         <div className="settings-header">
-          <h2>Settings</h2>
+          <h2>{t("Settings")}</h2>
           <input
             ref={inputRef}
             className="settings-search"
             type="text"
-            placeholder="Search settings"
+            placeholder={t("Search settings")}
             spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           {languages.length > 0 && (
-            <label className="settings-filter" title="Edit the settings of one language (extension defaults included)">
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} aria-label="Settings language">
-                <option value="">All languages</option>
+            <label className="settings-filter" title={t("Edit the settings of one language (extension defaults included)")}>
+              <select value={language} onChange={(e) => setLanguage(e.target.value)} aria-label={t("Settings language")}>
+                <option value="">{t("All languages")}</option>
                 {languages.map((id) => (
                   <option key={id} value={id}>
                     {id}
@@ -299,10 +305,10 @@ export function SettingsEditor({ open, onClose }: Props) {
           )}
           <label className="settings-filter">
             <input type="checkbox" checked={modifiedOnly} onChange={(e) => setModifiedOnly(e.target.checked)} />
-            Modified
+            {t("Modified")}
           </label>
           <ModalEditorTitleActions activeEditor="workbench.editor.settings2" />
-          <button type="button" className="icon-btn" title="Close (Esc)" onClick={onClose}>
+          <button type="button" className="icon-btn" title={t("Close (Esc)")} onClick={onClose}>
             <X size={16} />
           </button>
         </div>
@@ -315,23 +321,23 @@ export function SettingsEditor({ open, onClose }: Props) {
             onWheel={() => (pickedCategory.current = null)}
             onKeyDown={() => (pickedCategory.current = null)}
           >
-            {!groups.size && !extensionGroups.size && <div className="tree-empty">No settings found.</div>}
+            {!groups.size && !extensionGroups.size && <div className="tree-empty">{t("No settings found.")}</div>}
             {[...groups].map(([category, entries]) => (
               <section key={category} className="settings-section" data-category={category}>
-                <h3>{category}</h3>
+                <h3>{t(category)}</h3>
                 {entries.map((entry) => {
                   const value = scopedSettings[entry.key];
                   const modified = value !== scopedDefaults[entry.key];
                   return (
                     <div key={entry.key} className={`setting${modified ? " modified" : ""}`}>
                       <div className="setting-title">
-                        <span className="setting-category">{entry.category}: </span>
-                        <strong>{entry.label}</strong>
+                        <span className="setting-category">{t(entry.category)}: </span>
+                        <strong>{t(entry.label)}</strong>
                         {modified && (
                           <button
                             type="button"
                             className="setting-reset"
-                            title="Reset to default"
+                            title={t("Reset to default")}
                             onClick={() => (language ? resetLanguageSetting(language, entry.key) : resetSetting(entry.key))}
                           >
                             <RotateCcw size={13} />
@@ -342,16 +348,16 @@ export function SettingsEditor({ open, onClose }: Props) {
                       {typeof value === "boolean" ? (
                         <label className="setting-checkbox">
                           <input type="checkbox" checked={value} onChange={(e) => set(entry.key, e.target.checked as never)} />
-                          {entry.description}
+                          {t(entry.description)}
                         </label>
                       ) : (
                         <>
-                          <div className="setting-description">{entry.description}</div>
+                          <div className="setting-description">{t(entry.description)}</div>
                           {entry.options ? (
                             <select value={String(value)} onChange={(e) => set(entry.key, e.target.value as never)}>
                               {entry.options.map((option) => (
                                 <option key={option} value={option}>
-                                  {option}
+                                  {optionLabel(entry.key, option)}
                                 </option>
                               ))}
                             </select>
@@ -378,7 +384,7 @@ export function SettingsEditor({ open, onClose }: Props) {
             ))}
             {[...extensionGroups].map(([category, entries]) => (
               <section key={category} className="settings-section" data-category={category}>
-                <h3>{category}</h3>
+                <h3>{category.replace(/^Extensions › /, `${t("Extensions")} › `)}</h3>
                 {entries.map((setting) => (
                   <ExtensionSettingRow key={setting.key} setting={setting} />
                 ))}

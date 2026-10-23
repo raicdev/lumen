@@ -15,6 +15,8 @@ update themselves. Lumen needs the WebView2 runtime, which Windows 10 and 11 alr
 - **VS Code extensions**: install from [Open VSX](https://open-vsx.org) or a `.vsix`. Extensions are converted on install and
   rated for compatibility, and they run in a separate extension host so they never freeze the window.
 - **Built in**: integrated terminals, source control, search and replace across files, and TypeScript language features.
+- **Display languages**: English and 日本語 (`locale` setting or Configure Display Language), for Lumen and for extensions
+  that ship translations.
 - **Light**: no bundled browser, and a Process Explorer that shows what each part of the app uses.
 
 ## Development

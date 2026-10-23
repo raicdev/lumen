@@ -14,6 +14,7 @@ import { renderMarkdown } from "../lib/markdown";
 import { api } from "../lib/rpc";
 import { COMPAT_GRADES, compatClass, compatGrade } from "../lib/compat";
 import { normalizeKeybinding } from "../lib/extensions";
+import { t } from "../lib/i18n";
 import { CompatBadge, ExtensionIcon, type ExtensionAction, type ExtensionTarget } from "./ExtensionsView";
 
 type Tab = "details" | "features" | "compatibility" | "changelog" | "runtime";
@@ -40,23 +41,19 @@ function onLinkClick(e: React.MouseEvent) {
 /** `note` says where the report comes from (installed, development folder, or a package analyzed before install). */
 function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; report: CompatReport | undefined; note: string }) {
   if (kind !== "vscode") {
-    return (
-      <div className="ext-details-empty">
-        This is a Lumen extension: it is written against the <code>lumen</code> API and needs no conversion.
-      </div>
-    );
+    return <div className="ext-details-empty">{t("This is a Lumen extension: it is written against the lumen API and needs no conversion.")}</div>;
   }
-  if (!report) return <div className="ext-details-empty">No compatibility report was recorded for this extension.</div>;
+  if (!report) return <div className="ext-details-empty">{t("No compatibility report was recorded for this extension.")}</div>;
   const order: SupportLevel[] = ["unsupported", "partial", "supported"];
   const apis = [...report.apis].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || a.name.localeCompare(b.name));
   const grade = COMPAT_GRADES[compatGrade(report)];
   return (
     <div className="ext-compat">
       <div className={`ext-compat-summary ${compatClass(report)}`}>
-        <strong>{grade.label}</strong>
+        <strong>{t(grade.label)}</strong>
         <span>
-          {grade.text}
-          {report.coverage !== undefined && report.level !== "full" && ` ${report.coverage}% of the APIs and contribution points it uses work.`}
+          {t(grade.text)}
+          {report.coverage !== undefined && report.level !== "full" && ` ${t("{0}% of the APIs and contribution points it uses work.", report.coverage)}`}
         </span>
       </div>
       <p className="ext-compat-note">{note}</p>
@@ -67,14 +64,14 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
           ))}
         </ul>
       )}
-      <h4>API usage</h4>
+      <h4>{t("API usage")}</h4>
       {apis.length ? (
         <table className="ext-table">
           <thead>
             <tr>
               <th>API</th>
-              <th>Uses</th>
-              <th>Status</th>
+              <th>{t("Uses")}</th>
+              <th>{t("Status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -85,7 +82,7 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
                 </td>
                 <td>{entry.count}</td>
                 <td>
-                  <span className={`ext-status ${entry.status}`}>{STATUS_LABEL[entry.status]}</span>
+                  <span className={`ext-status ${entry.status}`}>{t(STATUS_LABEL[entry.status])}</span>
                   {entry.note && <span className="ext-status-note"> — {entry.note}</span>}
                 </td>
               </tr>
@@ -93,11 +90,11 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
           </tbody>
         </table>
       ) : (
-        <div className="ext-details-empty">No use of the extension API was found in the code.</div>
+        <div className="ext-details-empty">{t("No use of the extension API was found in the code.")}</div>
       )}
       {report.contributions.length > 0 && (
         <>
-          <h4>Contribution points</h4>
+          <h4>{t("Contribution points")}</h4>
           <table className="ext-table">
             <tbody>
               {report.contributions.map((entry) => (
@@ -106,7 +103,7 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
                     <code>{entry.name}</code>
                   </td>
                   <td>
-                    <span className={`ext-status ${entry.status}`}>{STATUS_LABEL[entry.status]}</span>
+                    <span className={`ext-status ${entry.status}`}>{t(STATUS_LABEL[entry.status])}</span>
                     {entry.note && <span className="ext-status-note"> — {entry.note}</span>}
                   </td>
                 </tr>
@@ -139,19 +136,19 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
     return raw ? normalizeKeybinding(raw) : "";
   };
   if (!commands.length && !settings.length && !languages.length && !snippets.length && !keybindings.length) {
-    return <div className="ext-details-empty">This extension contributes no commands, settings, languages or snippets.</div>;
+    return <div className="ext-details-empty">{t("This extension contributes no commands, settings, languages or snippets.")}</div>;
   }
   return (
     <div className="ext-features">
       {commands.length > 0 && (
         <>
-          <h4>Commands ({commands.length})</h4>
+          <h4>{t("Commands ({0})", commands.length)}</h4>
           <table className="ext-table">
             <thead>
               <tr>
-                <th>Title</th>
+                <th>{t("Title")}</th>
                 <th>ID</th>
-                <th>Keybinding</th>
+                <th>{t("Keybinding")}</th>
               </tr>
             </thead>
             <tbody>
@@ -170,13 +167,13 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
       )}
       {settings.length > 0 && (
         <>
-          <h4>Settings ({settings.length})</h4>
+          <h4>{t("Settings ({0})", settings.length)}</h4>
           <table className="ext-table">
             <thead>
               <tr>
-                <th>Setting</th>
-                <th>Default</th>
-                <th>Description</th>
+                <th>{t("Setting")}</th>
+                <th>{t("Default")}</th>
+                <th>{t("Description")}</th>
               </tr>
             </thead>
             <tbody>
@@ -197,7 +194,7 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
       )}
       {languages.length > 0 && (
         <>
-          <h4>Languages ({languages.length})</h4>
+          <h4>{t("Languages ({0})", languages.length)}</h4>
           <table className="ext-table">
             <tbody>
               {languages.map((language) => (
@@ -215,12 +212,12 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
       )}
       {snippets.length > 0 && (
         <>
-          <h4>Snippets</h4>
+          <h4>{t("Snippets")}</h4>
           <table className="ext-table">
             <tbody>
               {snippets.map((snippet) => (
                 <tr key={`${snippet.language}:${snippet.path}`}>
-                  <td>{snippet.language ?? "all languages"}</td>
+                  <td>{snippet.language ?? t("all languages")}</td>
                   <td>
                     <code>{snippet.path}</code>
                   </td>
@@ -232,7 +229,7 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
       )}
       {(manifest.activationEvents?.length ?? 0) > 0 && (
         <>
-          <h4>Activation events</h4>
+          <h4>{t("Activation events")}</h4>
           <div className="ext-chips">
             {manifest.activationEvents!.map((event) => (
               <code key={event}>{event}</code>
@@ -248,11 +245,11 @@ function FeaturesView({ manifest }: { manifest: ExtensionManifest }) {
 function ListingInfo({ listing, marketplace }: { listing: MarketplaceDetails | null; marketplace?: MarketplaceExtension }) {
   const updated = listing?.timestamp ?? marketplace?.timestamp;
   const facts = [
-    marketplace?.downloadCount ? { label: "Downloads", value: marketplace.downloadCount.toLocaleString() } : null,
-    marketplace?.averageRating ? { label: "Rating", value: `${marketplace.averageRating.toFixed(1)} / 5` } : null,
-    updated ? { label: "Last updated", value: new Date(updated).toLocaleDateString() } : null,
-    listing?.license ? { label: "License", value: listing.license } : null,
-    listing?.categories?.length ? { label: "Categories", value: listing.categories.join(", ") } : null,
+    marketplace?.downloadCount ? { label: t("Downloads"), value: marketplace.downloadCount.toLocaleString() } : null,
+    marketplace?.averageRating ? { label: t("Rating"), value: `${marketplace.averageRating.toFixed(1)} / 5` } : null,
+    updated ? { label: t("Last updated"), value: new Date(updated).toLocaleDateString() } : null,
+    listing?.license ? { label: t("License"), value: listing.license } : null,
+    listing?.categories?.length ? { label: t("Categories"), value: listing.categories.join(", ") } : null,
   ].filter((fact): fact is { label: string; value: string } => !!fact);
   if (!facts.length && !listing?.tags?.length) return null;
   return (
@@ -282,7 +279,7 @@ function MarkdownDoc({ source, empty }: { source: string | null | undefined; emp
   if (source === undefined) {
     return (
       <div className="ext-details-empty ext-details-loading">
-        <LoaderCircle size={13} className="codicon spin" /> Loading…
+        <LoaderCircle size={13} className="codicon spin" /> {t("Loading…")}
       </div>
     );
   }
@@ -324,7 +321,7 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
   if (result === "loading") {
     return (
       <div className="ext-details-empty ext-details-loading">
-        <LoaderCircle size={13} className="codicon spin" /> Loading…
+        <LoaderCircle size={13} className="codicon spin" /> {t("Loading…")}
       </div>
     );
   }
@@ -332,12 +329,12 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
   if (result === null || (typeof result === "object" && result.error)) {
     return (
       <div className="ext-details-empty">
-        {typeof result === "object" && result?.error && <p className="ext-compat-error">Could not check the compatibility: {result.error}</p>}
+        {typeof result === "object" && result?.error && <p className="ext-compat-error">{t("Could not check the compatibility: {0}", result.error)}</p>}
         <p className="muted">
-          Downloads the package of v{marketplace.version} from Open VSX and analyzes which APIs and contribution points it uses. Nothing is installed.
+          {t("Downloads the package of v{0} from Open VSX and analyzes which APIs and contribution points it uses. Nothing is installed.", marketplace.version)}
         </p>
         <button type="button" className="ext-install" onClick={() => check()}>
-          {result ? "Try Again" : "Check Compatibility"}
+          {result ? t("Try Again") : t("Check Compatibility")}
         </button>
       </div>
     );
@@ -345,7 +342,7 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
   if (result === "checking") {
     return (
       <div className="ext-details-empty ext-details-loading">
-        <LoaderCircle size={13} className="codicon spin" /> Downloading and analyzing the package…
+        <LoaderCircle size={13} className="codicon spin" /> {t("Downloading and analyzing the package…")}
       </div>
     );
   }
@@ -354,11 +351,11 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
     <>
       <div className="ext-compat-checked">
         <span>
-          {result.cached ? "Cached result" : "Checked"}
+          {result.cached ? t("Cached result") : t("Checked")}
           {result.analyzedAt ? ` · ${new Date(result.analyzedAt).toLocaleString()}` : ""}
         </span>
         <button type="button" className="ext-link" onClick={() => check(true)}>
-          Check Again
+          {t("Check Again")}
         </button>
       </div>
       <CompatibilityView
@@ -366,7 +363,20 @@ function MarketplaceCompatView({ marketplace }: { marketplace: MarketplaceExtens
         report={report}
         note={
           report
-            ? `Analyzed from the Open VSX package (not installed)${result.vscodeEngine ? `, engine ${result.vscodeEngine}` : ""}: installing would rewrite ${report.rewrittenImports} import(s) of "vscode" to "lumen" in ${report.filesRewritten} of ${report.filesScanned} script(s).`
+            ? result.vscodeEngine
+              ? t(
+                  'Analyzed from the Open VSX package (not installed), engine {0}: installing would rewrite {1} import(s) of "vscode" to "lumen" in {2} of {3} script(s).',
+                  result.vscodeEngine,
+                  report.rewrittenImports,
+                  report.filesRewritten,
+                  report.filesScanned,
+                )
+              : t(
+                  'Analyzed from the Open VSX package (not installed): installing would rewrite {0} import(s) of "vscode" to "lumen" in {1} of {2} script(s).',
+                  report.rewrittenImports,
+                  report.filesRewritten,
+                  report.filesScanned,
+                )
             : ""
         }
       />
@@ -448,20 +458,20 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
   const homepage = manifest?.homepage ?? listing?.homepage;
   const links = [
     marketplace || installed?.source?.type === "openvsx" ? { label: "Open VSX", url: `https://open-vsx.org/extension/${id.replace(".", "/")}` } : null,
-    repository ? { label: "Repository", url: repository.replace(/^git\+/, "").replace(/\.git$/, "") } : null,
-    homepage ? { label: "Homepage", url: homepage } : null,
+    repository ? { label: t("Repository"), url: repository.replace(/^git\+/, "").replace(/\.git$/, "") } : null,
+    homepage ? { label: t("Homepage"), url: homepage } : null,
   ].filter((link): link is { label: string; url: string } => !!link && /^https?:\/\//.test(link.url));
   const tabs: { id: Tab; label: string }[] = [
-    { id: "details", label: "Details" },
-    { id: "features", label: "Features" },
-    ...(!installed || installed.kind === "vscode" ? ([{ id: "compatibility", label: "Compatibility" }] as const) : []),
-    { id: "changelog", label: "Changelog" },
-    ...(installed ? ([{ id: "runtime", label: "Runtime Status" }] as const) : []),
+    { id: "details", label: t("Details") },
+    { id: "features", label: t("Features") },
+    ...(!installed || installed.kind === "vscode" ? ([{ id: "compatibility", label: t("Compatibility") }] as const) : []),
+    { id: "changelog", label: t("Changelog") },
+    ...(installed ? ([{ id: "runtime", label: t("Runtime Status") }] as const) : []),
   ];
 
   return (
     <div className="modal-overlay settings-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="settings-editor ext-details" role="dialog" aria-label={`Extension: ${name}`}>
+      <div className="settings-editor ext-details" role="dialog" aria-label={t("Extension: {0}", name)}>
         <div className="ext-details-header">
           <ExtensionIcon url={installed?.iconUrl ?? marketplace?.iconUrl} name={name} size={72} />
           <div className="ext-details-heading">
@@ -472,36 +482,36 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
               <span className="ext-details-publisher">
                 {publisher}
                 {marketplace?.verified && (
-                  <span className="ext-verified" title="Verified publisher">
-                    <Check size={14} strokeWidth={3} aria-label="Verified publisher" />
+                  <span className="ext-verified" title={t("Verified publisher")}>
+                    <Check size={14} strokeWidth={3} aria-label={t("Verified publisher")} />
                   </span>
                 )}
               </span>
               <code>{id}</code>
               {installed && <CompatBadge extension={installed} />}
-              {installed?.development && <span className="ext-badge">Development</span>}
-              {installed && !installed.enabled && <span className="ext-badge">Disabled</span>}
+              {installed?.development && <span className="ext-badge">{t("Development")}</span>}
+              {installed && !installed.enabled && <span className="ext-badge">{t("Disabled")}</span>}
             </div>
             <p className="ext-details-description">{description}</p>
             <div className="ext-details-actions">
               {isBusy ? (
                 <span className="ext-installing">
-                  <LoaderCircle size={13} className="codicon spin" /> Installing…
+                  <LoaderCircle size={13} className="codicon spin" /> {t("Installing…")}
                 </span>
               ) : (
                 <>
                   {(!installed || update) && marketplace && (
                     <button type="button" className="ext-install" onClick={() => onInstall(target)}>
-                      {update ? `Update to v${marketplace.version}` : "Install"}
+                      {update ? t("Update to v{0}", marketplace.version) : t("Install")}
                     </button>
                   )}
                   {installed && (
                     <>
                       <button type="button" className="modal-btn default" onClick={() => onAction(installed.enabled ? "disable" : "enable", installed)}>
-                        {installed.enabled ? "Disable" : "Enable"}
+                        {installed.enabled ? t("Disable") : t("Enable")}
                       </button>
                       <button type="button" className="modal-btn danger" onClick={() => onAction("uninstall", installed)}>
-                        Uninstall
+                        {t("Uninstall")}
                       </button>
                     </>
                   )}
@@ -515,7 +525,7 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
             </div>
           </div>
           <ModalEditorTitleActions activeEditor="workbench.editor.extension" />
-          <button type="button" className="icon-btn ext-details-close" title="Close (Esc)" onClick={onClose}>
+          <button type="button" className="icon-btn ext-details-close" title={t("Close (Esc)")} onClick={onClose}>
             <X size={16} />
           </button>
         </div>
@@ -541,13 +551,14 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
                 source={readme}
                 empty={
                   installed ? (
-                    "This extension has no README."
+                    t("This extension has no README.")
                   ) : (
                     <>
-                      <p>{listing?.error ? `Could not load the README from Open VSX: ${listing.error}` : marketplace?.description}</p>
+                      <p>{listing?.error ? t("Could not load the README from Open VSX: {0}", listing.error) : marketplace?.description}</p>
                       <p className="muted">
-                        Installing downloads the package from Open VSX. VS Code extensions are converted to Lumen extensions by the transpiler; the
-                        Compatibility tab can check what works first.
+                        {t(
+                          "Installing downloads the package from Open VSX. VS Code extensions are converted to Lumen extensions by the transpiler; the Compatibility tab can check what works first.",
+                        )}
                       </p>
                     </>
                   )
@@ -561,10 +572,10 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
             ) : listing?.manifest ? (
               <FeaturesView manifest={listing.manifest} />
             ) : listing ? (
-              <div className="ext-details-empty">Could not load the package manifest from Open VSX.</div>
+              <div className="ext-details-empty">{t("Could not load the package manifest from Open VSX.")}</div>
             ) : (
               <div className="ext-details-empty ext-details-loading">
-                <LoaderCircle size={13} className="codicon spin" /> Loading…
+                <LoaderCircle size={13} className="codicon spin" /> {t("Loading…")}
               </div>
             ))}
           {tab === "compatibility" &&
@@ -574,63 +585,78 @@ export function ExtensionDetails({ target, activation, busy, onClose, onInstall,
                 report={installed.compat}
                 note={
                   installed.development
-                    ? 'Loaded from a development folder: the code runs unchanged through Lumen\'s compatibility layer (require("vscode") resolves to the Lumen API).'
+                    ? t(
+                        'Loaded from a development folder: the code runs unchanged through Lumen\'s compatibility layer (require("vscode") resolves to the Lumen API).',
+                      )
                     : installed.compat
-                      ? `Transpiled from a VS Code extension${installed.manifest.lumen?.vscodeEngine ? ` (engine ${installed.manifest.lumen.vscodeEngine})` : ""}: ${installed.compat.rewrittenImports} import(s) of "vscode" rewritten to "lumen" in ${installed.compat.filesRewritten} of ${installed.compat.filesScanned} script(s).`
+                      ? installed.manifest.lumen?.vscodeEngine
+                        ? t(
+                            'Transpiled from a VS Code extension (engine {0}): {1} import(s) of "vscode" rewritten to "lumen" in {2} of {3} script(s).',
+                            installed.manifest.lumen.vscodeEngine,
+                            installed.compat.rewrittenImports,
+                            installed.compat.filesRewritten,
+                            installed.compat.filesScanned,
+                          )
+                        : t(
+                            'Transpiled from a VS Code extension: {0} import(s) of "vscode" rewritten to "lumen" in {1} of {2} script(s).',
+                            installed.compat.rewrittenImports,
+                            installed.compat.filesRewritten,
+                            installed.compat.filesScanned,
+                          )
                       : ""
                 }
               />
             ) : (
               marketplace && <MarketplaceCompatView marketplace={marketplace} />
             ))}
-          {tab === "changelog" && <MarkdownDoc source={changelog} empty="This extension has no changelog." />}
+          {tab === "changelog" && <MarkdownDoc source={changelog} empty={t("This extension has no changelog.")} />}
           {tab === "runtime" && installed && (
             <div className="ext-runtime">
               <table className="ext-table">
                 <tbody>
                   <tr>
-                    <td>State</td>
+                    <td>{t("State")}</td>
                     <td>
                       {!installed.enabled
-                        ? "Disabled"
+                        ? t("Disabled")
                         : runtime?.error
-                          ? "Activation failed"
+                          ? t("Activation failed")
                           : runtime
-                            ? "Activated"
-                            : "Not activated yet (waiting for its activation events)"}
+                            ? t("Activated")
+                            : t("Not activated yet (waiting for its activation events)")}
                     </td>
                   </tr>
                   {runtime && (
                     <tr>
-                      <td>Activation time</td>
+                      <td>{t("Activation time")}</td>
                       <td>{runtime.ms} ms</td>
                     </tr>
                   )}
                   {runtime?.error && (
                     <tr>
-                      <td>Error</td>
+                      <td>{t("Error")}</td>
                       <td className="ext-runtime-error">{runtime.error}</td>
                     </tr>
                   )}
                   <tr>
-                    <td>Kind</td>
-                    <td>{installed.kind === "vscode" ? "VS Code extension (transpiled / compatibility layer)" : "Lumen extension"}</td>
+                    <td>{t("Kind")}</td>
+                    <td>{installed.kind === "vscode" ? t("VS Code extension (transpiled / compatibility layer)") : t("Lumen extension")}</td>
                   </tr>
                   <tr>
-                    <td>Entry point</td>
+                    <td>{t("Entry point")}</td>
                     <td>
-                      <code>{installed.manifest.main ?? "(declarative — no code)"}</code>
+                      <code>{installed.manifest.main ?? t("(declarative — no code)")}</code>
                     </td>
                   </tr>
                   <tr>
-                    <td>Location</td>
+                    <td>{t("Location")}</td>
                     <td>
                       <code>{installed.location}</code>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <p className="muted">The extension host log is in the Output panel (“Extension Host” channel).</p>
+              <p className="muted">{t("The extension host log is in the Output panel (“Extension Host” channel).")}</p>
             </div>
           )}
         </div>

@@ -109,6 +109,7 @@ import { renderMarkdown } from "./markdown";
 import { snippetToTemplate, type SnippetVariables } from "./snippets";
 import { refreshTextMateGrammars, textMateLanguage } from "./textmate";
 import { debugEditorExtension, onDebugMarksChange, syncDebugMarks } from "./debug-editor";
+import { t } from "./i18n";
 import type { CompletionItem, Diagnostic, TextEdit, TextRange } from "../../shared/types";
 import type { HostCompletionItem, HostDocumentHighlight, HostSelection } from "../../shared/extensions";
 
@@ -303,7 +304,40 @@ export function lspStatusLabel(language: string): { text: string; active: boolea
   if (language === "html") return { text: "HTML", active: true };
   if (language === "shell") return { text: "Shell", active: true };
   if (language === "yaml") return { text: "YAML", active: true };
-  return { text: "No LSP", active: false };
+  return { text: t("No LSP"), active: false };
+}
+
+/** CodeMirror's own UI text (find / replace panel, folding, lint, completion) in the display language. */
+const CODEMIRROR_PHRASES = [
+  "Find",
+  "Replace",
+  "next",
+  "previous",
+  "all",
+  "match case",
+  "regexp",
+  "by word",
+  "replace",
+  "replace all",
+  "close",
+  "current match",
+  "on line",
+  "replaced $ matches",
+  "replaced match on line $",
+  "Go to line",
+  "go",
+  "Completions",
+  "Diagnostics",
+  "No diagnostics",
+  "Control character",
+  "Selection deleted",
+  "folded code",
+  "unfold",
+];
+let codeMirrorPhrases: Record<string, string> | undefined;
+function phrasesExtension(): Extension {
+  codeMirrorPhrases ??= Object.fromEntries(CODEMIRROR_PHRASES.map((phrase) => [phrase, t(phrase)]));
+  return EditorState.phrases.of(codeMirrorPhrases);
 }
 
 export function isUntitled(path: string) {
@@ -1592,6 +1626,7 @@ export class EditorController {
     );
 
     return [
+      phrasesExtension(),
       // Before the line numbers: the breakpoint gutter sits at the far left.
       debugEditorExtension(() => self.current?.path ?? null),
       settingsConf.of(settingsExtensions(getSettings(), path)),

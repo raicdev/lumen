@@ -1,7 +1,8 @@
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
 import { existsSync, readFileSync, statSync } from "fs";
-import { dirname, extname, relative } from "path";
+import { dirname, extname, join, relative } from "path";
 import { API_VERSION } from "../../shared/extension-api.ts";
+import { formatMessage, localizedFileNames } from "../../shared/i18n.ts";
 import { cssVariable } from "../../shared/color-theme.ts";
 import type {
   HostDecoration,
@@ -1400,7 +1401,7 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
     appName: host.init.appName,
     appRoot: host.init.appRoot,
     appHost: "desktop",
-    language: "en",
+    language: host.init.language ?? "en",
     machineId: host.machineId,
     sessionId: host.sessionId,
     uriScheme: "lumen",
@@ -1485,17 +1486,41 @@ export function createApi(host: ExtensionHost, runtime: ExtensionRuntime | null)
 
   /* l10n */
 
+  // The extension's bundle.l10n.<language>.json from its manifest's `l10n` folder; none in English.
+  const l10nFile = (() => {
+    const folder = runtime?.description.manifest.l10n;
+    if (typeof folder !== "string" || !runtime) return undefined;
+    return localizedFileNames(host.init.language ?? "en", (locale) => join(runtime.description.location, folder, `bundle.l10n.${locale}.json`)).find((file) =>
+      existsSync(file),
+    );
+  })();
+  let l10nBundle: Record<string, string> | undefined;
+  if (l10nFile) {
+    try {
+      const raw = JSON.parse(readFileSync(l10nFile, "utf8")) as Record<string, unknown>;
+      // Entries may be { message, comment } objects.
+      l10nBundle = Object.fromEntries(
+        Object.entries(raw).flatMap(([key, value]) => {
+          const text = typeof value === "string" ? value : (value as { message?: unknown } | null)?.message;
+          return typeof text === "string" ? [[key, text]] : [];
+        }),
+      );
+    } catch {
+      host.log("warning", `cannot read ${l10nFile}`, extensionId);
+    }
+  }
+
   const l10n = {
-    t: (message: string | { message: string; args?: unknown[] | Record<string, unknown> }, ...args: unknown[]) => {
+    t: (message: string | { message: string; args?: unknown[] | Record<string, unknown>; comment?: string | string[] }, ...args: unknown[]) => {
       const text = typeof message === "string" ? message : message.message;
       const values = typeof message === "string" ? (args.length === 1 && typeof args[0] === "object" && args[0] ? args[0] : args) : (message.args ?? []);
-      return text.replace(/\{(\w+)\}/g, (match, key: string) => {
-        const value = (values as Record<string, unknown>)[key];
-        return value === undefined ? match : String(value);
-      });
+      // Messages with a comment are keyed "message/comment" in bundles, as vscode-l10n writes them.
+      const comment = typeof message === "string" ? undefined : [message.comment ?? []].flat().join("");
+      const translated = l10nBundle?.[comment ? `${text}/${comment}` : text] ?? text;
+      return formatMessage(translated, values as unknown[] | Record<string, unknown>);
     },
-    bundle: undefined,
-    uri: undefined,
+    bundle: l10nBundle,
+    uri: l10nFile ? T.Uri.file(l10nFile) : undefined,
   };
 
   const stubNamespace = (name: string) => graceful(name, {});

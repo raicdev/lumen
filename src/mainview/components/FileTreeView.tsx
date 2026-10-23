@@ -12,6 +12,7 @@ import { FileIcon, FolderIcon } from "./FileIcon";
 import { FILE_DRAG_TYPE } from "./EditorDropTarget";
 import { themeColorReference } from "../lib/theme";
 import { normalizeDocumentKey } from "../../shared/file-systems";
+import { t } from "../lib/i18n";
 
 export type TreeContextAction = {
   action:
@@ -121,34 +122,34 @@ type MenuOptions = { provider?: boolean; readOnly?: boolean; readOnlyMessage?: s
 async function contextMenuFor(entry: FileEntry, x: number, y: number, options: MenuOptions = {}): Promise<TreeContextAction["action"] | null> {
   const items: ContextMenuItem[] = [];
   const readOnly = !!(options.readOnly || entry.readOnly);
-  if (!entry.isDirectory) items.push({ type: "item", label: "Open", action: "open" });
+  if (!entry.isDirectory) items.push({ type: "item", label: t("Open"), action: "open" });
   if (options.readOnly) {
     // Provider file systems added with { value } say why they cannot be changed.
-    const message = options.readOnlyMessage ? `Read-only: ${options.readOnlyMessage}` : "Read-only";
+    const message = options.readOnlyMessage ? t("Read-only: {0}", options.readOnlyMessage) : t("Read-only");
     items.push({ type: "item", label: message, action: "", disabled: true, run: () => {} });
     items.push({ type: "separator" });
   } else {
-    items.push({ type: "item", label: "New File…", action: "new-file" });
-    items.push({ type: "item", label: "New Folder…", action: "new-folder" });
+    items.push({ type: "item", label: t("New File…"), action: "new-file" });
+    items.push({ type: "item", label: t("New Folder…"), action: "new-folder" });
     items.push({ type: "separator" });
   }
   if (options.provider) {
-    items.push({ type: "item", label: "Copy", action: "copy" });
-    items.push({ type: "item", label: "Cut", action: "cut", disabled: readOnly });
-    if (entry.isDirectory) items.push({ type: "item", label: "Paste", action: "paste", disabled: !options.canPaste || readOnly });
+    items.push({ type: "item", label: t("Copy"), action: "copy" });
+    items.push({ type: "item", label: t("Cut"), action: "cut", disabled: readOnly });
+    if (entry.isDirectory) items.push({ type: "item", label: t("Paste"), action: "paste", disabled: !options.canPaste || readOnly });
     items.push({ type: "separator" });
   }
   if (entry.isDirectory && !options.provider) {
-    items.push({ type: "item", label: "Find in Folder…", action: "find-in-folder" });
-    items.push({ type: "item", label: "Open in Integrated Terminal", action: "open-in-terminal" });
+    items.push({ type: "item", label: t("Find in Folder…"), action: "find-in-folder" });
+    items.push({ type: "item", label: t("Open in Integrated Terminal"), action: "open-in-terminal" });
     items.push({ type: "separator" });
   }
-  items.push({ type: "item", label: "Copy Path", action: "copy-path" });
-  items.push({ type: "item", label: "Copy Relative Path", action: "copy-relative-path" });
-  if (!options.provider) items.push({ type: "item", label: "Reveal in File Explorer", action: "reveal" });
+  items.push({ type: "item", label: t("Copy Path"), action: "copy-path" });
+  items.push({ type: "item", label: t("Copy Relative Path"), action: "copy-relative-path" });
+  if (!options.provider) items.push({ type: "item", label: t("Reveal in File Explorer"), action: "reveal" });
   items.push({ type: "separator" });
-  items.push({ type: "item", label: "Rename…", action: "rename", disabled: readOnly });
-  items.push({ type: "item", label: "Delete", action: "delete", danger: true, disabled: readOnly });
+  items.push({ type: "item", label: t("Rename…"), action: "rename", disabled: readOnly });
+  items.push({ type: "item", label: t("Delete"), action: "delete", danger: true, disabled: readOnly });
   const action = await showContextMenu(x, y, items);
   return action as TreeContextAction["action"] | null;
 }
@@ -286,7 +287,7 @@ function TreeNode(props: NodeProps) {
         <div className="tree-children open">
           {children === null && (
             <div className="tree-item" style={{ paddingLeft: 8 + (depth + 1) * 12, color: "var(--text-muted)" }}>
-              Loading…
+              {t("Loading…")}
             </div>
           )}
           {error && (
@@ -376,7 +377,7 @@ export function FileTreeView(props: Props) {
       setEntries(list);
       onPaths(list.map((entry) => entry.path));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
+      setError(e instanceof Error ? e.message : t("Failed to load"));
     } finally {
       setLoading(false);
     }
@@ -521,17 +522,17 @@ export function FileTreeView(props: Props) {
   if (!workspaceRoot && !extraRoots.length) {
     return (
       <div className="tree-empty">
-        You have not yet opened a folder.
+        {t("You have not yet opened a folder.")}
         <br />
         <button type="button" onClick={props.onOpenFolder}>
-          Open Folder
+          {t("Open Folder")}
         </button>
       </div>
     );
   }
-  if (workspaceRoot && loading && !entries.length && !extraRoots.length) return <div className="tree-empty">Loading…</div>;
+  if (workspaceRoot && loading && !entries.length && !extraRoots.length) return <div className="tree-empty">{t("Loading…")}</div>;
   if (workspaceRoot && error && !extraRoots.length) return <div className="tree-empty">{error}</div>;
-  if (workspaceRoot && !entries.length && !extraRoots.length) return <div className="tree-empty">Empty folder</div>;
+  if (workspaceRoot && !entries.length && !extraRoots.length) return <div className="tree-empty">{t("Empty folder")}</div>;
 
   return (
     <div

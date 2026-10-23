@@ -5,6 +5,7 @@ import { extensionService } from "./extensions";
 import { showDialog } from "./dialog";
 import { notify } from "./toast";
 import { dispatchHostRequest } from "../features/registry";
+import { t } from "./i18n";
 
 /**
  * The view's answers to the extension host's requests (window.show*,
@@ -70,9 +71,9 @@ export function createExtensionHandlers(bridge: ExtensionBridge): {
     async showMessage(kind, message, items, options) {
       if (options.modal) {
         const buttons = items.map((label, index) => ({ label, role: index === 0 ? ("primary" as const) : ("default" as const), value: String(index) }));
-        buttons.push({ label: "Cancel", role: "default", value: "cancel" });
+        buttons.push({ label: t("Cancel"), role: "default", value: "cancel" });
         const choice = await showDialog({
-          title: options.source ?? (kind === "error" ? "Error" : kind === "warning" ? "Warning" : "Information"),
+          title: options.source ?? (kind === "error" ? t("Error") : kind === "warning" ? t("Warning") : t("Information")),
           message,
           detail: options.detail,
           buttons,

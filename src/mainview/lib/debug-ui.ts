@@ -4,6 +4,7 @@ import { debugService } from "./debug";
 import { extensionService } from "./extensions";
 import { showPrompt } from "./dialog";
 import { toast } from "./toast";
+import { t } from "./i18n";
 
 /**
  * View-only debugging state on top of `debugService` (src/mainview/lib/debug.ts):
@@ -205,7 +206,7 @@ export async function startDebugging(
   try {
     listed = await debugService.listConfigurations(folder);
   } catch (error) {
-    toast(`Could not read launch configurations: ${error instanceof Error ? error.message : String(error)}`, "error");
+    toast(t("Could not read launch configurations: {0}", error instanceof Error ? error.message : String(error)), "error");
     return;
   }
   if (listed.error) toast(`launch.json: ${listed.error}`, "error");
@@ -226,8 +227,10 @@ export async function startDebugging(
     const debuggers = debugService.debuggers();
     toast(
       debuggers.length
-        ? `No launch configuration, and no installed debugger supports ${activeLanguage ?? "this file"}. Add a .vscode/launch.json.`
-        : "No debugger is installed. Install a debugger extension (e.g. Python Debugger, JavaScript Debugger).",
+        ? activeLanguage
+          ? t("No launch configuration, and no installed debugger supports {0}. Add a .vscode/launch.json.", activeLanguage)
+          : t("No launch configuration, and no installed debugger supports this file. Add a .vscode/launch.json.")
+        : t("No debugger is installed. Install a debugger extension (e.g. Python Debugger, JavaScript Debugger)."),
       "error",
     );
     return;
@@ -236,7 +239,7 @@ export async function startDebugging(
   const result = (await debugService.startConfiguration(folder, configuration).catch((error: unknown) => ({
     error: error instanceof Error ? error.message : String(error),
   }))) as { sessionId?: string; error?: string } | undefined;
-  if (result?.error) toast(`Could not start debugging: ${result.error}`, "error");
+  if (result?.error) toast(t("Could not start debugging: {0}", result.error), "error");
 }
 
 export async function stopDebugging() {
@@ -248,7 +251,7 @@ export async function restartDebugging() {
   const session = currentSession();
   if (!session) return;
   const result = (await debugService.restart(session.id)) as { error?: string } | undefined;
-  if (result?.error) toast(`Could not restart: ${result.error}`, "error");
+  if (result?.error) toast(t("Could not restart: {0}", result.error), "error");
 }
 
 /* ── breakpoints ─────────────────────────────────────────────────────────── */
@@ -286,12 +289,20 @@ export function moveBreakpoints(path: string, moved: { id: string; line: number 
 export async function editBreakpoint(path: string, line: number, kind: "condition" | "hitCondition" | "logMessage") {
   const existing = breakpointsFor(path).find((bp) => bp.line === line);
   const labels = {
-    condition: { title: "Conditional Breakpoint", message: `Break on line ${line} when the expression is true.`, placeholder: "e.g. count > 10" },
-    hitCondition: { title: "Hit Count Breakpoint", message: `Break on line ${line} when the hit count condition is met.`, placeholder: "e.g. >= 5" },
+    condition: {
+      title: t("Conditional Breakpoint"),
+      message: t("Break on line {0} when the expression is true.", line),
+      placeholder: t("e.g. count > 10"),
+    },
+    hitCondition: {
+      title: t("Hit Count Breakpoint"),
+      message: t("Break on line {0} when the hit count condition is met.", line),
+      placeholder: t("e.g. >= 5"),
+    },
     logMessage: {
-      title: "Logpoint",
-      message: `Log a message when line ${line} is reached. Use {expression} to interpolate.`,
-      placeholder: "e.g. value is {value}",
+      title: t("Logpoint"),
+      message: t("Log a message when line {0} is reached. Use {expression} to interpolate.", line),
+      placeholder: t("e.g. value is {value}"),
     },
   }[kind];
   const value = await showPrompt({ ...labels, defaultValue: existing?.[kind] ?? "" });

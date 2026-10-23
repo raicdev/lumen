@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight, ArrowUp, Pause, Play, RotateCw, Square } from "l
 import { useDebug } from "../lib/debug";
 import { currentSession, debugMenuLookup, debugStep, restartDebugging, stopDebugging, useDebugUi } from "../lib/debug-ui";
 import { MenuActions } from "../features/menus-walkthroughs/MenuActions";
+import { t } from "../lib/i18n";
 
 /** The floating Continue / Step / Restart / Stop bar shown while debugging, with the extensions' debug/toolBar entries. */
 export function DebugToolbar({ keys }: { keys: Map<string, string> }) {
@@ -14,18 +15,18 @@ export function DebugToolbar({ keys }: { keys: Map<string, string> }) {
   const tip = (title: string, command: string) => (keys.get(command) ? `${title} (${keys.get(command)})` : title);
 
   return (
-    <div className="dbg-toolbar" role="toolbar" aria-label="Debug">
+    <div className="dbg-toolbar" role="toolbar" aria-label={t("Debug")}>
       {stopped ? (
         <button
           type="button"
           className="dbg-tool continue"
-          title={tip("Continue", "workbench.action.debug.continue")}
+          title={tip(t("Continue"), "workbench.action.debug.continue")}
           onClick={() => void debugStep("continue")}
         >
           <Play size={15} />
         </button>
       ) : (
-        <button type="button" className="dbg-tool" title={tip("Pause", "workbench.action.debug.pause")} onClick={() => void debugStep("pause")}>
+        <button type="button" className="dbg-tool" title={tip(t("Pause"), "workbench.action.debug.pause")} onClick={() => void debugStep("pause")}>
           <Pause size={15} />
         </button>
       )}
@@ -33,7 +34,7 @@ export function DebugToolbar({ keys }: { keys: Map<string, string> }) {
         type="button"
         className="dbg-tool"
         disabled={!stopped}
-        title={tip("Step Over", "workbench.action.debug.stepOver")}
+        title={tip(t("Step Over"), "workbench.action.debug.stepOver")}
         onClick={() => void debugStep("next")}
       >
         <ArrowRight size={15} />
@@ -42,7 +43,7 @@ export function DebugToolbar({ keys }: { keys: Map<string, string> }) {
         type="button"
         className="dbg-tool"
         disabled={!stopped}
-        title={tip("Step Into", "workbench.action.debug.stepInto")}
+        title={tip(t("Step Into"), "workbench.action.debug.stepInto")}
         onClick={() => void debugStep("in")}
       >
         <ArrowDown size={15} />
@@ -51,15 +52,15 @@ export function DebugToolbar({ keys }: { keys: Map<string, string> }) {
         type="button"
         className="dbg-tool"
         disabled={!stopped}
-        title={tip("Step Out", "workbench.action.debug.stepOut")}
+        title={tip(t("Step Out"), "workbench.action.debug.stepOut")}
         onClick={() => void debugStep("out")}
       >
         <ArrowUp size={15} />
       </button>
-      <button type="button" className="dbg-tool restart" title={tip("Restart", "workbench.action.debug.restart")} onClick={() => void restartDebugging()}>
+      <button type="button" className="dbg-tool restart" title={tip(t("Restart"), "workbench.action.debug.restart")} onClick={() => void restartDebugging()}>
         <RotateCw size={15} />
       </button>
-      <button type="button" className="dbg-tool stop" title={tip("Stop", "workbench.action.debug.stop")} onClick={() => void stopDebugging()}>
+      <button type="button" className="dbg-tool stop" title={tip(t("Stop"), "workbench.action.debug.stop")} onClick={() => void stopDebugging()}>
         <Square size={13} />
       </button>
       <MenuActions

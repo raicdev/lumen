@@ -10,7 +10,7 @@ export const menusWalkthroughsSupport: AreaSupport = {
     menus: ["supported", "touchBar (macOS hardware) and searchPanel/aiResults/commands (AI search results) are not implemented and not works."],
     walkthroughs: [
       "supported",
-      "Welcome page list (icons, featuredFor glob matches against workspace files first, progress, Hide action persisted in workbench.welcomePage.hiddenCategories) and walkthrough editor tabs; image (light/dark/hc/hcLight), themed inline SVG and Markdown media with relative images and command links; step descriptions with markdown/command links, lone links as buttons, command:toSide: runs in a split beside; every completionEvent (onCommand, onLink, onView for built-in, contributed and feature views, onSettingChanged, onContext, extensionInstalled/onExtensionInstalled, onStepSelected; buttons/selection are the default), legacy doneOn; walkthrough/step when re-evaluated live; progress persisted and reset/mark commands; openOnInstall; hidden walkthroughs stay reachable from workbench.action.openWalkthrough and welcome.showAllWalkthroughs",
+      "Welcome page list (featuredFor, progress, Hide) and walkthrough tabs; image, SVG and Markdown media; command links incl. toSide; all completionEvents and doneOn; live when; openOnInstall",
     ],
     resourceLabelFormatters: [
       "partial",

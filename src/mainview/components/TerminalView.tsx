@@ -5,6 +5,7 @@ import { showContextMenu, type ContextMenuItem } from "../lib/context-menu";
 import { WithCodicons } from "./Codicon";
 import { contributedMenuItems, refArg, showContributedMenu } from "../features/menus-walkthroughs/menus";
 import type { TerminalInfo } from "../lib/terminals";
+import { t } from "../lib/i18n";
 
 /** Drag payload types (also read by the dock overlay). */
 export const TERMINAL_DRAG_TYPE = "application/x-lumen-terminal";
@@ -96,12 +97,12 @@ export function TerminalHost({ id, active, onFocus, editor }: { id: string; acti
                 [
                   {
                     type: "item",
-                    label: "Copy",
+                    label: t("Copy"),
                     action: "copy",
                     disabled: !terminalService.hasSelection(id),
                     run: () => void terminalService.copySelection(id),
                   },
-                  { type: "item", label: "Paste", action: "paste", run: () => void terminalService.paste(id) },
+                  { type: "item", label: t("Paste"), action: "paste", run: () => void terminalService.paste(id) },
                 ],
               )
           : undefined
@@ -136,19 +137,19 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
     void showContextMenu(x, y, [
       ...(menuId === "terminal/context"
         ? [
-            { type: "item" as const, label: "Copy", action: "copy", disabled: !terminalService.hasSelection(id) },
-            { type: "item" as const, label: "Paste", action: "paste" },
+            { type: "item" as const, label: t("Copy"), action: "copy", disabled: !terminalService.hasSelection(id) },
+            { type: "item" as const, label: t("Paste"), action: "paste" },
             { type: "separator" as const },
           ]
         : []),
-      { type: "item", label: "Split Terminal", action: "split" },
-      ...(inGroup ? [{ type: "item" as const, label: "Unsplit Terminal", action: "unsplit" }] : []),
-      { type: "item", label: "Move Terminal into Editor Area", action: "move-to-editor" },
+      { type: "item", label: t("Split Terminal"), action: "split" },
+      ...(inGroup ? [{ type: "item" as const, label: t("Unsplit Terminal"), action: "unsplit" }] : []),
+      { type: "item", label: t("Move Terminal into Editor Area"), action: "move-to-editor" },
       { type: "separator" },
-      { type: "item", label: "Rename…", action: "rename" },
-      { type: "item", label: "Relaunch Active Terminal", action: "relaunch" },
+      { type: "item", label: t("Rename…"), action: "rename" },
+      { type: "item", label: t("Relaunch Active Terminal"), action: "relaunch" },
       { type: "separator" },
-      { type: "item", label: "Kill Terminal", action: "kill", danger: true },
+      { type: "item", label: t("Kill Terminal"), action: "kill", danger: true },
       ...(contributed.length ? [{ type: "separator" as const }, ...contributed] : []),
     ]).then((action) => {
       if (action === "copy") terminalService.copySelection(id);
@@ -161,7 +162,7 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
     return (
       <div className="terminal-empty">
         <button type="button" className="welcome-link" onClick={() => onAction("split", "")}>
-          Create a new terminal
+          {t("Create a new terminal")}
         </button>
       </div>
     );
@@ -179,7 +180,7 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
           ))}
       </div>
       {panelTerminals.length > 1 && (
-        <div className="terminal-tabs" role="tablist" aria-label="Terminals">
+        <div className="terminal-tabs" role="tablist" aria-label={t("Terminals")}>
           {snapshot.groups.map((g) =>
             g.map((id, index) => (
               <div
@@ -187,7 +188,7 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
                 role="tab"
                 aria-selected={id === snapshot.activeId}
                 className={`terminal-tab${id === snapshot.activeId ? " active" : ""}${dropTarget === id ? " drop-target" : ""}`}
-                title={`${titleOf(id)}${exited(id) ? " (exited)" : ""}`}
+                title={exited(id) ? t("{0} (exited)", titleOf(id)) : titleOf(id)}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData(TERMINAL_DRAG_TYPE, id);
@@ -225,7 +226,7 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Split Terminal"
+                    title={t("Split Terminal")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAction("split", id);
@@ -236,7 +237,7 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Kill Terminal"
+                    title={t("Kill Terminal")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAction("kill", id);

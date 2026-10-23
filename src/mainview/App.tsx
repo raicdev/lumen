@@ -57,6 +57,8 @@ import {
 import { showContextMenu } from "./lib/context-menu";
 import { basename, dirname, joinPath } from "./lib/paths";
 import { getSettings, updateSetting, useSettings } from "./lib/settings";
+import { localeLabel, t } from "./lib/i18n";
+import { DISPLAY_LANGUAGES } from "../shared/i18n";
 import { listColorThemes, reloadConfiguredColorTheme, showColorTheme, type ColorThemeEntry } from "./lib/theme";
 import { DEFAULT_THEME_ID } from "../shared/color-theme";
 import {
@@ -197,7 +199,7 @@ async function readDocument(path: string, encoding?: string): Promise<ReadDocume
   try {
     return await extensionService.call("readVirtualFile", path);
   } catch (error) {
-    return { error: `Cannot open ${path}: ${error instanceof Error ? error.message : error}` };
+    return { error: t("Cannot open {0}: {1}", path, error instanceof Error ? error.message : error) };
   }
 }
 
@@ -228,7 +230,7 @@ async function writeDocument(
     await extensionService.call("writeVirtualFile", path, content);
     return { success: true };
   } catch (error) {
-    return { success: false, error: `Cannot save ${path}: ${error instanceof Error ? error.message : error}` };
+    return { success: false, error: t("Cannot save {0}: {1}", path, error instanceof Error ? error.message : error) };
   }
 }
 
@@ -820,7 +822,7 @@ export function App() {
     async (path: string): Promise<DiffContent> => {
       const doc = docs.current.get(path);
       if (doc) return { content: docContent(path) ?? doc.content, language: doc.language, readOnly: doc.readOnly };
-      if (isUntitled(path)) return { error: `Cannot open ${path}: the document is not open.` };
+      if (isUntitled(path)) return { error: t("Cannot open {0}: the document is not open.", path) };
       return await readDocument(path);
     },
     [docContent],
@@ -934,7 +936,7 @@ export function App() {
       if (!editor || !doc) return false;
       // A read-only file system provider's message says why the file cannot be written.
       if (doc.readOnly && !options.saveAs) {
-        toast(doc.readOnlyMessage ?? `${basename(path)} is read-only.`, "info");
+        toast(doc.readOnlyMessage ?? t("{0} is read-only.", basename(path)), "info");
         return false;
       }
 
@@ -959,7 +961,7 @@ export function App() {
         if (s["editor.formatOnSave"] && editor.canFormat()) {
           // A formatter that hangs (or an extension host that died) must not keep the file from being saved.
           const formatted = await Promise.race([editor.format().catch(() => false), delay(FORMAT_ON_SAVE_TIMEOUT_MS).then(() => "timeout" as const)]);
-          if (formatted === "timeout") toast(`Formatting ${basename(path)} took too long; it was saved without formatting.`, "info");
+          if (formatted === "timeout") toast(t("Formatting {0} took too long; it was saved without formatting.", basename(path)), "info");
         }
         // onWillSaveTextDocument: extensions may hand back edits (reason 1 = Manually).
         if (extensionService.hasExtensions) {
@@ -982,12 +984,12 @@ export function App() {
         const choice = unchanged
           ? "overwrite"
           : await showDialog({
-              title: "File Changed on Disk",
-              message: `${basename(target)} has been changed on disk since you opened it. Overwrite it with your changes?`,
-              detail: "Revert File (Command Palette) loads the version on disk instead.",
+              title: t("File Changed on Disk"),
+              message: t("{0} has been changed on disk since you opened it. Overwrite it with your changes?", basename(target)),
+              detail: t("Revert File (Command Palette) loads the version on disk instead."),
               buttons: [
-                { label: "Overwrite", role: "danger", value: "overwrite" },
-                { label: "Cancel", role: "default", value: "cancel" },
+                { label: t("Overwrite"), role: "danger", value: "overwrite" },
+                { label: t("Cancel"), role: "default", value: "cancel" },
               ],
               kind: "warning",
             });
@@ -995,7 +997,7 @@ export function App() {
         result = await write();
       }
       if (!result.success) {
-        toast(result.error ?? "Save failed", "error");
+        toast(result.error ?? t("Save failed"), "error");
         return false;
       }
 
@@ -1069,13 +1071,13 @@ export function App() {
         const holder = targets.find((id) => groupsRef.current[id]?.tabs.some((tab) => tab.path === path));
         if (holder && !isDiffTab(path) && docs.current.has(document)) await openFile(document, { recordNav: false, groupId: holder });
         const choice = await showDialog({
-          title: "Unsaved changes",
-          message: `Do you want to save the changes you made to ${basename(document)}?`,
-          detail: "Your changes will be lost if you don't save them.",
+          title: t("Unsaved changes"),
+          message: t("Do you want to save the changes you made to {0}?", basename(document)),
+          detail: t("Your changes will be lost if you don't save them."),
           buttons: [
-            { label: "Save", role: "primary", value: "save" },
-            { label: "Don't Save", role: "danger", value: "discard" },
-            { label: "Cancel", role: "default", value: "cancel" },
+            { label: t("Save"), role: "primary", value: "save" },
+            { label: t("Don't Save"), role: "danger", value: "discard" },
+            { label: t("Cancel"), role: "default", value: "cancel" },
           ],
         });
         if (choice === "cancel" || choice === null) return false;
@@ -1273,7 +1275,7 @@ export function App() {
       }
       const { error } = await api().request.readDir({ path, depth: 1 });
       if (error) {
-        toast(`Cannot open ${path}: ${error}`, "error");
+        toast(t("Cannot open {0}: {1}", path, error), "error");
         return false;
       }
       const previousRoot = workspaceRootRef.current;
@@ -1448,14 +1450,14 @@ export function App() {
     const current = editor?.getCurrent();
     if (!editor || !current) return;
     if (!isTsFamily(current.language) || isUntitled(current.path)) {
-      toast("References are available for TypeScript and JavaScript files.", "info");
+      toast(t("References are available for TypeScript and JavaScript files."), "info");
       return;
     }
     await editor.syncLsp();
     const position = editor.getCursor();
     const word = editor.wordAtCursor();
     const { locations } = await api().request.lspReferences({ path: current.path, ...position });
-    setReferences({ title: word || "symbol", locations });
+    setReferences({ title: word || t("symbol"), locations });
     setPanelTab("references");
     setPanelVisible(true);
   }, [editorRef]);
@@ -1469,7 +1471,7 @@ export function App() {
     const builtIn = isTsFamily(current.language) && !isUntitled(current.path);
     const hasExtension = extensionService.providersFor("rename", current.path, current.language).length > 0;
     if (!builtIn && !hasExtension) {
-      toast("Rename Symbol is available for TypeScript and JavaScript files.", "info");
+      toast(t("Rename Symbol is available for TypeScript and JavaScript files."), "info");
       return;
     }
     const position = editor.getCursor();
@@ -1483,7 +1485,7 @@ export function App() {
       }
       if (prepared) oldName = prepared.placeholder;
     }
-    const newName = await showPrompt({ title: "Rename Symbol", message: `Rename “${oldName}” to:`, defaultValue: oldName });
+    const newName = await showPrompt({ title: t("Rename Symbol"), message: t("Rename “{0}” to:", oldName), defaultValue: oldName });
     editor.focus();
     if (!newName || newName === oldName) return;
 
@@ -1494,7 +1496,14 @@ export function App() {
         if (open) refreshTabDirty(open);
       }
       syncDirtyState();
-      toast(`Renamed ${edits.reduce((n, f) => n + f.edits.length, 0)} occurrence(s) in ${changed} file(s)`, "success");
+      toast(
+        t(
+          "Renamed {0} occurrence(s) in {1} file(s)",
+          edits.reduce((n, f) => n + f.edits.length, 0),
+          changed,
+        ),
+        "success",
+      );
     };
 
     if (builtIn) {
@@ -1505,14 +1514,14 @@ export function App() {
         return;
       }
       if (!hasExtension) {
-        toast(error ?? `No rename result for “${oldName}”.`, error ? "error" : "info");
+        toast(error ?? t("No rename result for “{0}”.", oldName), error ? "error" : "info");
         return;
       }
     }
 
     const result = await extensionService.call("provideRenameEdits", current.path, position.line, position.character, newName).catch(() => null);
     if (!result) {
-      toast("The rename provider returned no edits.", "info");
+      toast(t("The rename provider returned no edits."), "info");
       return;
     }
     if ("error" in result) {
@@ -1527,11 +1536,11 @@ export function App() {
     const current = editor?.getCurrent();
     if (!editor || !current) return;
     if (!editor.canFormat()) {
-      toast(`There is no formatter for '${languageLabel(current.language)}' files.`, "info");
+      toast(t("There is no formatter for '{0}' files.", languageLabel(current.language)), "info");
       return;
     }
     const ok = await editor.format().catch(() => false);
-    if (!ok) toast("Formatting failed (is the document valid?)", "error");
+    if (!ok) toast(t("Formatting failed (is the document valid?)"), "error");
   }, [editorRef]);
 
   const navigate = useCallback(
@@ -1577,10 +1586,10 @@ export function App() {
   const openRecentPicker = useCallback(() => {
     const folders = recentFolders();
     pick(
-      "Select a folder to open",
+      t("Select a folder to open"),
       [
         ...folders.map((path) => ({ id: path, label: basename(path), description: path })),
-        ...(folders.length ? [{ id: "__clear", label: "Clear Recently Opened…" }] : []),
+        ...(folders.length ? [{ id: "__clear", label: t("Clear Recently Opened…") }] : []),
       ],
       (id) => {
         if (id === "__clear") {
@@ -1598,10 +1607,10 @@ export function App() {
     const current = editor?.getCurrent();
     if (!editor || !current) return;
     pick(
-      "Select Language Mode",
+      t("Select Language Mode"),
       Object.entries(allLanguageLabels())
         .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([id, label]) => ({ id, label, description: id === current.language ? `(${id}) - Configured Language` : `(${id})` })),
+        .map(([id, label]) => ({ id, label, description: id === current.language ? t("({0}) - Configured Language", id) : `(${id})` })),
       (id) => {
         const doc = docs.current.get(current.path);
         if (doc) doc.language = id;
@@ -1620,11 +1629,11 @@ export function App() {
     const path = editor?.getCurrent()?.path ?? null;
     const current = indentationFor(path, s);
     pick(
-      "Select Action",
+      t("Select Action"),
       [
-        { id: "spaces", label: "Indent Using Spaces", description: current.insertSpaces ? "(current)" : "" },
-        { id: "tabs", label: "Indent Using Tabs", description: !current.insertSpaces ? "(current)" : "" },
-        ...[1, 2, 3, 4, 6, 8].map((n) => ({ id: `size:${n}`, label: `Tab Size: ${n}`, description: current.tabSize === n ? "(current)" : "" })),
+        { id: "spaces", label: t("Indent Using Spaces"), description: current.insertSpaces ? t("(current)") : "" },
+        { id: "tabs", label: t("Indent Using Tabs"), description: !current.insertSpaces ? t("(current)") : "" },
+        ...[1, 2, 3, 4, 6, 8].map((n) => ({ id: `size:${n}`, label: t("Tab Size: {0}", n), description: current.tabSize === n ? t("(current)") : "" })),
       ],
       (id) => {
         const next =
@@ -1645,21 +1654,36 @@ export function App() {
     );
   }, [pick, editorRef]);
 
+  /** Configure Display Language: sets `locale`; the window offers a reload (lib/i18n.ts). */
+  const displayLanguagePicker = useCallback(() => {
+    const configured = getSettings().locale;
+    pick(
+      t("Select Display Language"),
+      ["auto", ...DISPLAY_LANGUAGES.map((language) => language.id)].map((id) => ({
+        id,
+        label: localeLabel(id),
+        description: id === configured ? t("(current)") : "",
+      })),
+      (id) => updateSetting("locale", id as ReturnType<typeof getSettings>["locale"]),
+      configured,
+    );
+  }, [pick]);
+
   /** Preferences: Color Theme — the highlighted theme is previewed; Escape goes back to the configured one. */
   const colorThemePicker = useCallback(async () => {
     const themes = await listColorThemes();
     const current = getSettings()["workbench.colorTheme"] || DEFAULT_THEME_ID;
     const groups: [string, ColorThemeEntry[]][] = [
-      ["light themes", themes.filter((theme) => theme.kind === "light")],
-      ["dark themes", themes.filter((theme) => theme.kind === "dark")],
-      ["high contrast themes", themes.filter((theme) => theme.kind === "hcDark" || theme.kind === "hcLight")],
+      [t("light themes"), themes.filter((theme) => theme.kind === "light")],
+      [t("dark themes"), themes.filter((theme) => theme.kind === "dark")],
+      [t("high contrast themes"), themes.filter((theme) => theme.kind === "hcDark" || theme.kind === "hcLight")],
     ];
     const items: PickItem[] = groups.flatMap(([title, list]) =>
       list.map((theme, index) => ({ id: theme.id, label: theme.label, separator: index === 0 ? title : undefined })),
     );
     setQuick({
       kind: "pick",
-      placeholder: "Select Color Theme (Up/Down Keys to Preview)",
+      placeholder: t("Select Color Theme (Up/Down Keys to Preview)"),
       items,
       activeId: themes.find((theme) => theme.id === current || theme.label === current)?.id,
       onActive: (id) => void showColorTheme(id),
@@ -1676,10 +1700,10 @@ export function App() {
     const doc = path ? docs.current.get(path) : null;
     if (!path || !doc) return;
     pick(
-      "Select End of Line Sequence",
+      t("Select End of Line Sequence"),
       [
-        { id: "LF", label: "LF", description: doc.eol === "LF" ? "(current)" : "" },
-        { id: "CRLF", label: "CRLF", description: doc.eol === "CRLF" ? "(current)" : "" },
+        { id: "LF", label: "LF", description: doc.eol === "LF" ? t("(current)") : "" },
+        { id: "CRLF", label: "CRLF", description: doc.eol === "CRLF" ? t("(current)") : "" },
       ],
       (id) => {
         doc.eol = id as DocState["eol"];
@@ -1700,7 +1724,7 @@ export function App() {
       setGitBusy(true);
       try {
         const result = await run(root);
-        if (!result.ok) toast(result.error ?? "Git command failed", "error");
+        if (!result.ok) toast(result.error ?? t("Git command failed"), "error");
         return result.ok;
       } finally {
         setGitBusy(false);
@@ -1713,14 +1737,14 @@ export function App() {
   const scmOpenChanges = useCallback(
     async (file: GitFileStatus) => {
       if (file.worktree === "D" || file.index === "D") {
-        toast(`${basename(file.path)} was deleted.`, "info");
+        toast(t("{0} was deleted.", basename(file.path)), "info");
         return;
       }
       if (!(await openFile(file.path, { preview: true }))) return;
       const root = workspaceRootRef.current;
       if (!root) return;
       const { content } = await api().request.gitShowHead({ root, path: file.path });
-      if (content === null) toast(`${basename(file.path)} is new — there is nothing to compare.`, "info");
+      if (content === null) toast(t("{0} is new — there is nothing to compare.", basename(file.path)), "info");
       else editorRef.current?.showInlineDiff(content);
     },
     [openFile, editorRef],
@@ -1736,7 +1760,7 @@ export function App() {
       return;
     }
     const { content } = await api().request.gitShowHead({ root, path: current.path });
-    if (content === null) toast("This file is not tracked by git.", "info");
+    if (content === null) toast(t("This file is not tracked by git."), "info");
     else editor.showInlineDiff(content);
   }, [editorRef]);
 
@@ -1782,9 +1806,9 @@ export function App() {
   const createEntry = useCallback(
     async (kind: "file" | "folder", dir: string) => {
       const name = await showPrompt({
-        title: kind === "file" ? "New File" : "New Folder",
-        message: `Create ${kind} in ${basename(dir)}`,
-        placeholder: kind === "file" ? "filename.ts (use / for sub folders)" : "folder-name",
+        title: kind === "file" ? t("New File") : t("New Folder"),
+        message: kind === "file" ? t("Create file in {0}", basename(dir)) : t("Create folder in {0}", basename(dir)),
+        placeholder: kind === "file" ? t("filename.ts (use / for sub folders)") : t("folder-name"),
       });
       if (!name?.trim()) return;
       const full = joinPath(dir, name.trim());
@@ -1800,7 +1824,7 @@ export function App() {
           ? await extensionService.call("providerCreateFile", full, "")
           : await extensionService.call("providerCreateDirectory", full);
       if (!result.success) {
-        toast(result.error ?? `Failed to create ${kind}`, "error");
+        toast(result.error ?? (kind === "file" ? t("Failed to create file") : t("Failed to create folder")), "error");
         return;
       }
       extensionService.didFileOperation("create", [{ path: full }]);
@@ -1838,8 +1862,8 @@ export function App() {
         const current = getSettings()["terminal.integrated.defaultProfile"] || profiles[0]?.id;
         setQuick({
           kind: "pick",
-          placeholder: "Select a terminal profile",
-          items: profiles.map((profile) => ({ id: profile.id, label: profile.name, description: profile.id === current ? "default" : "" })),
+          placeholder: t("Select a terminal profile"),
+          items: profiles.map((profile) => ({ id: profile.id, label: profile.name, description: profile.id === current ? t("default") : "" })),
           onPick,
           activeId: current,
         });
@@ -1934,7 +1958,7 @@ export function App() {
         break;
       }
       case "rename":
-        void showPrompt({ title: "Rename Terminal", message: "Enter a name for the terminal", defaultValue: terminalService.info(id)?.title ?? "" }).then(
+        void showPrompt({ title: t("Rename Terminal"), message: t("Enter a name for the terminal"), defaultValue: terminalService.info(id)?.title ?? "" }).then(
           (name) => {
             if (name) terminalService.rename(id, name);
             terminalService.focus(id);
@@ -1965,7 +1989,7 @@ export function App() {
   const reportInstall = useCallback((result: { extension?: ExtensionDescription; cancelled?: boolean; error?: string }) => {
     if (result.cancelled) return;
     if (result.error || !result.extension) {
-      toast(`Installing the extension failed: ${result.error ?? "unknown error"}`, "error");
+      toast(t("Installing the extension failed: {0}", result.error ?? t("unknown error")), "error");
       return;
     }
     const extension = result.extension;
@@ -1975,13 +1999,19 @@ export function App() {
       const grade = compatGrade(extension.compat);
       void notify(
         grade === "limited" || grade === "low" ? "warning" : "info",
-        `${name} was converted from a VS Code extension. Compatibility: ${COMPAT_GRADES[grade].label.toLowerCase()} — ${COMPAT_GRADES[grade].text}`,
-        ["Show Compatibility"],
-        "Extensions",
+        t("{0} was converted from a VS Code extension. Compatibility: {1} — {2}", name, COMPAT_GRADES[grade].label.toLowerCase(), COMPAT_GRADES[grade].text),
+        [t("Show Compatibility")],
+        t("Extensions"),
       ).then((choice) => {
         if (choice === 0) setExtensionTarget({ installed: extension });
       });
-    } else toast(`Installed ${name} ${extension.manifest.version}${extension.kind === "vscode" ? " (converted from VS Code)" : ""}`, "success");
+    } else
+      toast(
+        extension.kind === "vscode"
+          ? t("Installed {0} {1} (converted from VS Code)", name, extension.manifest.version)
+          : t("Installed {0} {1}", name, extension.manifest.version),
+        "success",
+      );
   }, []);
 
   const installFromMarketplace = useCallback(
@@ -1991,15 +2021,18 @@ export function App() {
         (extension) => extension.source?.type === "openvsx" && `${extension.source.namespace}.${extension.source.name}`.toLowerCase() === id,
       );
       const choice = await showDialog({
-        title: current ? "Update Extension" : "Install Extension",
+        title: current ? t("Update Extension") : t("Install Extension"),
         message: current
-          ? `Update “${entry.displayName ?? entry.name}” from ${current.manifest.version} to ${entry.version}?`
-          : `Install “${entry.displayName ?? entry.name}” ${entry.version} by ${entry.publisher ?? entry.namespace}${entry.verified ? " (verified publisher)" : ""}?`,
-        detail:
+          ? t("Update “{0}” from {1} to {2}?", entry.displayName ?? entry.name, current.manifest.version, entry.version)
+          : entry.verified
+            ? t("Install “{0}” {1} by {2} (verified publisher)?", entry.displayName ?? entry.name, entry.version, entry.publisher ?? entry.namespace)
+            : t("Install “{0}” {1} by {2}?", entry.displayName ?? entry.name, entry.version, entry.publisher ?? entry.namespace),
+        detail: t(
           "Extensions run with the same access to your computer as Lumen. Only install extensions from publishers you trust.\nVS Code extensions are converted by the transpiler on the way in.",
+        ),
         buttons: [
-          { label: current ? "Update" : "Install", role: "primary", value: "install" },
-          { label: "Cancel", role: "default", value: "cancel" },
+          { label: current ? t("Update") : t("Install"), role: "primary", value: "install" },
+          { label: t("Cancel"), role: "default", value: "cancel" },
         ],
       });
       if (choice !== "install") return;
@@ -2007,7 +2040,7 @@ export function App() {
       try {
         reportInstall(await api().request.extensionsInstallMarketplace({ namespace: entry.namespace, name: entry.name }));
       } catch (error) {
-        toast(`Installing the extension failed: ${error instanceof Error ? error.message : error}`, "error");
+        toast(t("Installing the extension failed: {0}", error instanceof Error ? error.message : error), "error");
       } finally {
         setExtensionBusy((previous) => {
           const next = new Set(previous);
@@ -2039,21 +2072,21 @@ export function App() {
         case "enable":
         case "disable":
           await api().request.extensionsSetEnabled({ id: extension.id, enabled: action === "enable" });
-          toast(`${name} ${action === "enable" ? "enabled" : "disabled"}`, "success");
+          toast(action === "enable" ? t("{0} enabled", name) : t("{0} disabled", name), "success");
           break;
         case "uninstall": {
           const choice = await showDialog({
-            title: "Uninstall Extension",
-            message: `Uninstall “${name}”?`,
-            detail: extension.development ? "The development folder itself stays on disk." : `Removes ${extension.location}.`,
+            title: t("Uninstall Extension"),
+            message: t("Uninstall “{0}”?", name),
+            detail: extension.development ? t("The development folder itself stays on disk.") : t("Removes {0}.", extension.location),
             buttons: [
-              { label: "Uninstall", role: "danger", value: "uninstall" },
-              { label: "Cancel", role: "default", value: "cancel" },
+              { label: t("Uninstall"), role: "danger", value: "uninstall" },
+              { label: t("Cancel"), role: "default", value: "cancel" },
             ],
           });
           if (choice !== "uninstall") return;
           const { ok } = await api().request.extensionsUninstall({ id: extension.id });
-          if (ok) toast(`Uninstalled ${name}`, "success");
+          if (ok) toast(t("Uninstalled {0}", name), "success");
           setExtensionTarget((target) => (target?.installed?.id === extension.id && !target.marketplace ? null : target));
           break;
         }
@@ -2062,7 +2095,7 @@ export function App() {
           return;
         case "copy-id":
           await navigator.clipboard.writeText(extension.id).catch(() => {});
-          toast("Copied to clipboard", "success");
+          toast(t("Copied to clipboard"), "success");
           return;
         case "reveal":
           await api().request.showInFolder({ path: extension.location });
@@ -2118,17 +2151,21 @@ export function App() {
     const doc = path ? docs.current.get(path) : null;
     if (!path || !doc || isVirtualDocument(path)) return;
     const current = doc.encoding ?? "utf8";
-    const actions = [...(isUntitled(path) ? [] : [{ id: "reopen", label: "Reopen with Encoding" }]), { id: "save", label: "Save with Encoding" }];
-    pick("Select Action", actions, (action) => {
-      const encodings = FILE_ENCODINGS.map((encoding) => ({ id: encoding.id, label: encoding.label, description: encoding.id === current ? "(current)" : "" }));
+    const actions = [...(isUntitled(path) ? [] : [{ id: "reopen", label: t("Reopen with Encoding") }]), { id: "save", label: t("Save with Encoding") }];
+    pick(t("Select Action"), actions, (action) => {
+      const encodings = FILE_ENCODINGS.map((encoding) => ({
+        id: encoding.id,
+        label: encoding.label,
+        description: encoding.id === current ? t("(current)") : "",
+      }));
       pick(
-        action === "reopen" ? "Reopen with Encoding" : "Save with Encoding",
+        action === "reopen" ? t("Reopen with Encoding") : t("Save with Encoding"),
         encodings,
         (id) => {
           if (action === "save") {
             doc.encoding = id;
             void saveDoc(path).then(() => setCursor((c) => (c ? { ...c } : c)));
-          } else if (isDocDirty(path)) toast("Save or revert your changes before reopening the file in another encoding.", "info");
+          } else if (isDocDirty(path)) toast(t("Save or revert your changes before reopening the file in another encoding."), "info");
           else void revertDocument(path, id);
         },
         current,
@@ -2145,10 +2182,10 @@ export function App() {
       if (isUntitled(uri)) return;
       const choices = extensionService.customEditorsFor(uri, docs.current.get(uri)?.language);
       pick(
-        "Reopen Editor With…",
+        t("Reopen Editor With…"),
         [
-          { id: "default", label: "Text Editor" },
-          ...choices.map((choice) => ({ id: choice.viewType, label: choice.displayName, description: choice.priority === "option" ? "option" : undefined })),
+          { id: "default", label: t("Text Editor") },
+          ...choices.map((choice) => ({ id: choice.viewType, label: choice.displayName, description: choice.priority === "option" ? t("option") : undefined })),
         ],
         (id) => {
           void (async () => {
@@ -2156,7 +2193,7 @@ export function App() {
             const holders = allTabPaths().filter((tab) => tab === uri || customEditorTabInfo(tab)?.uri === uri);
             if (holders.length && !(await closeTabs(holders))) return;
             const opened = await openFile(uri, { groupId: group, viewType: id });
-            if (!opened && id !== "default") toast(`No custom editor handles ${basename(uri)}`, "info");
+            if (!opened && id !== "default") toast(t("No custom editor handles {0}", basename(uri)), "info");
           })();
         },
       );
@@ -2225,7 +2262,7 @@ export function App() {
           ? undefined
           : async (configs) => {
               pick(
-                "Select a launch configuration",
+                t("Select a launch configuration"),
                 configs.map((c) => ({ id: c.name, label: c.name, description: c.type })),
                 (name) => {
                   debugUi.selectConfig(name);
@@ -2243,7 +2280,7 @@ export function App() {
   const openLaunchJson = useCallback(async () => {
     const root = workspaceRootRef.current;
     if (!root) {
-      toast("Open a folder to create a launch.json file.", "error");
+      toast(t("Open a folder to create a launch.json file."), "error");
       return;
     }
     const dir = joinPath(root, ".vscode");
@@ -2302,6 +2339,7 @@ export function App() {
     openRecentPicker,
     changeLanguagePicker,
     colorThemePicker,
+    displayLanguagePicker,
     goToReferences,
     renameSymbol,
     formatDocument,
@@ -2449,7 +2487,7 @@ export function App() {
         category: "File",
         run: async () => {
           const saved = await a().saveAll();
-          if (saved) toast(`Saved ${saved} file(s)`, "success");
+          if (saved) toast(t("Saved {0} file(s)", saved), "success");
         },
       },
       {
@@ -2897,6 +2935,7 @@ export function App() {
       { id: "workbench.action.openSettings", title: "Open Settings", category: "Preferences", run: () => setSettingsOpen(true) },
       { id: "workbench.action.openGlobalKeybindings", title: "Open Keyboard Shortcuts", category: "Preferences", run: () => setShortcutsOpen(true) },
       { id: "workbench.action.selectTheme", title: "Color Theme", category: "Preferences", run: () => void a().colorThemePicker() },
+      { id: "workbench.action.configureLocale", title: "Configure Display Language", run: () => a().displayLanguagePicker() },
       // Navigation & language features
       { id: "workbench.action.navigateBack", title: "Go Back", category: "Go", run: () => a().navigate("back") },
       { id: "workbench.action.navigateForward", title: "Go Forward", category: "Go", run: () => a().navigate("forward") },
@@ -3004,7 +3043,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.6", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.7", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -3186,7 +3225,7 @@ export function App() {
         .then(() => commandExecuted(id))
         .catch((error: unknown) => {
           console.error(`[command] ${id} failed`, error);
-          toast(`${commandLabel(command)} failed`, "error");
+          toast(t("{0} failed", commandLabel(command)), "error");
         });
     },
     [commands, extensionCommands, viewCommands, runExtensionCommand],
@@ -3237,7 +3276,7 @@ export function App() {
         if (candidates[0]) {
           flash(null);
           runCommand(candidates[0].command, false, candidates[0].args);
-        } else flash(`The key combination (${sequence}) is not a command.`);
+        } else flash(t("The key combination ({0}) is not a command.", sequence));
         return;
       }
       if (candidates[0]) {
@@ -3252,7 +3291,7 @@ export function App() {
             chord = key;
             e.preventDefault();
             e.stopPropagation();
-            flash(`(${key}) was pressed. Waiting for second key of chord…`, true);
+            flash(t("({0}) was pressed. Waiting for second key of chord…", key), true);
             return;
           }
         }
@@ -3550,7 +3589,7 @@ export function App() {
           const order = leafIds(gridRef.current);
           groupId = order[order.indexOf(groupId) + 1] ?? splitGroup(groupId, "right");
         }
-        setTabs((prev) => [...prev, { path, name: webviewService.info(event.id)?.title || "Webview", dirty: false, preview: false }], groupId);
+        setTabs((prev) => [...prev, { path, name: webviewService.info(event.id)?.title || t("Webview"), dirty: false, preview: false }], groupId);
         touch(path);
         setActivePath(path, groupId);
         if (!event.reveal.preserveFocus) focusGroup(groupId);
@@ -3658,7 +3697,7 @@ export function App() {
         if (!doc) continue;
         const deleted = (changes ?? []).some((change) => change.type === 3 && sameDocumentKey(change.path, changedPath));
         if (deleted) {
-          toast(isDocDirty(path) ? `${basename(path)} was deleted. Your unsaved changes are kept.` : `${basename(path)} was deleted.`, "info");
+          toast(isDocDirty(path) ? t("{0} was deleted. Your unsaved changes are kept.", basename(path)) : t("{0} was deleted.", basename(path)), "info");
           continue;
         }
         void readDocument(path).then((result) => {
@@ -3667,7 +3706,7 @@ export function App() {
           // Our own save just wrote exactly this (providers may fire a change event for it).
           if (content === doc.savedContent || content === doc.content) return;
           if (isDocDirty(path)) {
-            toast(`${basename(path)} changed. Your unsaved changes are kept.`, "info");
+            toast(t("{0} changed. Your unsaved changes are kept.", basename(path)), "info");
             return;
           }
           doc.savedContent = content;
@@ -3797,7 +3836,7 @@ export function App() {
         // as in VS Code: deleting a file never throws away edits that exist nowhere else.
         const affected = [...docs.current.keys()].filter((p) => isInside(p, file.path!));
         const kept = affected.filter((path) => isDocDirty(path));
-        if (kept.length) toast(`Unsaved changes in ${kept.map((path) => basename(path)).join(", ")} are kept in the editor.`, "info");
+        if (kept.length) toast(t("Unsaved changes in {0} are kept in the editor.", kept.map((path) => basename(path)).join(", ")), "info");
         const closing = affected.filter((path) => !kept.includes(path));
         if (closing.length) await act.current.closeTabs(closing);
       }
@@ -3932,7 +3971,13 @@ export function App() {
       count++;
     }
     syncDirtyState();
-    if (count) toast(`Restored unsaved changes in ${count} editor${count === 1 ? "" : "s"} from the last session.`, "info");
+    if (count)
+      toast(
+        count === 1
+          ? t("Restored unsaved changes in 1 editor from the last session.")
+          : t("Restored unsaved changes in {0} editors from the last session.", count),
+        "info",
+      );
   }, [applyWorkspaceEdits, docContent, newUntitled, openFile, refreshTabDirty, syncDirtyState]);
 
   /* ── close guard ──────────────────────────────────────────────────────── */
@@ -3944,13 +3989,13 @@ export function App() {
       const total = dirty.length + dirtyCustom.length;
       if (!total) return { allow: true, dirtyCount: 0 };
       const choice = await showDialog({
-        title: "Unsaved changes",
-        message: `Do you want to save the changes to ${total} file(s)?`,
+        title: t("Unsaved changes"),
+        message: t("Do you want to save the changes to {0} file(s)?", total),
         detail: [...dirty.map((path) => basename(path)), ...dirtyCustom.map((entry) => basename(entry.uri))].join(", "),
         buttons: [
-          { label: "Save All", role: "primary", value: "save" },
-          { label: "Don't Save", role: "danger", value: "discard" },
-          { label: "Cancel", role: "default", value: "cancel" },
+          { label: t("Save All"), role: "primary", value: "save" },
+          { label: t("Don't Save"), role: "danger", value: "discard" },
+          { label: t("Cancel"), role: "default", value: "cancel" },
         ],
       });
       if (choice === "save") {
@@ -4048,7 +4093,7 @@ export function App() {
             }
             if (isDocDirty(path)) {
               // The version stays the one read: saving asks before overwriting the other program's changes.
-              toast(`${basename(path)} changed on disk. Your unsaved changes are kept; saving will ask before overwriting.`, "info");
+              toast(t("{0} changed on disk. Your unsaved changes are kept; saving will ask before overwriting.", basename(path)), "info");
               return;
             }
             doc.savedContent = content;
@@ -4464,7 +4509,7 @@ export function App() {
   const transferProviderEntries = useCallback(
     async (paths: string[], targetDir: string, copy: boolean) => {
       if (!isVirtualDocument(targetDir)) {
-        toast("Copy and move are supported inside one provided file system.", "info");
+        toast(t("Copy and move are supported inside one provided file system."), "info");
         return;
       }
       for (const source of paths) {
@@ -4473,7 +4518,7 @@ export function App() {
         if (source === target) continue;
         // A folder cannot be copied or moved into itself.
         if (isInside(targetDir, source)) {
-          toast(`Cannot ${copy ? "copy" : "move"} ${basename(source)} into itself.`, "error");
+          toast(copy ? t("Cannot copy {0} into itself.", basename(source)) : t("Cannot move {0} into itself.", basename(source)), "error");
           continue;
         }
         if (copy) {
@@ -4481,7 +4526,7 @@ export function App() {
           if (willEdits.length) await applyWorkspaceEdits(willEdits);
           const result = await extensionService.call("providerCopy", source, target);
           if (!result.success) {
-            toast(result.error ?? "Copy failed", "error");
+            toast(result.error ?? t("Copy failed"), "error");
             continue;
           }
           extensionService.didFileOperation("create", [{ path: target }]);
@@ -4490,7 +4535,7 @@ export function App() {
           if (willEdits.length) await applyWorkspaceEdits(willEdits);
           const result = await extensionService.call("providerRename", source, target);
           if (!result.success) {
-            toast(result.error ?? "Move failed", "error");
+            toast(result.error ?? t("Move failed"), "error");
             continue;
           }
           extensionService.didFileOperation("rename", [{ oldPath: source, newPath: target }]);
@@ -4518,7 +4563,7 @@ export function App() {
           await createEntry("folder", dir);
           break;
         case "rename": {
-          const newName = await showPrompt({ title: "Rename", message: `Rename ${basename(evt.path)}`, defaultValue: basename(evt.path) });
+          const newName = await showPrompt({ title: t("Rename"), message: t("Rename {0}", basename(evt.path)), defaultValue: basename(evt.path) });
           if (!newName?.trim() || newName === basename(evt.path)) return;
           const newPath = joinPath(dirname(evt.path), newName.trim());
           // Extensions may rewrite references before the move (workspace.onWillRenameFiles).
@@ -4528,7 +4573,7 @@ export function App() {
             ? await extensionService.call("providerRename", evt.path, newPath)
             : await api().request.renamePath({ oldPath: evt.path, newPath });
           if (!result.success) {
-            toast(result.error ?? "Rename failed", "error");
+            toast(result.error ?? t("Rename failed"), "error");
             return;
           }
           extensionService.didFileOperation("rename", [{ oldPath: evt.path, newPath }]);
@@ -4537,12 +4582,12 @@ export function App() {
         }
         case "delete": {
           const choice = await showDialog({
-            title: "Delete",
-            message: `Are you sure you want to delete '${basename(evt.path)}'?`,
-            detail: evt.isDirectory ? "The folder and its contents will be permanently deleted." : "This cannot be undone.",
+            title: t("Delete"),
+            message: t("Are you sure you want to delete '{0}'?", basename(evt.path)),
+            detail: evt.isDirectory ? t("The folder and its contents will be permanently deleted.") : t("This cannot be undone."),
             buttons: [
-              { label: "Delete", role: "danger", value: "delete" },
-              { label: "Cancel", role: "default", value: "cancel" },
+              { label: t("Delete"), role: "danger", value: "delete" },
+              { label: t("Cancel"), role: "default", value: "cancel" },
             ],
           });
           if (choice !== "delete") return;
@@ -4553,7 +4598,7 @@ export function App() {
             ? await extensionService.call("providerDelete", evt.path)
             : await api().request.deletePath({ path: evt.path });
           if (!result.success) {
-            toast(result.error ?? "Delete failed", "error");
+            toast(result.error ?? t("Delete failed"), "error");
             return;
           }
           extensionService.didFileOperation("delete", [{ path: evt.path }]);
@@ -4567,12 +4612,12 @@ export function App() {
         case "copy-relative-path": {
           const text = evt.action === "copy-relative-path" ? relativeToRoot(evt.path) : evt.path;
           await navigator.clipboard.writeText(text).catch(() => {});
-          toast("Copied to clipboard", "success");
+          toast(t("Copied to clipboard"), "success");
           break;
         }
         case "find-in-folder":
           focusSearch();
-          toast(`Tip: open “files to include” (⋯) and enter ${basename(evt.path)}/ to search only that folder.`, "info");
+          toast(t("Tip: open “files to include” (⋯) and enter {0}/ to search only that folder.", basename(evt.path)), "info");
           break;
         case "open-in-terminal":
           newTerminal({ cwd: evt.isDirectory ? evt.path : dirname(evt.path) });
@@ -4625,7 +4670,7 @@ export function App() {
         case "copy-relative-path": {
           const text = action === "copy-relative-path" && workspaceRoot ? path.slice(workspaceRoot.length + 1).replace(/\\/g, "/") : path;
           await navigator.clipboard.writeText(text).catch(() => {});
-          toast("Copied to clipboard", "success");
+          toast(t("Copied to clipboard"), "success");
           break;
         }
         case "reveal-in-sidebar":
@@ -4767,38 +4812,38 @@ export function App() {
   const activity: { view: SideView; title: string; command: string; icon: React.ReactNode; badge?: number; extra?: React.ReactNode }[] = [
     {
       view: "explorer",
-      title: "Explorer",
+      title: t("Explorer"),
       command: "workbench.view.explorer",
       icon: <Files size={22} strokeWidth={1.5} />,
     },
     {
       view: "search",
-      title: "Search",
+      title: t("Search"),
       command: "workbench.view.search",
       icon: <Search size={22} strokeWidth={1.5} />,
     },
     {
       view: "scm",
-      title: "Source Control",
+      title: t("Source Control"),
       command: "workbench.view.scm",
       badge: scmCount,
       icon: <GitBranch size={22} strokeWidth={1.5} />,
     },
     {
       view: "debug",
-      title: "Run and Debug",
+      title: t("Run and Debug"),
       command: "workbench.view.debug",
       icon: <Bug size={22} strokeWidth={1.5} />,
     },
     {
       view: "outline",
-      title: "Outline",
+      title: t("Outline"),
       command: "outline.focus",
       icon: <ListTree size={22} strokeWidth={1.5} />,
     },
     {
       view: "extensions",
-      title: "Extensions",
+      title: t("Extensions"),
       command: "workbench.view.extensions",
       badge: ext.crashed ? 1 : undefined,
       icon: <Blocks size={22} strokeWidth={1.5} />,
@@ -4910,7 +4955,7 @@ export function App() {
     void showContextMenu(x, y, [
       ...(item
         ? [
-            { type: "item" as const, label: `Hide '${item.title}'`, action: "hide", disabled: lastShown, run: () => setActivityHidden(item.view, true) },
+            { type: "item" as const, label: t("Hide '{0}'", item.title), action: "hide", disabled: lastShown, run: () => setActivityHidden(item.view, true) },
             { type: "separator" as const },
           ]
         : []),
@@ -4928,7 +4973,7 @@ export function App() {
       { type: "separator" },
       {
         type: "item",
-        label: "Reset Activity Bar",
+        label: t("Reset Activity Bar"),
         action: "reset",
         disabled: !activityOrder.length && !activityHidden.size,
         run: () => {
@@ -4936,7 +4981,7 @@ export function App() {
           updateSetting("workbench.activityBar.hidden", []);
         },
       },
-      { type: "item", label: "Hide Activity Bar", action: "hideBar", run: () => updateSetting("workbench.activityBar.visible", false) },
+      { type: "item", label: t("Hide Activity Bar"), action: "hideBar", run: () => updateSetting("workbench.activityBar.visible", false) },
     ]);
   };
 
@@ -4944,18 +4989,20 @@ export function App() {
     ? (sideContainers.find((container) => `view:${container.id}` === sideView)?.title ??
       featureViews.find((view) => featureViewId(view.id) === sideView)?.title ??
       "")
-    : { explorer: "Explorer", search: "Search", scm: "Source Control", debug: "Run and Debug", outline: "Outline", extensions: "Extensions" }[
-        sideView as "explorer"
-      ];
+    : t(
+        { explorer: "Explorer", search: "Search", scm: "Source Control", debug: "Run and Debug", outline: "Outline", extensions: "Extensions" }[
+          sideView as "explorer"
+        ],
+      );
 
   const extensionsMenu = (x: number, y: number) =>
     void showContextMenu(x, y, [
-      { type: "item", label: "Install from VSIX…", action: "workbench.extensions.action.installVSIX" },
-      { type: "item", label: "Install Extension from Location… (development)", action: "workbench.extensions.action.installExtensionFromLocation" },
+      { type: "item", label: t("Install from VSIX…"), action: "workbench.extensions.action.installVSIX" },
+      { type: "item", label: t("Install Extension from Location… (development)"), action: "workbench.extensions.action.installExtensionFromLocation" },
       { type: "separator" },
-      { type: "item", label: "Restart Extension Host", action: "workbench.action.restartExtensionHost" },
-      { type: "item", label: "Show Extension Host Log", action: "workbench.action.showExtensionHostLog" },
-      { type: "item", label: "Open Extensions Folder", action: "workbench.extensions.action.openExtensionsFolder" },
+      { type: "item", label: t("Restart Extension Host"), action: "workbench.action.restartExtensionHost" },
+      { type: "item", label: t("Show Extension Host Log"), action: "workbench.action.showExtensionHostLog" },
+      { type: "item", label: t("Open Extensions Folder"), action: "workbench.extensions.action.openExtensionsFolder" },
     ]).then((action) => action && runCommand(action));
 
   const gridAreaRef = useRef<HTMLDivElement>(null);
@@ -5051,14 +5098,23 @@ export function App() {
           {!path && singleGroup && <Welcome recent={recent} keys={keys} onRun={(id) => runCommand(id)} onOpenRecent={(folder) => void openWorkspace(folder)} />}
           {!group.tabs.length && !singleGroup && (
             <div className="empty-group">
-              <button type="button" className="icon-btn empty-group-close" title="Close Editor Group" onClick={() => void closeGroup(groupId)}>
+              <button type="button" className="icon-btn empty-group-close" title={t("Close Editor Group")} onClick={() => void closeGroup(groupId)}>
                 <X size={16} />
               </button>
               <div className="empty-group-hint">
                 <LayoutPanelLeft size={40} strokeWidth={1} />
-                <p>Drop a tab, file or terminal here</p>
+                <p>{t("Drop a tab, file or terminal here")}</p>
                 <p className="muted">
-                  or open one with <kbd>{keys.get("workbench.action.quickOpen") ?? "Ctrl+P"}</kbd>
+                  {(() => {
+                    const [before, after = ""] = t("or open one with {0}").split("{0}");
+                    return (
+                      <>
+                        {before}
+                        <kbd>{keys.get("workbench.action.quickOpen") ?? "Ctrl+P"}</kbd>
+                        {after}
+                      </>
+                    );
+                  })()}
                 </p>
               </div>
             </div>
@@ -5080,7 +5136,7 @@ export function App() {
           )}
           {webviewId && (
             <div className="editor-webview">
-              <WebviewSlot slotKey={webviewId} placeholder={webviews.find((webview) => webview.id === webviewId)?.restoring ? "Restoring…" : undefined} />
+              <WebviewSlot slotKey={webviewId} placeholder={webviews.find((webview) => webview.id === webviewId)?.restoring ? t("Restoring…") : undefined} />
             </div>
           )}
           {diff && (
@@ -5151,7 +5207,7 @@ export function App() {
         {showActivityBar && (
           <nav
             className="activity-bar"
-            aria-label="Activity"
+            aria-label={t("Activity")}
             onContextMenu={(e) => {
               e.preventDefault();
               activityMenu(e.clientX, e.clientY);
@@ -5205,7 +5261,7 @@ export function App() {
             <button
               className="activity-btn"
               type="button"
-              title={`Manage — Settings (${keys.get("workbench.action.openSettings") ?? ""})`}
+              title={t("Manage — Settings ({0})", keys.get("workbench.action.openSettings") ?? "")}
               onClick={() => setSettingsOpen(true)}
             >
               <Settings size={21} strokeWidth={1.5} />
@@ -5221,39 +5277,39 @@ export function App() {
                 <div className="sidebar-actions">
                   {sideView === "explorer" && newEntryRoot && (
                     <>
-                      <button className="icon-btn" type="button" title="New File…" onClick={() => void createEntry("file", newEntryRoot)}>
+                      <button className="icon-btn" type="button" title={t("New File…")} onClick={() => void createEntry("file", newEntryRoot)}>
                         <FilePlus size={16} strokeWidth={1.75} />
                       </button>
-                      <button className="icon-btn" type="button" title="New Folder…" onClick={() => void createEntry("folder", newEntryRoot)}>
+                      <button className="icon-btn" type="button" title={t("New Folder…")} onClick={() => void createEntry("folder", newEntryRoot)}>
                         <FolderPlus size={16} strokeWidth={1.75} />
                       </button>
-                      <button className="icon-btn" type="button" title="Refresh Explorer" onClick={() => setTreeRefresh((n) => n + 1)}>
+                      <button className="icon-btn" type="button" title={t("Refresh Explorer")} onClick={() => setTreeRefresh((n) => n + 1)}>
                         <RefreshCw size={15} strokeWidth={1.75} />
                       </button>
-                      <button className="icon-btn" type="button" title="Collapse Folders in Explorer" onClick={() => setTreeCollapse((n) => n + 1)}>
+                      <button className="icon-btn" type="button" title={t("Collapse Folders in Explorer")} onClick={() => setTreeCollapse((n) => n + 1)}>
                         <ListCollapse size={16} strokeWidth={1.75} />
                       </button>
                     </>
                   )}
                   {sideView === "scm" && (
-                    <button className="icon-btn" type="button" title="Refresh" onClick={() => void refreshGit()}>
+                    <button className="icon-btn" type="button" title={t("Refresh")} onClick={() => void refreshGit()}>
                       <RefreshCw size={15} strokeWidth={1.75} />
                     </button>
                   )}
                   {sideView === "outline" && (
-                    <button className="icon-btn" type="button" title="Collapse All" onClick={() => setOutlineCollapse((n) => n + 1)}>
+                    <button className="icon-btn" type="button" title={t("Collapse All")} onClick={() => setOutlineCollapse((n) => n + 1)}>
                       <ListCollapse size={16} strokeWidth={1.75} />
                     </button>
                   )}
                   {sideView === "extensions" && (
                     <>
-                      <button className="icon-btn" type="button" title="Refresh" onClick={() => void refreshExtensions()}>
+                      <button className="icon-btn" type="button" title={t("Refresh")} onClick={() => void refreshExtensions()}>
                         <RefreshCw size={15} strokeWidth={1.75} />
                       </button>
                       <button
                         className="icon-btn"
                         type="button"
-                        title="More Actions…"
+                        title={t("More Actions…")}
                         onClick={(e) => {
                           const rect = e.currentTarget.getBoundingClientRect();
                           extensionsMenu(rect.left, rect.bottom + 2);
@@ -5288,7 +5344,7 @@ export function App() {
                   <>
                     <div
                       className="explorer-views-sash"
-                      title="Drag to resize · Double-click to reset"
+                      title={t("Drag to resize · Double-click to reset")}
                       onMouseDown={onExplorerViewsResizeStart}
                       onDoubleClick={() => setExplorerViewsHeight(null)}
                     />
@@ -5333,15 +5389,15 @@ export function App() {
                   onUnstage={(files) => void gitAction((root) => api().request.gitUnstage({ root, paths: files.map((f) => f.path) }))}
                   onDiscard={(files) =>
                     void showDialog({
-                      title: "Discard Changes",
+                      title: t("Discard Changes"),
                       message:
                         files.length === 1
-                          ? `Are you sure you want to discard changes in ${basename(files[0]!.path)}?`
-                          : `Are you sure you want to discard ALL changes in ${files.length} files?`,
-                      detail: files.some((f) => f.index === "?") ? "Untracked files will be DELETED. This is IRREVERSIBLE!" : "This is IRREVERSIBLE!",
+                          ? t("Are you sure you want to discard changes in {0}?", basename(files[0]!.path))
+                          : t("Are you sure you want to discard ALL changes in {0} files?", files.length),
+                      detail: files.some((f) => f.index === "?") ? t("Untracked files will be DELETED. This is IRREVERSIBLE!") : t("This is IRREVERSIBLE!"),
                       buttons: [
-                        { label: "Discard", role: "danger", value: "discard" },
-                        { label: "Cancel", role: "default", value: "cancel" },
+                        { label: t("Discard"), role: "danger", value: "discard" },
+                        { label: t("Cancel"), role: "default", value: "cancel" },
                       ],
                     }).then((choice) => {
                       if (choice === "discard") {
@@ -5354,12 +5410,12 @@ export function App() {
                     let stageAll = false;
                     if (!staged) {
                       const choice = await showDialog({
-                        title: "Commit",
-                        message: "There are no staged changes to commit.",
-                        detail: "Would you like to stage all your changes and commit them directly?",
+                        title: t("Commit"),
+                        message: t("There are no staged changes to commit."),
+                        detail: t("Would you like to stage all your changes and commit them directly?"),
                         buttons: [
-                          { label: "Yes", role: "primary", value: "yes" },
-                          { label: "Cancel", role: "default", value: "cancel" },
+                          { label: t("Yes"), role: "primary", value: "yes" },
+                          { label: t("Cancel"), role: "default", value: "cancel" },
                         ],
                       });
                       if (choice !== "yes") return false;
@@ -5367,7 +5423,7 @@ export function App() {
                     }
                     const ok = await gitAction((root) => api().request.gitCommit({ root, message, stageAll }));
                     if (ok) {
-                      toast("Committed", "success");
+                      toast(t("Committed"), "success");
                       const current = editorRef.current?.getCurrent()?.path;
                       if (current) void loadGitBase(current);
                     }
@@ -5390,9 +5446,9 @@ export function App() {
               <div className="sidebar-panel" hidden={sideView !== "extensions"}>
                 {ext.crashed && (
                   <div className="ext-crashed">
-                    The extension host stopped: {ext.crashed}
+                    {t("The extension host stopped: {0}", ext.crashed)}
                     <button type="button" className="ext-install" onClick={() => void extensionService.restart()}>
-                      Restart
+                      {t("Restart")}
                     </button>
                   </div>
                 )}
@@ -5408,7 +5464,7 @@ export function App() {
                 />
               </div>
             </aside>
-            <div className="resizer" title="Resize sidebar" onMouseDown={onSidebarResizeStart} />
+            <div className="resizer" title={t("Resize sidebar")} onMouseDown={onSidebarResizeStart} />
           </>
         )}
 
@@ -5419,7 +5475,7 @@ export function App() {
             {renderGrid()}
           </div>
 
-          {showPanelArea && !panelMaximized && <div className="panel-resizer" title="Resize panel" onMouseDown={onPanelResizeStart} />}
+          {showPanelArea && !panelMaximized && <div className="panel-resizer" title={t("Resize panel")} onMouseDown={onPanelResizeStart} />}
           <div
             className="panel-container"
             hidden={!showPanelArea}
@@ -5457,7 +5513,7 @@ export function App() {
               onOpenLocation={(path, line, character) => void openFile(path, { line, character })}
               terminal={<TerminalPanelView visible={showPanelArea && panelTab === "terminal"} onAction={terminalAction} />}
               extraTabs={[
-                { id: "view:debug-console" as const, label: "Debug Console", content: <DebugConsole /> },
+                { id: "view:debug-console" as const, label: t("Debug Console"), content: <DebugConsole /> },
                 ...viewLayout.containers
                   .filter((container) => container.location === "panel" && visibleViews(container.views).length > 0)
                   .map((container) => ({
@@ -5471,27 +5527,32 @@ export function App() {
               onClearOutput={(name) => extensionService.clearOutput(name)}
               terminalActions={
                 <>
-                  <button type="button" className="icon-btn" title="New Terminal (Ctrl+Shift+`)" onClick={() => newTerminal()}>
+                  <button type="button" className="icon-btn" title={t("New Terminal ({0})", "Ctrl+Shift+`")} onClick={() => newTerminal()}>
                     <Plus size={16} strokeWidth={1.75} />
                   </button>
-                  <button type="button" className="icon-btn" title="Launch Profile…" onClick={() => pickProfile((profileId) => newTerminal({ profileId }))}>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title={t("Launch Profile…")}
+                    onClick={() => pickProfile((profileId) => newTerminal({ profileId }))}
+                  >
                     <ChevronDown size={15} strokeWidth={1.75} />
                   </button>
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Split Terminal (Ctrl+Shift+5)"
+                    title={t("Split Terminal ({0})", "Ctrl+Shift+5")}
                     onClick={() => newTerminal({ splitWith: terminals.activeId ?? undefined })}
                   >
                     <SquareSplitHorizontal size={15} strokeWidth={1.75} />
                   </button>
-                  <button type="button" className="icon-btn" title="Clear Terminal" onClick={() => terminalService.clear(terminals.activeId)}>
+                  <button type="button" className="icon-btn" title={t("Clear Terminal")} onClick={() => terminalService.clear(terminals.activeId)}>
                     <Eraser size={15} strokeWidth={1.75} />
                   </button>
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Kill Terminal"
+                    title={t("Kill Terminal")}
                     disabled={!terminals.activeId}
                     onClick={() => terminals.activeId && terminalAction("kill", terminals.activeId)}
                   >
@@ -5505,7 +5566,7 @@ export function App() {
 
         {showAuxBarArea && (
           <>
-            <div className="resizer" title="Resize secondary side bar" onMouseDown={onAuxBarResizeStart} />
+            <div className="resizer" title={t("Resize secondary side bar")} onMouseDown={onAuxBarResizeStart} />
             <aside className="aux-sidebar" style={{ width: auxBarWidth }}>
               <div className="aux-sidebar-header">
                 <div className="aux-sidebar-tabs" role="tablist">
@@ -5527,7 +5588,7 @@ export function App() {
                 <button
                   type="button"
                   className="icon-btn"
-                  title={`Hide Secondary Side Bar (${keys.get("workbench.action.toggleAuxiliaryBar") ?? ""})`}
+                  title={t("Hide Secondary Side Bar ({0})", keys.get("workbench.action.toggleAuxiliaryBar") ?? "")}
                   onClick={() => setAuxBarVisible(false)}
                 >
                   <X size={16} strokeWidth={1.75} />
@@ -5553,7 +5614,7 @@ export function App() {
           warnings={warningCount}
           cursor={editorActive ? cursor : null}
           indentation={
-            editorActive ? (activeIndentation.insertSpaces ? `Spaces: ${activeIndentation.tabSize}` : `Tab Size: ${activeIndentation.tabSize}`) : null
+            editorActive ? (activeIndentation.insertSpaces ? t("Spaces: {0}", activeIndentation.tabSize) : t("Tab Size: {0}", activeIndentation.tabSize)) : null
           }
           eol={editorActive ? (activeDoc?.eol ?? null) : null}
           encoding={editorActive && activeDoc && activePath && !isVirtualDocument(activePath) ? encodingShortName(activeDoc.encoding ?? "utf8") : null}
@@ -5611,17 +5672,22 @@ export function App() {
 
       {groups[MODAL_GROUP] && (
         <div className="modal-overlay modal-editor-overlay" onMouseDown={(e) => e.target === e.currentTarget && void closeModalEditor()}>
-          <div className={`modal-editor-part${modalMaximized ? " maximized" : ""}`} role="dialog" aria-modal="true" aria-label="Modal Editor">
+          <div className={`modal-editor-part${modalMaximized ? " maximized" : ""}`} role="dialog" aria-modal="true" aria-label={t("Modal Editor")}>
             <div className="modal-editor-header" onDoubleClick={(e) => e.target === e.currentTarget && setModalMaximized((value) => !value)}>
               <span className="modal-editor-title">{groups[MODAL_GROUP].tabs.find((tab) => tab.path === groups[MODAL_GROUP]!.activePath)?.name ?? ""}</span>
               <ModalEditorTitleActions path={groups[MODAL_GROUP].activePath} maximized={modalMaximized} />
-              <button type="button" className="icon-btn" title="Move into Editor Area" onClick={() => void moveModalEditorToEditorArea()}>
+              <button type="button" className="icon-btn" title={t("Move into Editor Area")} onClick={() => void moveModalEditorToEditorArea()}>
                 <LayoutPanelLeft size={14} />
               </button>
-              <button type="button" className="icon-btn" title={modalMaximized ? "Restore" : "Maximize"} onClick={() => setModalMaximized((value) => !value)}>
+              <button
+                type="button"
+                className="icon-btn"
+                title={modalMaximized ? t("Restore") : t("Maximize")}
+                onClick={() => setModalMaximized((value) => !value)}
+              >
                 {modalMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
-              <button type="button" className="icon-btn" title="Close" onClick={() => void closeModalEditor()}>
+              <button type="button" className="icon-btn" title={t("Close")} onClick={() => void closeModalEditor()}>
                 <X size={14} />
               </button>
             </div>

@@ -6,6 +6,7 @@ import { FeatureStatusItems } from "../features/components";
 import { showContextMenu } from "../lib/context-menu";
 import { useExtensions } from "../lib/extensions";
 import { contributedMenuItems } from "../features/menus-walkthroughs/menus";
+import { t } from "../lib/i18n";
 
 /**
  * The remote indicator (VS Code's "><" button at the far left): shown while
@@ -19,7 +20,7 @@ function RemoteIndicator() {
     <button
       type="button"
       className="status-btn status-remote"
-      title="Open a Remote Window"
+      title={t("Open a Remote Window")}
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         void showContextMenu(
@@ -101,7 +102,7 @@ export function StatusBar(props: Props) {
       <div className="status-left">
         <RemoteIndicator />
         {props.branch && (
-          <button type="button" className="status-btn" title="Source Control (Ctrl+Shift+G)" onClick={props.onBranch}>
+          <button type="button" className="status-btn" title={t("Source Control (Ctrl+Shift+G)")} onClick={props.onBranch}>
             <GitBranch size={13} />
             {props.branch}
             {props.changes > 0 ? "*" : ""}
@@ -109,7 +110,7 @@ export function StatusBar(props: Props) {
             {props.behind > 0 && ` ↓${props.behind}`}
           </button>
         )}
-        <button type="button" className="status-btn" title="Problems (Ctrl+Shift+M)" onClick={props.onProblems}>
+        <button type="button" className="status-btn" title={t("Problems (Ctrl+Shift+M)")} onClick={props.onProblems}>
           <CircleX size={13} />
           {props.errors}
           <TriangleAlert size={13} />
@@ -130,49 +131,49 @@ export function StatusBar(props: Props) {
         <ExtensionItems items={props.extensionItems} side="right" onClick={props.onExtensionItem} />
         <FeatureStatusItems side="right" />
         {cursor && (
-          <button type="button" className="status-btn" title="Go to Line/Column (Ctrl+G)" onClick={props.onGotoLine}>
-            Ln {cursor.line}, Col {cursor.column}
-            {cursor.selectedChars > 0 && ` (${cursor.selectedChars} selected)`}
-            {cursor.selections > 1 && ` · ${cursor.selections} selections`}
+          <button type="button" className="status-btn" title={t("Go to Line/Column (Ctrl+G)")} onClick={props.onGotoLine}>
+            {t("Ln {0}, Col {1}", cursor.line, cursor.column)}
+            {cursor.selectedChars > 0 && ` ${t("({0} selected)", cursor.selectedChars)}`}
+            {cursor.selections > 1 && ` · ${t("{0} selections", cursor.selections)}`}
           </button>
         )}
         {props.indentation && (
-          <button type="button" className="status-btn" title="Select Indentation" onClick={props.onIndentation}>
+          <button type="button" className="status-btn" title={t("Select Indentation")} onClick={props.onIndentation}>
             {props.indentation}
           </button>
         )}
         {props.encoding && (
-          <button type="button" className="status-btn" title="Select Encoding" onClick={props.onEncoding}>
+          <button type="button" className="status-btn" title={t("Select Encoding")} onClick={props.onEncoding}>
             {props.encoding}
           </button>
         )}
         {props.eol && (
-          <button type="button" className="status-btn" title="Select End of Line Sequence" onClick={props.onEol}>
+          <button type="button" className="status-btn" title={t("Select End of Line Sequence")} onClick={props.onEol}>
             {props.eol}
           </button>
         )}
         {props.language && (
-          <button type="button" className="status-btn" title="Select Language Mode (Ctrl+K M)" onClick={props.onLanguage}>
+          <button type="button" className="status-btn" title={t("Select Language Mode (Ctrl+K M)")} onClick={props.onLanguage}>
             {props.language}
           </button>
         )}
         {props.lsp?.active && (
-          <span className="status-item status-lsp" title={`${props.lsp.text} language features are active`}>
+          <span className="status-item status-lsp" title={t("{0} language features are active", props.lsp.text)}>
             <Braces size={13} />
           </span>
         )}
         {props.autoSave && (
-          <span className="status-item muted" title="Auto Save is on">
-            Auto Save
+          <span className="status-item muted" title={t("Auto Save is on")}>
+            {t("Auto Save")}
           </span>
         )}
         <button
           type="button"
           className={`status-btn${props.terminalActive ? " active" : ""}`}
-          title="Toggle Terminal (Ctrl+`)"
+          title={t("Toggle Terminal (Ctrl+`)")}
           onClick={props.onToggleTerminal}
         >
-          Terminal
+          {t("Terminal")}
         </button>
       </div>
     </footer>

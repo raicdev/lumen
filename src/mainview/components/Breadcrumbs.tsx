@@ -5,6 +5,7 @@ import { SymbolIcon } from "./SymbolIcon";
 import { FileIcon } from "./FileIcon";
 import { useFeaturesVersion } from "../features/store";
 import { resourceLabel } from "../features/menus-walkthroughs/state";
+import { t } from "../lib/i18n";
 
 type Props = {
   path: string;
@@ -34,7 +35,7 @@ export function Breadcrumbs({ path, workspaceRoot, symbols, cursorLine, onReveal
   const chain = symbols && cursorLine !== null ? symbolPathAt(symbols, cursorLine - 1) : [];
 
   return (
-    <nav className="breadcrumbs" aria-label="Breadcrumbs">
+    <nav className="breadcrumbs" aria-label={t("Breadcrumbs")}>
       {segments.map((segment, index) => {
         const folder = base ? [base, ...segments.slice(0, index + 1)].join(sep) : segments.slice(0, index + 1).join(sep);
         return (
@@ -47,7 +48,7 @@ export function Breadcrumbs({ path, workspaceRoot, symbols, cursorLine, onReveal
         );
       })}
       <span className="crumb-wrap">
-        <button type="button" className="crumb file" onClick={onShowSymbols} title="Go to Symbol (Ctrl+Shift+O)">
+        <button type="button" className="crumb file" onClick={onShowSymbols} title={t("Go to Symbol (Ctrl+Shift+O)")}>
           <FileIcon name={formatted ? path : file} />
           {file}
         </button>

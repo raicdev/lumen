@@ -6,6 +6,7 @@ import { api } from "../lib/rpc";
 import { COMPAT_GRADES, compatClass, compatGrade } from "../lib/compat";
 import { showContextMenu } from "../lib/context-menu";
 import { contributedMenuItems, showContributedMenu } from "../features/menus-walkthroughs/menus";
+import { t } from "../lib/i18n";
 
 export type ExtensionTarget = { installed?: ExtensionDescription; marketplace?: MarketplaceExtension };
 
@@ -47,9 +48,9 @@ export function CompatBadge({ extension }: { extension: ExtensionDescription }) 
   return (
     <span
       className={`ext-badge ${compatClass(extension.compat)}`}
-      title="Converted from a VS Code extension by the transpiler — open the details for the compatibility report"
+      title={t("Converted from a VS Code extension by the transpiler — open the details for the compatibility report")}
     >
-      VS Code · {COMPAT_GRADES[compatGrade(extension.compat)].badge}
+      VS Code · {t(COMPAT_GRADES[compatGrade(extension.compat)].badge)}
     </span>
   );
 }
@@ -65,7 +66,7 @@ function VscodeLogo({ size }: { size: number }) {
 
 /** At most `max` names, then "and N more". */
 function nameList(names: string[], max = 5): string {
-  return names.length > max ? `${names.slice(0, max).join(", ")} and ${names.length - max} more` : names.join(", ");
+  return names.length > max ? t("{0} and {1} more", names.slice(0, max).join(", "), names.length - max) : names.join(", ");
 }
 
 /**
@@ -83,7 +84,7 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
   const unsupportedApis = report?.apis.filter((api) => api.status === "unsupported").map((api) => api.name) ?? [];
   const partialApis = report?.apis.filter((api) => api.status === "partial").map((api) => api.name) ?? [];
   const contributions =
-    report?.contributions.filter((c) => c.status !== "supported").map((c) => (c.status === "partial" ? `${c.name} (partial)` : c.name)) ?? [];
+    report?.contributions.filter((c) => c.status !== "supported").map((c) => (c.status === "partial" ? t("{0} (partial)", c.name) : c.name)) ?? [];
 
   const card = anchor && (
     <div
@@ -93,27 +94,27 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
     >
       <div className="ext-compat-card-title">
         <VscodeLogo size={13} />
-        VS Code extension · {info.label}
+        {t("VS Code extension")} · {t(info.label)}
       </div>
-      <p>{report ? info.text : "Not analyzed yet: open the details to check it."}</p>
+      <p>{report ? t(info.text) : t("Not analyzed yet: open the details to check it.")}</p>
       {report?.coverage !== undefined && report.level !== "full" && (
         <p>
-          <b>Works:</b> {report.coverage}% of the APIs and contribution points it uses
+          <b>{t("Works:")}</b> {t("{0}% of the APIs and contribution points it uses", report.coverage)}
         </p>
       )}
       {unsupportedApis.length > 0 && (
         <p>
-          <b>Not available:</b> {nameList(unsupportedApis)}
+          <b>{t("Not available:")}</b> {nameList(unsupportedApis)}
         </p>
       )}
       {partialApis.length > 0 && (
         <p>
-          <b>Partly available:</b> {nameList(partialApis)}
+          <b>{t("Partly available:")}</b> {nameList(partialApis)}
         </p>
       )}
       {contributions.length > 0 && (
         <p>
-          <b>Contributions:</b> {nameList(contributions)}
+          <b>{t("Contributions:")}</b> {nameList(contributions)}
         </p>
       )}
       {report?.warnings.slice(0, 2).map((warning) => (
@@ -121,7 +122,7 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
           {warning}
         </p>
       ))}
-      <p className="ext-compat-card-hint">Open the details for the full compatibility report.</p>
+      <p className="ext-compat-card-hint">{t("Open the details for the full compatibility report.")}</p>
     </div>
   );
 
@@ -130,7 +131,7 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
       className={`ext-compat-icon ${color}`}
       // An empty title keeps the row's tooltip (the extension id) from covering the card.
       title=""
-      aria-label={`VS Code extension: ${info.label}`}
+      aria-label={t("VS Code extension: {0}", t(info.label))}
       onMouseEnter={(e) => setAnchor(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => setAnchor(null)}
     >
@@ -258,16 +259,16 @@ export function ExtensionsView(props: Props) {
     void showContextMenu(x, y, [
       ...(update
         ? [
-            { type: "item" as const, label: `Update to ${update.version}`, action: "update", run: () => props.onInstall(update) },
+            { type: "item" as const, label: t("Update to {0}", update.version), action: "update", run: () => props.onInstall(update) },
             { type: "separator" as const },
           ]
         : []),
-      extension.enabled ? { type: "item", label: "Disable", action: "disable" } : { type: "item", label: "Enable", action: "enable" },
-      { type: "item", label: "Uninstall", action: "uninstall", danger: true },
+      extension.enabled ? { type: "item", label: t("Disable"), action: "disable" } : { type: "item", label: t("Enable"), action: "enable" },
+      { type: "item", label: t("Uninstall"), action: "uninstall", danger: true },
       { type: "separator" },
-      { type: "item", label: "Show Details", action: "details" },
-      { type: "item", label: "Copy Extension ID", action: "copy-id" },
-      { type: "item", label: "Reveal in File Explorer", action: "reveal" },
+      { type: "item", label: t("Show Details"), action: "details" },
+      { type: "item", label: t("Copy Extension ID"), action: "copy-id" },
+      { type: "item", label: t("Reveal in File Explorer"), action: "reveal" },
       ...(contributed.length ? [{ type: "separator" as const }, ...contributed] : []),
     ]).then((action) => {
       if (action) props.onAction(action as ExtensionAction, extension);
@@ -298,39 +299,39 @@ export function ExtensionsView(props: Props) {
             <span className="ext-name">{name}</span>
             <span className="ext-version">{manifest.version}</span>
             {runtime?.error && (
-              <span className="ext-error" title={`Activation failed: ${runtime.error}`}>
+              <span className="ext-error" title={t("Activation failed: {0}", runtime.error)}>
                 <TriangleAlert size={13} />
               </span>
             )}
           </div>
           <div className="ext-description">{manifest.description}</div>
           <div className="ext-meta">
-            <span className="ext-publisher">{manifest.publisher ?? "unknown"}</span>
-            {!extension.enabled && <span className="ext-badge">Disabled</span>}
-            {extension.development && <span className="ext-badge">Development</span>}
+            <span className="ext-publisher">{manifest.publisher ?? t("unknown")}</span>
+            {!extension.enabled && <span className="ext-badge">{t("Disabled")}</span>}
+            {extension.development && <span className="ext-badge">{t("Development")}</span>}
             {busy ? (
               <span className="ext-installing">
-                <LoaderCircle size={12} className="codicon spin" /> Updating…
+                <LoaderCircle size={12} className="codicon spin" /> {t("Updating…")}
               </span>
             ) : (
               update && (
                 <button
                   type="button"
                   className="ext-install"
-                  title={`Update ${manifest.version} → ${update.version}`}
+                  title={t("Update {0} → {1}", manifest.version, update.version)}
                   onClick={(e) => {
                     e.stopPropagation();
                     props.onInstall(update);
                   }}
                 >
-                  Update
+                  {t("Update")}
                 </button>
               )
             )}
             <button
               type="button"
               className={`icon-btn ext-gear${update || busy ? " after-action" : ""}`}
-              title="Manage"
+              title={t("Manage")}
               onClick={(e) => {
                 e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -369,7 +370,7 @@ export function ExtensionsView(props: Props) {
           <div className="ext-title">
             <span className="ext-name">{name}</span>
             {entry.downloadCount ? (
-              <span className="ext-downloads" title={`${entry.downloadCount.toLocaleString()} downloads`}>
+              <span className="ext-downloads" title={t("{0} downloads", entry.downloadCount.toLocaleString())}>
                 <Download size={11} /> {compactNumber(entry.downloadCount)}
               </span>
             ) : null}
@@ -379,17 +380,17 @@ export function ExtensionsView(props: Props) {
             <span className="ext-publisher">
               {entry.publisher}
               {entry.verified && (
-                <span className="ext-verified" title="Verified publisher">
-                  <Check size={12} strokeWidth={3} aria-label="Verified publisher" />
+                <span className="ext-verified" title={t("Verified publisher")}>
+                  <Check size={12} strokeWidth={3} aria-label={t("Verified publisher")} />
                 </span>
               )}
             </span>
             {busy ? (
               <span className="ext-installing">
-                <LoaderCircle size={12} className="codicon spin" /> Installing…
+                <LoaderCircle size={12} className="codicon spin" /> {t("Installing…")}
               </span>
             ) : installed && !update ? (
-              <span className="ext-badge">Installed</span>
+              <span className="ext-badge">{t("Installed")}</span>
             ) : (
               <button
                 type="button"
@@ -399,7 +400,7 @@ export function ExtensionsView(props: Props) {
                   props.onInstall(entry);
                 }}
               >
-                {update ? "Update" : "Install"}
+                {update ? t("Update") : t("Install")}
               </button>
             )}
           </div>
@@ -416,7 +417,7 @@ export function ExtensionsView(props: Props) {
           ref={inputRef}
           type="text"
           spellCheck={false}
-          placeholder="Search Extensions in Open VSX"
+          placeholder={t("Search Extensions in Open VSX")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -425,26 +426,26 @@ export function ExtensionsView(props: Props) {
         />
       </div>
       <div className="ext-list">
-        <Section title="Installed" count={installedShown.length}>
+        <Section title={t("Installed")} count={installedShown.length}>
           {installedShown.length ? (
             installedShown.map(installedRow)
           ) : (
             <div className="ext-empty">
               {props.installed.length
-                ? "No installed extension matches."
-                : "No extensions installed yet. Search Open VSX above, or use “Install from VSIX…” in the ⋯ menu."}
+                ? t("No installed extension matches.")
+                : t("No extensions installed yet. Search Open VSX above, or use “Install from VSIX…” in the ⋯ menu.")}
             </div>
           )}
         </Section>
         {!scope && (
-          <Section title={text ? "Open VSX" : "Popular on Open VSX"} count={marketplace.length || undefined}>
+          <Section title={text ? "Open VSX" : t("Popular on Open VSX")} count={marketplace.length || undefined}>
             {loading && !marketplace.length && (
               <div className="ext-empty">
-                <LoaderCircle size={13} className="codicon spin" /> Searching…
+                <LoaderCircle size={13} className="codicon spin" /> {t("Searching…")}
               </div>
             )}
-            {error && <div className="ext-empty error">Could not reach Open VSX: {error}</div>}
-            {!loading && !error && text && !marketplace.length && <div className="ext-empty">No extensions found.</div>}
+            {error && <div className="ext-empty error">{t("Could not reach Open VSX: {0}", error)}</div>}
+            {!loading && !error && text && !marketplace.length && <div className="ext-empty">{t("No extensions found.")}</div>}
             {marketplace.map(marketplaceRow)}
           </Section>
         )}

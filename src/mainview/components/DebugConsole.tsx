@@ -4,6 +4,7 @@ import type { HostDebugEvaluateResult } from "../../shared/extensions";
 import { debugService, useDebug } from "../lib/debug";
 import { currentSession, useDebugUi } from "../lib/debug-ui";
 import { DebugValue, VariableNode } from "./DebugVariables";
+import { t } from "../lib/i18n";
 
 /**
  * The Debug Console: adapter output plus a REPL that evaluates in the focused
@@ -69,7 +70,7 @@ export function DebugConsole() {
     setInput("");
     const session = currentSession();
     if (!session) {
-      replStore.set([...entries, { after: debug.console.length, expression, sessionId: "", result: { error: "No active debug session." } }]);
+      replStore.set([...entries, { after: debug.console.length, expression, sessionId: "", result: { error: t("No active debug session.") } }]);
       return;
     }
     const entry: ReplEntry = { after: debug.console.length, expression, sessionId: session.id, result: null };
@@ -78,7 +79,7 @@ export function DebugConsole() {
     const result = await debugService
       .evaluate(session.id, expression, frameId, "repl")
       .catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }));
-    replStore.set(entries.map((e) => (e === entry ? { ...e, result: result ?? { error: "No result." } } : e)));
+    replStore.set(entries.map((e) => (e === entry ? { ...e, result: result ?? { error: t("No result.") } } : e)));
   };
 
   // Interleave output lines and REPL entries by position.
@@ -112,13 +113,13 @@ export function DebugConsole() {
           stick.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
         }}
       >
-        {rows.length ? rows : <div className="dbg-placeholder">Output of debug sessions appears here. Evaluate expressions below while paused.</div>}
+        {rows.length ? rows : <div className="dbg-placeholder">{t("Output of debug sessions appears here. Evaluate expressions below while paused.")}</div>}
       </div>
       <div className="dbg-console-input">
         <ChevronRight size={14} />
         <input
           value={input}
-          placeholder={currentSession() ? "Evaluate expression" : "Start a debug session to evaluate expressions"}
+          placeholder={currentSession() ? t("Evaluate expression") : t("Start a debug session to evaluate expressions")}
           spellCheck={false}
           onChange={(e) => setInput(e.currentTarget.value)}
           onKeyDown={(e) => {

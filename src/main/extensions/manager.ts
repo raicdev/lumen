@@ -6,6 +6,7 @@ import type { CompatReport, ExtensionDescription, ExtensionManifest, ExtensionSo
 import { TRANSPILER_VERSION, isVscodeManifest, refreshReport, transpileExtension, transpileVsix } from "./transpiler.ts";
 import { extractZip, readZipFile } from "./vsix.ts";
 import { currentTargetPlatform, platformLabel, runsOn, vsixTargetPlatform } from "./platform.ts";
+import { localizedFileNames } from "../../shared/i18n.ts";
 
 /**
  * Installed extensions: ~/.lumen/extensions/<publisher.name-version>/ (like
@@ -61,18 +62,37 @@ function readManifest(dir: string): ExtensionManifest | null {
   }
 }
 
+/** The display language the view uses (it says so at startup); manifests and l10n bundles follow it. */
+let displayLanguage = "en";
+
+export function setDisplayLanguage(language: string): void {
+  displayLanguage = language;
+}
+
+export function getDisplayLanguage(): string {
+  return displayLanguage;
+}
+
+function readNlsBundle(file: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Replace "%key%" strings (titles, categories, descriptions…) with their text
- * from package.nls.json, as VS Code does. The UI is English, so only the
- * default bundle is read; keys it lacks stay as they are.
+ * from package.nls.<language>.json, falling back to package.nls.json, as VS Code
+ * does; keys neither has stay as they are.
  */
 function localizeManifest(dir: string, manifest: ExtensionManifest): ExtensionManifest {
-  let bundle: Record<string, unknown>;
-  try {
-    bundle = JSON.parse(readFileSync(join(dir, "package.nls.json"), "utf8")) as Record<string, unknown>;
-  } catch {
-    return manifest;
-  }
+  const bundles = [...localizedFileNames(displayLanguage, (locale) => `package.nls.${locale}.json`), "package.nls.json"]
+    .map((name) => readNlsBundle(join(dir, name)))
+    .filter((bundle): bundle is Record<string, unknown> => !!bundle);
+  if (!bundles.length) return manifest;
+  // The most specific file wins; the default fills in what a translation leaves out.
+  const bundle: Record<string, unknown> = Object.assign({}, ...bundles.toReversed());
   const localize = (value: unknown): unknown => {
     if (typeof value === "string") {
       const key = /^%(.+)%$/.exec(value)?.[1];

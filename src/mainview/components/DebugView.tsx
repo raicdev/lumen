@@ -15,6 +15,7 @@ import { MenuActions } from "../features/menus-walkthroughs/MenuActions";
 import { showContributedMenu } from "../features/menus-walkthroughs/menus";
 import { basename } from "../lib/paths";
 import { DebugValue, VariableNode } from "./DebugVariables";
+import { t } from "../lib/i18n";
 
 type Props = {
   workspaceRoot: string | null;
@@ -76,20 +77,22 @@ export function DebugView({ workspaceRoot, onStart, onOpenLaunchJson, onReveal }
   }, [workspaceRoot, live.length]);
 
   const selected = configs.find((c) => c.name === ui.selectedConfig) ?? configs[0] ?? null;
+  // The launch.json link sits wherever the translation puts it.
+  const [customizeBefore, customizeAfter = ""] = t("{0} to customize it.", "\u0000").split("\u0000");
 
   return (
     <div className="dbg-view">
       <div className="dbg-launch">
         {configs.length ? (
           <>
-            <button className="dbg-start" type="button" title="Start Debugging (F5)" onClick={() => onStart(selected)}>
+            <button className="dbg-start" type="button" title={t("Start Debugging (F5)")} onClick={() => onStart(selected)}>
               <Play size={14} strokeWidth={2} />
             </button>
             <select
               className="dbg-config-select"
               value={selected?.name ?? ""}
               onChange={(e) => debugUi.selectConfig(e.target.value)}
-              title="Launch configuration"
+              title={t("Launch configuration")}
             >
               {configs.map((c) => (
                 <option key={c.name} value={c.name}>
@@ -97,38 +100,43 @@ export function DebugView({ workspaceRoot, onStart, onOpenLaunchJson, onReveal }
                 </option>
               ))}
             </select>
-            <button className="icon-btn" type="button" title="Open launch.json" onClick={onOpenLaunchJson}>
+            <button className="icon-btn" type="button" title={t("Open launch.json")} onClick={onOpenLaunchJson}>
               <Settings size={15} strokeWidth={1.75} />
             </button>
           </>
         ) : (
           <div className="dbg-empty-launch">
             <button className="dbg-run-button" type="button" onClick={() => onStart(null)}>
-              Run and Debug
+              {t("Run and Debug")}
             </button>
             <p>
-              Debugs the active file with an installed debugger.{" "}
+              {t("Debugs the active file with an installed debugger.")} {customizeBefore}
               <a href="#" onClick={(e) => (e.preventDefault(), onOpenLaunchJson())}>
-                Create a launch.json file
-              </a>{" "}
-              to customize it.
+                {t("Create a launch.json file")}
+              </a>
+              {customizeAfter}
             </p>
             {configError && <p className="dbg-error">{configError}</p>}
           </div>
         )}
       </div>
 
-      <Section title="Variables">
+      <Section title={t("Variables")}>
         <VariablesSection generation={ui.generation} />
       </Section>
       <Section
-        title="Watch"
+        title={t("Watch")}
         actions={
           <>
-            <button className="icon-btn" type="button" title="Add Expression" onClick={() => window.dispatchEvent(new CustomEvent("lumen:debug-add-watch"))}>
+            <button
+              className="icon-btn"
+              type="button"
+              title={t("Add Expression")}
+              onClick={() => window.dispatchEvent(new CustomEvent("lumen:debug-add-watch"))}
+            >
               <Plus size={14} />
             </button>
-            <button className="icon-btn" type="button" title="Remove All Expressions" onClick={() => debugUi.removeWatch("all")}>
+            <button className="icon-btn" type="button" title={t("Remove All Expressions")} onClick={() => debugUi.removeWatch("all")}>
               <Trash2 size={13} />
             </button>
           </>
@@ -136,13 +144,13 @@ export function DebugView({ workspaceRoot, onStart, onOpenLaunchJson, onReveal }
       >
         <WatchSection />
       </Section>
-      <Section title="Call Stack">
+      <Section title={t("Call Stack")}>
         <CallStackSection sessions={live} onReveal={onReveal} />
       </Section>
       <Section
-        title="Breakpoints"
+        title={t("Breakpoints")}
         actions={
-          <button className="icon-btn" type="button" title="Remove All Breakpoints" onClick={() => void debugService.removeAllBreakpoints()}>
+          <button className="icon-btn" type="button" title={t("Remove All Breakpoints")} onClick={() => void debugService.removeAllBreakpoints()}>
             <Trash2 size={13} />
           </button>
         }
@@ -176,7 +184,7 @@ function VariablesSection({ generation }: { generation: number }) {
     };
   }, [sessionId, frameId, generation]);
 
-  if (!focused) return <div className="dbg-placeholder">Not paused.</div>;
+  if (!focused) return <div className="dbg-placeholder">{t("Not paused.")}</div>;
   if (!scopes) return null;
   return (
     <>
@@ -240,7 +248,7 @@ function WatchSection() {
       className="dbg-watch-input"
       autoFocus
       defaultValue={initial}
-      placeholder="Expression to watch"
+      placeholder={t("Expression to watch")}
       onBlur={(e) => commit(index, e.currentTarget.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") commit(index, e.currentTarget.value);
@@ -273,13 +281,13 @@ function WatchSection() {
             <span className="dbg-name">{expression}</span>
             <span className="dbg-sep">: </span>
             {!focused || !result ? (
-              <span className="dbg-value dbg-value-null">not available</span>
+              <span className="dbg-value dbg-value-null">{t("not available")}</span>
             ) : "error" in result ? (
               <span className="dbg-error">{result.error}</span>
             ) : (
               <DebugValue value={result.result} type={result.type} />
             )}
-            <button className="icon-btn dbg-row-action" type="button" title="Remove Expression" onClick={() => debugUi.removeWatch(i)}>
+            <button className="icon-btn dbg-row-action" type="button" title={t("Remove Expression")} onClick={() => debugUi.removeWatch(i)}>
               <X size={13} />
             </button>
           </div>
@@ -313,7 +321,7 @@ function WatchSection() {
 /* ── Call stack ────────────────────────────────────────────────────────── */
 
 function CallStackSection({ sessions, onReveal }: { sessions: HostDebugSession[]; onReveal: Props["onReveal"] }) {
-  if (!sessions.length) return <div className="dbg-placeholder">Not running.</div>;
+  if (!sessions.length) return <div className="dbg-placeholder">{t("Not running.")}</div>;
   return (
     <>
       {sessions.map((session) => (
@@ -342,10 +350,12 @@ function SessionNode({ session, depth, onReveal }: { session: HostDebugSession; 
 
   const label =
     session.state === "stopped"
-      ? `Paused${session.stoppedReason ? ` on ${session.stoppedReason}` : ""}`
+      ? session.stoppedReason
+        ? t("Paused on {0}", session.stoppedReason)
+        : t("Paused")
       : session.state === "starting"
-        ? "Starting"
-        : "Running";
+        ? t("Starting")
+        : t("Running");
   return (
     <>
       <div
@@ -429,7 +439,7 @@ function ThreadNode({
         >
           <ChevronRight size={14} className={`dbg-chevron${open ? " open" : ""}${stopped ? "" : " hidden"}`} />
           <span className="dbg-name">{thread.name}</span>
-          <span className="dbg-state">{stopped ? "Paused" : "Running"}</span>
+          <span className="dbg-state">{stopped ? t("Paused") : t("Running")}</span>
           <CallStackInline lookup={callStackLookup(session, "thread", single, stopped)} args={[{ sessionId: session.id, threadId: thread.id }]} />
         </div>
       )}
@@ -454,7 +464,7 @@ function ThreadNode({
               key={frame.id}
               className={`dbg-row dbg-frame-row${isFocused ? " focused" : ""}${path ? "" : " no-source"}`}
               style={{ paddingLeft: 8 + frameDepth * 12 }}
-              title={path ? `${path}:${frame.line}` : "Source not available"}
+              title={path ? `${path}:${frame.line}` : t("Source not available")}
               onClick={() => {
                 debugUi.focusFrame(session.id, thread.id, frame, i === 0);
                 if (path) onReveal(path, frame.line, frame.column);
@@ -514,7 +524,7 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
   const sorted = [...breakpoints].sort(
     (a, b) => (a.path ?? a.functionName ?? "").localeCompare(b.path ?? b.functionName ?? "") || (a.line ?? 0) - (b.line ?? 0),
   );
-  if (!filters.length && !sorted.length) return <div className="dbg-placeholder">No breakpoints. Click left of a line number to add one.</div>;
+  if (!filters.length && !sorted.length) return <div className="dbg-placeholder">{t("No breakpoints. Click left of a line number to add one.")}</div>;
   return (
     <>
       {filters.map((f) => (
@@ -533,10 +543,10 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
             className={`dbg-row dbg-bp-row${unverified ? " unverified" : ""}`}
             title={
               [
-                bp.condition && `Condition: ${bp.condition}`,
-                bp.hitCondition && `Hit count: ${bp.hitCondition}`,
-                bp.logMessage && `Log: ${bp.logMessage}`,
-                unverified && (bp.message ?? "Unverified breakpoint"),
+                bp.condition && t("Condition: {0}", bp.condition),
+                bp.hitCondition && t("Hit count: {0}", bp.hitCondition),
+                bp.logMessage && t("Log: {0}", bp.logMessage),
+                unverified && (bp.message ?? t("Unverified breakpoint")),
               ]
                 .filter(Boolean)
                 .join("\n") || path
@@ -556,7 +566,7 @@ function BreakpointsSection({ breakpoints, onReveal }: { breakpoints: HostDebugB
             <button
               className="icon-btn dbg-row-action"
               type="button"
-              title="Remove Breakpoint"
+              title={t("Remove Breakpoint")}
               onClick={(e) => {
                 e.stopPropagation();
                 removeBreakpoint(bp);
