@@ -1,6 +1,6 @@
 {
   "name": "lumen",
-  "version": "0.2.2-beta.5",
+  "version": "0.3.0-beta.6",
   "private": true,
   "description": "Lumen — a lightweight VS Code alternative that runs VS Code extensions, built on the system WebView with Node.js & TypeScript.",
   "type": "module",

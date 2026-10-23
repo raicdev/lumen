@@ -190,6 +190,8 @@ export function transpileManifest(source: ExtensionManifest): {
 
   const contributions: CompatReport["contributions"] = [];
   for (const point of Object.keys(source.contributes ?? {})) {
+    // A comment key ("//": "…"), not a contribution point.
+    if (point.startsWith("//")) continue;
     const entry = CONTRIBUTION_SUPPORT[point];
     const [status, note] = !entry ? (["unsupported", undefined] as const) : typeof entry === "string" ? [entry, undefined] : entry;
     contributions.push({ name: point, status, note });

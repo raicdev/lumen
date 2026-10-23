@@ -299,7 +299,8 @@
   width: 18px;
 }
 .cm-test-gutter:not(:has(.tst-gutter-icon)) {
-  display: none;
+  /* !important: CodeMirror's base theme sets display: flex !important on every gutter. */
+  display: none !important;
 }
 .cm-test-gutter .cm-gutterElement {
   display: flex;

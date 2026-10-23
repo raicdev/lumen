@@ -225,6 +225,45 @@ test("an extension whose APIs are all unsupported is limited, not partial", () =
   assert.equal(refreshReport(mixed, manifest).level, "partial");
 });
 
+test("comment keys are not contribution points, and the Java extensions' points count as supported", () => {
+  const manifest = {
+    name: "javaish",
+    publisher: "test",
+    version: "1.0.0",
+    engines: { vscode: "^1.90.0", lumen: "^0.1.0" },
+    contributes: {
+      "//": "comment",
+      commands: [{ command: "a", title: "A" }],
+      javaExtensions: ["./server/plugin.jar"],
+      javaShortcuts: [{ title: "A", command: "a" }],
+      javaBuildFilePatterns: ["^build\\.gradle$"],
+      javaBuildTools: [{ displayName: "Gradle", buildFileNames: ["build.gradle"] }],
+    },
+  };
+  const stale = {
+    transpilerVersion: 1,
+    rewrittenImports: 0,
+    filesScanned: 0,
+    filesRewritten: 0,
+    apis: [],
+    contributions: [],
+    warnings: [],
+    level: "partial" as const,
+  };
+  const report = refreshReport(stale, manifest);
+  assert.deepEqual(
+    report.contributions.map((c) => [c.name, c.status]),
+    [
+      ["commands", "supported"],
+      ["javaExtensions", "supported"],
+      ["javaShortcuts", "supported"],
+      ["javaBuildFilePatterns", "supported"],
+      ["javaBuildTools", "supported"],
+    ],
+  );
+  assert.equal(report.level, "full");
+});
+
 test("partial extensions are graded by how much of what they use works", () => {
   const manifest = {
     name: "graded",

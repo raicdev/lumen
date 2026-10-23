@@ -18,6 +18,8 @@
   border: none;
   border-radius: 0;
   white-space: nowrap;
+  /* Every item in the status bar's own color, not dimmed. */
+  color: var(--vscode-statusBar-foreground);
 }
 
 .status-bar .status-btn:hover {
@@ -27,6 +29,7 @@
 
 .status-bar .status-item {
   padding: 0 6px;
+  color: var(--vscode-statusBar-foreground);
 }
 
 .status-message {

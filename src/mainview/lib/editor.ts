@@ -163,7 +163,7 @@ const chromeStyles = {
     border: "none",
   },
   ".cm-lineNumbers .cm-gutterElement": {
-    padding: "0 10px 0 12px",
+    padding: "0 8px 0 4px",
     minWidth: "3ch",
   },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {

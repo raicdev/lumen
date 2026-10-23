@@ -4,7 +4,8 @@
   width: 16px;
 }
 .cm-comment-gutter:not(:has(.cm-comment-add)) {
-  display: none;
+  /* !important: CodeMirror's base theme sets display: flex !important on every gutter. */
+  display: none !important;
 }
 .cm-comment-gutter .cm-gutterElement {
   display: flex;

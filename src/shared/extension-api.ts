@@ -355,6 +355,11 @@ const BASE_CONTRIBUTION_SUPPORT: Record<string, Entry> = {
   ],
   jsonValidation: "supported",
   customEditors: "supported",
+  // Points of the Java extensions: redhat.java and the Java pack read them from extensions.all[].packageJSON.
+  javaExtensions: ["supported", "read by the Language Support for Java extension (redhat.java), not by Lumen"],
+  javaShortcuts: ["supported", "read by the Language Support for Java extension (redhat.java), not by Lumen"],
+  javaBuildFilePatterns: ["supported", "read by the Language Support for Java extension (redhat.java), not by Lumen"],
+  javaBuildTools: ["supported", "read by the Language Support for Java extension (redhat.java), not by Lumen"],
 };
 
 /* -- the tables with what the feature areas changed (shared/extension-support/<area>.ts) -- */

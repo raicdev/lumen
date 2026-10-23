@@ -189,7 +189,7 @@ export const COLOR_DEFAULTS: Record<string, [string, string]> = {
   "panelTitle.inactiveForeground": ["@descriptionForeground", "#6b6b6b"],
   "panelTitle.activeBorder": ["@focusBorder", "@focusBorder"],
   "statusBar.background": ["@titleBar.activeBackground", "@titleBar.activeBackground"],
-  "statusBar.foreground": ["@descriptionForeground", "#4b4b4b"],
+  "statusBar.foreground": ["@foreground", "@foreground"],
   "statusBar.border": ["#00000000", "#00000000"],
   "statusBar.debuggingBackground": ["#cc6633", "#cc6633"],
   "statusBar.debuggingForeground": ["#ffffff", "#ffffff"],

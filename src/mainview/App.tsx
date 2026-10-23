@@ -3004,7 +3004,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.2.2-beta.5", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.6", platform: navigator.platform }));
           await showAbout(info);
         },
       },

@@ -139,6 +139,8 @@ function overviewRuler(field: StateField<ExtensionDecorationState>) {
 
 const decorationTheme = EditorView.theme({
   ".cm-ext-gutter": { minWidth: "0", width: "auto", padding: "0" },
+  // No icon: no gutter (!important over CodeMirror's display: flex !important).
+  ".cm-ext-gutter:not(:has(.cm-ext-gutter-icon))": { display: "none !important" },
   ".cm-ext-gutter .cm-gutterElement": { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px" },
   ".cm-ext-gutter-icon": { display: "block", backgroundRepeat: "no-repeat", backgroundPosition: "center" },
   ".cm-ext-decoration-icon": { display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },

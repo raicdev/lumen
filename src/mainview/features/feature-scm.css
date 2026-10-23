@@ -108,7 +108,8 @@
 
 /* No changed line: no gutter. */
 .cm-scm-gutter:not(:has(.scm-quickdiff)) {
-  display: none;
+  /* !important: CodeMirror's base theme sets display: flex !important on every gutter. */
+  display: none !important;
 }
 
 .cm-scm-gutter .cm-gutterElement {
