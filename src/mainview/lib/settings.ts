@@ -61,6 +61,7 @@ export type Settings = {
   /** Product icon theme contributed by an extension (id or label); empty = default. */
   "workbench.productIconTheme": string;
   "terminal.integrated.fontSize": number;
+  "terminal.integrated.scrollback": number;
   /** Profile id (pwsh, powershell, cmd, gitbash, wsl, bash, …); empty = first available. */
   "terminal.integrated.defaultProfile": string;
   /** default: check at startup and every few hours, download in the background; manual: Help > Check for Updates only; none: never. */
@@ -113,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   "workbench.iconTheme": "",
   "workbench.productIconTheme": "",
   "terminal.integrated.fontSize": 13,
+  "terminal.integrated.scrollback": 1000,
   "terminal.integrated.defaultProfile": "",
   "update.mode": "default",
   "update.channel": "stable",
@@ -254,6 +256,15 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
   { key: "workbench.statusBar.visible", category: "Workbench", label: "Status Bar", description: "Controls the visibility of the status bar." },
   { key: "workbench.activityBar.visible", category: "Workbench", label: "Activity Bar", description: "Controls the visibility of the activity bar." },
   { key: "terminal.integrated.fontSize", category: "Terminal", label: "Font Size", description: "Controls the font size of the terminal.", min: 6, max: 40 },
+  {
+    key: "terminal.integrated.scrollback",
+    category: "Terminal",
+    label: "Scrollback",
+    description:
+      "Lines a terminal keeps for scrolling back. Older output is kept as plain text, which uses far less memory: Terminal: Show Full History opens all of it.",
+    min: 100,
+    max: 100000,
+  },
   {
     key: "terminal.integrated.defaultProfile",
     category: "Terminal",

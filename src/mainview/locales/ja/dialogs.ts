@@ -139,6 +139,10 @@ export const dialogs: Record<string, string> = {
   partial: "一部",
   barely: "わずか",
   limited: "制限あり",
+  Unsupported: "未サポート",
+  unsupported: "未サポート",
+  "None of the APIs and contribution points it uses work in Lumen; it will not work.":
+    "使用している API とコントリビューション ポイントはいずれも Lumen で動作しません。この拡張機能は動作しません。",
   "Everything this extension uses works in Lumen.": "この拡張機能が使用するものはすべて Lumen で動作します。",
   "Most of what it uses works in Lumen; a few features are missing or limited.":
     "使用しているものの大部分は Lumen で動作します。一部の機能は使用できないか、制限があります。",

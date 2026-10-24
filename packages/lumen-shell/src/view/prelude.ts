@@ -7,6 +7,7 @@
  *   - `onEnvelope(listener)`    → subscribe (with buffering) to envelopes
  *   - `installMenu(groups)`     → render the in-page menu bar (non-Windows)
  *   - `window.*`                → minimize / toggleMaximize / close / startDrag
+ *   - `show()`                  → show the window before `load` (a page with a splash)
  *   - `frameless`, `windowState` (+ `lumen:window-state` events)
  *
  * For frameless windows it also turns `[data-lumen-drag-region]` elements into
@@ -56,8 +57,12 @@ export function prelude(token: string, origin: string | null): string {
   }
 
   // Tells the shell the page has painted, so the (still invisible) window can
-  // be shown without a blank frame. The timeout covers throttled frames.
+  // be shown without a blank frame. The timeout covers throttled frames. By
+  // default on \`load\`; a page with a splash calls __lumen.show() sooner.
+  var showSignalled = false;
   function signalShow() {
+    if (showSignalled) return;
+    showSignalled = true;
     var sent = false;
     function send() {
       if (sent) return;
@@ -119,6 +124,7 @@ export function prelude(token: string, origin: string | null): string {
         try { listener(queue[i]); } catch (error) { console.error("[lumen]", error); }
       }
     },
+    show: function () { signalShow(); },
     installMenu: function (groups) { installMenu(groups); },
     menuAction: function (action) {
       if (typeof window.__lumen_invoke === "function") {

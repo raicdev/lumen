@@ -118,8 +118,8 @@ export type CompatReport = {
   apis: { name: string; status: SupportLevel; count: number; note?: string }[];
   contributions: { name: string; status: SupportLevel; note?: string }[];
   warnings: string[];
-  /** Summary: everything used is supported / some features missing / core features missing. */
-  level: "full" | "partial" | "limited";
+  /** Summary: everything used is supported / some features missing / core features missing / nothing it uses works. */
+  level: "full" | "partial" | "limited" | "unsupported";
   /** Share (0–100) of the distinct APIs and contribution points it uses that work in Lumen; partial ones count half. */
   coverage?: number;
   /** With level "partial": how much of it works, by coverage (high: most of it, medium: about half, low: little). */

@@ -103,6 +103,8 @@ export function TerminalHost({ id, active, onFocus, editor }: { id: string; acti
                     run: () => void terminalService.copySelection(id),
                   },
                   { type: "item", label: t("Paste"), action: "paste", run: () => void terminalService.paste(id) },
+                  { type: "separator" },
+                  { type: "item", label: t("Show Full History"), action: "history", run: () => terminalService.showHistory(id) },
                 ],
               )
           : undefined
@@ -111,7 +113,7 @@ export function TerminalHost({ id, active, onFocus, editor }: { id: string; acti
   );
 }
 
-export type TerminalMenuAction = "rename" | "split" | "unsplit" | "move-to-editor" | "relaunch" | "kill";
+export type TerminalMenuAction = "rename" | "split" | "unsplit" | "move-to-editor" | "relaunch" | "kill" | "history";
 
 type PanelProps = {
   visible: boolean;
@@ -139,6 +141,8 @@ export function TerminalPanelView({ visible, onAction }: PanelProps) {
         ? [
             { type: "item" as const, label: t("Copy"), action: "copy", disabled: !terminalService.hasSelection(id) },
             { type: "item" as const, label: t("Paste"), action: "paste" },
+            { type: "separator" as const },
+            { type: "item" as const, label: t("Show Full History"), action: "history" },
             { type: "separator" as const },
           ]
         : []),

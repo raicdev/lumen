@@ -180,6 +180,7 @@ export const APP_MENU: MenuGroup[] = [
       sep,
       cmd("workbench.action.terminal.toggleTerminal", "Toggle Terminal"),
       cmd("workbench.action.terminal.clear", "Clear Terminal"),
+      cmd("lumen.terminal.showFullHistory", "Show Full Terminal History"),
       cmd("workbench.action.terminal.kill", "Kill Terminal"),
       cmd("workbench.action.terminal.selectDefaultShell", "Select Default Profile…"),
     ],

@@ -220,6 +220,8 @@ test("an extension whose APIs are all unsupported is limited, not partial", () =
     level: "partial" as const,
   };
   assert.equal(refreshReport(stale, manifest).level, "limited");
+  // Not even a contribution point works: unsupported.
+  assert.equal(refreshReport(stale, { ...manifest, contributes: {} }).level, "unsupported");
   // One working API is enough for partial.
   const mixed = { ...stale, apis: [...stale.apis, { name: "commands.registerCommand", status: "supported" as const, count: 1 }] };
   assert.equal(refreshReport(mixed, manifest).level, "partial");

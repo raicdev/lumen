@@ -3,11 +3,14 @@ import { Emitter } from "../shared/emitter.ts";
 import type { RpcApi, RpcHandlers, RPCSchema } from "../shared/protocol.ts";
 import type { Envelope } from "../shared/protocol.ts";
 import { RpcEndpoint, createApi } from "../shared/rpc.ts";
-import { NativeWebview, SizeHint, type NativeHandle } from "./native/webview.ts";
+import { NativeWebview, SizeHint, type MemoryUsageTargetLevel, type NativeHandle } from "./native/webview.ts";
 import { platform } from "./native/index.ts";
 import type { MenuGroup, PageRect, ResizeEdge, WindowState } from "./native/platform.ts";
 import { prelude } from "../view/prelude.ts";
 import { app } from "./app.ts";
+
+/** How long a window stays in the background (another app in front) before WebView2 may trim its memory. */
+const BACKGROUND_MEMORY_DELAY_MS = 60_000;
 
 export type CloseGuard = () => boolean | Promise<boolean>;
 
@@ -127,6 +130,10 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
   #readyToShow = false;
   #revealTimer: ReturnType<typeof setTimeout> | null = null;
   #state: WindowState = "normal";
+  /** Set while the window is in the background; when it fires, WebView2 may give memory back. */
+  #backgroundTimer: ReturnType<typeof setTimeout> | null = null;
+  #inBackground = false;
+  #memoryLevel: MemoryUsageTargetLevel = "normal";
 
   constructor(options: BrowserWindowOptions<S> = {}) {
     const width = options.width ?? 1024;
@@ -346,6 +353,7 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
         // webview_destroy() again here.
         if (self.#destroyed) return;
         self.#destroyed = true;
+        self.#clearBackgroundTimer();
         self.#endpoint.close("Window was closed");
         app.unregisterWindow(self as unknown as BrowserWindow<RPCSchema>);
         self.events.emit("closed");
@@ -356,20 +364,47 @@ export class BrowserWindow<S extends RPCSchema = RPCSchema> {
       onStateChange: (state: WindowState) => {
         if (state === self.#state) return;
         const wasMaximized = self.#state === "maximized";
-        const wasMinimized = self.#state === "minimized";
         self.#state = state;
-        // A minimized window lets WebView2 give memory back until it is shown again.
-        if (state === "minimized") self.#native.setMemoryUsageTargetLevel("low");
-        else if (wasMinimized) self.#native.setMemoryUsageTargetLevel("normal");
+        self.#updateMemoryLevel();
         if (state === "maximized") self.events.emit("maximize");
         else if (wasMaximized && state === "normal") self.events.emit("unmaximize");
         self.#pushWindowState();
+      },
+      onActiveChange: (active: boolean) => {
+        self.#clearBackgroundTimer();
+        if (active) {
+          self.#inBackground = false;
+          self.#updateMemoryLevel();
+        } else {
+          self.#backgroundTimer = setTimeout(() => {
+            self.#backgroundTimer = null;
+            self.#inBackground = true;
+            self.#updateMemoryLevel();
+          }, BACKGROUND_MEMORY_DELAY_MS);
+        }
       },
       onMaximizeButtonState: ({ hover, pressed }: { hover: boolean; pressed: boolean }) => {
         if (!self.#ready || self.#destroyed) return;
         self.#native.eval(`window.__lumen && window.__lumen.setMaximizeButtonState(${hover}, ${pressed})`);
       },
     };
+  }
+
+  /**
+   * A minimized window, or one left in the background for a while, lets
+   * WebView2 give memory back (MemoryUsageTargetLevel low) until it is used again.
+   */
+  #updateMemoryLevel(): void {
+    if (this.#destroyed) return;
+    const level: MemoryUsageTargetLevel = this.#state === "minimized" || this.#inBackground ? "low" : "normal";
+    if (level === this.#memoryLevel) return;
+    this.#memoryLevel = level;
+    this.#native.setMemoryUsageTargetLevel(level);
+  }
+
+  #clearBackgroundTimer(): void {
+    if (this.#backgroundTimer) clearTimeout(this.#backgroundTimer);
+    this.#backgroundTimer = null;
   }
 
   #clearRevealTimer(): void {

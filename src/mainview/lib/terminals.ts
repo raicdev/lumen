@@ -1,4 +1,4 @@
-import { Terminal, type ILink } from "@xterm/xterm";
+import { Terminal, type IBuffer, type ILink } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { api } from "./rpc";
 import { onColorThemeChange, themeColor } from "./theme";
@@ -83,7 +83,25 @@ type Instance = {
   interacted: boolean;
   exitCode: number | null | undefined;
   integration: ShellIntegrationParser;
+  /**
+   * Output older than the scrollback, as plain text (see archiveOverflow): one
+   * string per batch, its lines joined by "\n", oldest first.
+   */
+  archive: { text: string; lines: number }[];
+  archivedLines: number;
+  /** "Earlier output" bar shown at the top of the scrollback while there is an archive. */
+  historyBar: HTMLDivElement | null;
 };
+
+/**
+ * xterm stores ~12 bytes per cell (a full 200-column line is ~2.4 KB), plain
+ * text a byte or two per character. A terminal keeps `scrollback` lines in
+ * xterm and moves older ones into its archive, in batches: xterm may hold up
+ * to this many lines more, so output arriving between two checks is not lost.
+ */
+const ARCHIVE_HEADROOM = 1000;
+/** Lines kept in a terminal's archive; older ones are dropped. */
+const ARCHIVE_MAX_LINES = 100_000;
 
 export type TerminalInfo = {
   id: string;
@@ -103,6 +121,21 @@ export type TerminalSnapshot = {
   activeGroup: number;
   activeId: string | null;
 };
+
+/** The text of buffer rows [start, end), wrapped rows joined into their logical lines. */
+function logicalLines(buffer: IBuffer, start: number, end: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (let index = start; index < end; index++) {
+    const wrapsOn = index + 1 < end && !!buffer.getLine(index + 1)?.isWrapped;
+    // A row that wraps on keeps its trailing spaces: they are part of the line.
+    line += buffer.getLine(index)?.translateToString(!wrapsOn) ?? "";
+    if (wrapsOn) continue;
+    lines.push(line);
+    line = "";
+  }
+  return lines;
+}
 
 /** xterm's colors from the active color theme (terminal.* colors). */
 function terminalTheme() {
@@ -164,6 +197,8 @@ class TerminalService {
   private seq = 0;
   private defaultCwd = "";
   private fontSize = 13;
+  private scrollback = 1000;
+  private historyOpener: ((id: string) => void) | null = null;
   private listeners = new Set<() => void>();
   private eventListeners = new Set<(event: TerminalEvent) => void>();
   private linkProvider: TerminalLinkProvider | null = null;
@@ -280,6 +315,87 @@ class TerminalService {
     for (const instance of this.instances.values()) instance.term.options.theme = theme;
   }
 
+  /** Lines each terminal keeps in xterm (terminal.integrated.scrollback); older ones go to its archive. */
+  setScrollback(lines: number) {
+    if (lines === this.scrollback) return;
+    this.scrollback = lines;
+    for (const instance of this.instances.values()) {
+      // Archived first, so a smaller scrollback does not drop lines.
+      this.archiveOverflow(instance, true);
+      instance.term.options.scrollback = lines + ARCHIVE_HEADROOM;
+    }
+  }
+
+  /** Opens a terminal's full history (Terminal: Show Full History); set by the workbench. */
+  setHistoryOpener(opener: ((id: string) => void) | null) {
+    this.historyOpener = opener;
+  }
+
+  /** Opens the terminal's full history in an editor (through the workbench's opener). */
+  showHistory(id: string) {
+    this.historyOpener?.(id);
+  }
+
+  /* ── history ──────────────────────────────────────────────────────────── */
+
+  /**
+   * Moves the lines above the scrollback out of xterm into the archive, once
+   * half the headroom is used (`now`: whatever is above it). xterm has no API
+   * to drop lines: lowering its scrollback option trims them from the top,
+   * then it is raised again.
+   */
+  private archiveOverflow(instance: Instance, now = false) {
+    const { term } = instance;
+    const buffer = term.buffer.normal;
+    let count = buffer.length - term.rows - this.scrollback;
+    if (count <= 0 || (!now && count < ARCHIVE_HEADROOM / 2)) return;
+    // Cut between logical lines: a wrapped line stays whole on one side.
+    while (count > 0 && buffer.getLine(count)?.isWrapped) count--;
+    if (!count) return;
+    // Joined into one flat string: xterm builds a line's text a character at a time, and
+    // kept as is, each line would stay a chain of string pieces (~20 bytes per character).
+    const lines = logicalLines(buffer, 0, count);
+    instance.archive.push({ text: lines.join("\n"), lines: lines.length });
+    instance.archivedLines += lines.length;
+    while (instance.archivedLines - instance.archive[0]!.lines >= ARCHIVE_MAX_LINES) instance.archivedLines -= instance.archive.shift()!.lines;
+    term.options.scrollback = buffer.length - term.rows - count;
+    term.options.scrollback = this.scrollback + ARCHIVE_HEADROOM;
+    this.updateHistoryBar(instance);
+  }
+
+  /** The bar offering the full history, while the scrollback is shown from its first line. */
+  private updateHistoryBar(instance: Instance) {
+    const { buffer } = instance.term;
+    const show = instance.archivedLines > 0 && buffer.active === buffer.normal && buffer.normal.viewportY === 0;
+    if (!show) {
+      instance.historyBar?.remove();
+      instance.historyBar = null;
+      return;
+    }
+    if (!instance.historyBar) {
+      const bar = document.createElement("div");
+      bar.className = "terminal-history-bar";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = t("Show Full History");
+      button.addEventListener("click", () => this.showHistory(instance.id));
+      bar.append(document.createElement("span"), button);
+      instance.el.append(bar);
+      instance.historyBar = bar;
+    }
+    instance.historyBar.firstChild!.textContent = t("{0} earlier lines are not shown here.", instance.archivedLines.toLocaleString());
+  }
+
+  /** Everything the terminal printed that is still kept: the archive, then xterm's normal buffer. */
+  historyText(id: string): string | null {
+    const instance = this.instances.get(id);
+    if (!instance) return null;
+    const buffer = instance.term.buffer.normal;
+    const lines = [...instance.archive.map((batch) => batch.text), ...logicalLines(buffer, 0, buffer.length)];
+    while (lines.length && !lines.at(-1)) lines.pop();
+    return lines.join("\n");
+  }
+
   setFontSize(size: number) {
     this.fontSize = size;
     for (const instance of this.instances.values()) {
@@ -326,7 +442,7 @@ class TerminalService {
       lineHeight: 1.2,
       theme: terminalTheme(),
       allowProposedApi: true,
-      scrollback: 5000,
+      scrollback: this.scrollback + ARCHIVE_HEADROOM,
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -358,8 +474,13 @@ class TerminalService {
       interacted: false,
       exitCode: undefined,
       integration: new ShellIntegrationParser(),
+      archive: [],
+      archivedLines: 0,
+      historyBar: null,
     };
     this.instances.set(id, instance);
+    term.onWriteParsed(() => this.archiveOverflow(instance));
+    term.onScroll(() => this.updateHistoryBar(instance));
     if (options.message) term.write(`${options.message.replace(/\r?\n/g, "\r\n")}\r\n`);
 
     term.onData((data) => {
@@ -566,6 +687,10 @@ class TerminalService {
 
   clear(id: string | null) {
     const instance = id ? this.instances.get(id) : null;
+    if (instance) {
+      instance.archive = [];
+      instance.archivedLines = 0;
+    }
     instance?.term.clear();
     instance?.term.focus();
   }

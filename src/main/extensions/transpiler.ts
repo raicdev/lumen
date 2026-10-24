@@ -245,8 +245,9 @@ function coverageOf(report: Pick<CompatReport, "apis" | "contributions">): numbe
 }
 
 function summarize(report: Omit<CompatReport, keyof Rating>): Rating {
-  const level = levelOf(report);
   const coverage = coverageOf(report);
+  // None of the APIs and contribution points it uses works (coverage is 100 when it uses none).
+  const level = coverage === 0 ? "unsupported" : levelOf(report);
   // partialGrade is always set (undefined too), so it replaces the grade of a stored report.
   if (level !== "partial") return { level, coverage, partialGrade: undefined };
   const partialGrade = coverage >= PARTIAL_HIGH ? "high" : coverage >= PARTIAL_MEDIUM ? "medium" : "low";

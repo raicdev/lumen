@@ -53,7 +53,7 @@ function CompatibilityView({ kind, report, note }: { kind: "lumen" | "vscode"; r
         <strong>{t(grade.label)}</strong>
         <span>
           {t(grade.text)}
-          {report.coverage !== undefined && report.level !== "full" && ` ${t("{0}% of the APIs and contribution points it uses work.", report.coverage)}`}
+          {report.coverage !== undefined && report.level !== "full" && report.level !== "unsupported" && ` ${t("{0}% of the APIs and contribution points it uses work.", report.coverage)}`}
         </span>
       </div>
       <p className="ext-compat-note">{note}</p>

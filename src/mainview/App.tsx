@@ -33,6 +33,7 @@ import { ContainerIcon, ViewContainerView, WebviewSlot } from "./components/Webv
 import { isTerminalTab, terminalIdOf, terminalService, terminalTabPath } from "./lib/terminals";
 import { showDialog, showPrompt, showAbout } from "./lib/dialog";
 import { COMPAT_GRADES, compatGrade } from "./lib/compat";
+import { hideSplash } from "./lib/splash";
 import { notify, toast } from "./lib/toast";
 import { extensionService, useExtensions } from "./lib/extensions";
 import { treeService, useTreeViews } from "./lib/trees";
@@ -1957,6 +1958,9 @@ export function App() {
         }
         break;
       }
+      case "history":
+        void showTerminalHistory(id);
+        break;
       case "rename":
         void showPrompt({ title: t("Rename Terminal"), message: t("Enter a name for the terminal"), defaultValue: terminalService.info(id)?.title ?? "" }).then(
           (name) => {
@@ -1998,7 +2002,7 @@ export function App() {
     if (extension.kind === "vscode" && level && level !== "full") {
       const grade = compatGrade(extension.compat);
       void notify(
-        grade === "limited" || grade === "low" ? "warning" : "info",
+        grade === "unsupported" || grade === "limited" || grade === "low" ? "warning" : "info",
         t("{0} was converted from a VS Code extension. Compatibility: {1} — {2}", name, COMPAT_GRADES[grade].label.toLowerCase(), COMPAT_GRADES[grade].text),
         [t("Show Compatibility")],
         t("Extensions"),
@@ -2116,6 +2120,22 @@ export function App() {
       await openFile(path);
     },
     [openFile, setTabs],
+  );
+
+  /** Terminal: Show Full History: what the terminal printed (older output included) as a read-only untitled editor. */
+  const showTerminalHistory = useCallback(
+    async (id: string) => {
+      const content = terminalService.historyText(id);
+      if (content === null) return;
+      const path = `untitled:${t("History of {0}", terminalService.info(id)?.title ?? "terminal")}`;
+      // Shown again, it has the output as it is now.
+      if (docs.current.has(path)) await closeTabs([path]);
+      docs.current.set(path, { content, savedContent: content, language: "plaintext", eol: "LF", savedEol: "LF", readOnly: true });
+      setTabs((prev) => [...prev.filter((tab) => tab.path !== path), { path, name: path.replace(/^untitled:/, ""), dirty: false, preview: false }]);
+      // The latest output is at the end.
+      await openFile(path, { line: content.split("\n").length - 1 });
+    },
+    [closeTabs, openFile, setTabs],
   );
 
   const setDocumentLanguage = useCallback(
@@ -2365,6 +2385,7 @@ export function App() {
     openActiveEditorInModal,
     applyWorkspaceEdits,
     openUntitledAt,
+    showTerminalHistory,
     setDocumentLanguage,
     revertDocument,
     reopenWithEditor,
@@ -2793,6 +2814,16 @@ export function App() {
       { id: "workbench.action.terminal.focusPrevious", title: "Focus Previous Terminal", category: "Terminal", run: () => terminalService.cycle(-1) },
       { id: "workbench.action.terminal.clear", title: "Clear", category: "Terminal", run: () => terminalService.clear(activeTerminalId()) },
       {
+        id: "lumen.terminal.showFullHistory",
+        title: "Show Full History",
+        category: "Terminal",
+        enabled: () => !!activeTerminalId(),
+        run: () => {
+          const id = activeTerminalId();
+          if (id) void a().showTerminalHistory(id);
+        },
+      },
+      {
         id: "workbench.action.terminal.kill",
         title: "Kill the Active Terminal Instance",
         category: "Terminal",
@@ -3043,7 +3074,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.7", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.8", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -4057,9 +4088,11 @@ export function App() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Extensions start once the last workspace (and its editors) is back.
+  // Extensions start once the last workspace (and its editors) is back; the splash gives way to it.
   useEffect(() => {
-    if (startupDone) void extensionService.start(workspaceRootRef.current);
+    if (!startupDone) return;
+    hideSplash();
+    void extensionService.start(workspaceRootRef.current);
   }, [startupDone]);
   // Then the unsaved editors the last session left behind.
   const backupsRestored = useRef(false);
@@ -4307,7 +4340,13 @@ export function App() {
 
   useEffect(() => {
     terminalService.setFontSize(settings["terminal.integrated.fontSize"]);
+    terminalService.setScrollback(settings["terminal.integrated.scrollback"]);
   }, [settings]);
+
+  useEffect(() => {
+    terminalService.setHistoryOpener((id) => void act.current.showTerminalHistory(id));
+    return () => terminalService.setHistoryOpener(null);
+  }, []);
 
   // The terminal panel is never shown empty: open one when it is revealed, or
   // when another project (without saved terminals) opens.

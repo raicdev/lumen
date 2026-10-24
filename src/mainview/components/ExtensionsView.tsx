@@ -72,7 +72,7 @@ function nameList(names: string[], max = 5): string {
 /**
  * A VS Code extension's compatibility, as a colored VS Code logo next to its
  * name (green: supported; yellow-green, yellow or orange: mostly, half or barely
- * supported; red: limited). Hovering shows what
+ * supported; red: limited or unsupported). Hovering shows what
  * is missing; the details page has the full report.
  */
 export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
@@ -97,7 +97,7 @@ export function CompatIcon({ extension }: { extension: ExtensionDescription }) {
         {t("VS Code extension")} · {t(info.label)}
       </div>
       <p>{report ? t(info.text) : t("Not analyzed yet: open the details to check it.")}</p>
-      {report?.coverage !== undefined && report.level !== "full" && (
+      {report?.coverage !== undefined && report.level !== "full" && report.level !== "unsupported" && (
         <p>
           <b>{t("Works:")}</b> {t("{0}% of the APIs and contribution points it uses", report.coverage)}
         </p>

@@ -113,6 +113,7 @@ function symbols(): ReturnType<typeof loadUser32> {
 const PM_REMOVE = 0x0001;
 const WM_DESTROY = 0x0002;
 const WM_SIZE = 0x0005;
+const WM_ACTIVATE = 0x0006;
 const WM_CLOSE = 0x0010;
 const WM_QUIT = 0x0012;
 const WM_COMMAND = 0x0111;
@@ -259,6 +260,13 @@ function wndProc(handle: NativeHandle | null, message: number, wParam: number | 
       }
     }
     return result;
+  } else if (message === WM_ACTIVATE) {
+    // LOWORD(wParam): WA_INACTIVE (0), or how it was activated (click or not).
+    try {
+      entry.hooks.onActiveChange?.((BigInt(wParam) & 0xffffn) !== 0n);
+    } catch {
+      /* ignore */
+    }
   } else if (message === WM_CLOSE) {
     if (entry.hooks.hasCloseGuard()) {
       try {

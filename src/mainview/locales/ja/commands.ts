@@ -95,6 +95,8 @@ export const commands: Record<string, string> = {
   "Split Terminal": "ターミナルの分割",
   "Rename Terminal…": "ターミナルの名前を変更…",
   "Clear Terminal": "ターミナルのクリア",
+  "Show Full Terminal History": "ターミナルの全履歴を表示",
+  "Show Full History": "全履歴を表示",
   "Kill Terminal": "ターミナルの強制終了",
   "Select Default Profile…": "既定のプロファイルの選択…",
   "Keyboard Shortcuts Reference": "キーボード ショートカットの参照",

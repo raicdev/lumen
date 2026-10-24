@@ -92,6 +92,9 @@ export const settings: Record<string, string> = {
   "Activity Bar": "アクティビティ バー",
   "Controls the visibility of the activity bar.": "アクティビティ バーの表示を制御します。",
   "Controls the font size of the terminal.": "ターミナルのフォント サイズを制御します。",
+  Scrollback: "スクロールバック",
+  "Lines a terminal keeps for scrolling back. Older output is kept as plain text, which uses far less memory: Terminal: Show Full History opens all of it.":
+    "ターミナルでスクロールして戻れる行数です。それより古い出力はメモリをあまり使わないプレーン テキストとして保持され、「ターミナル: 全履歴を表示」ですべて開けます。",
   "Default Profile": "既定のプロファイル",
   "Shell used for new terminals: pwsh, powershell, cmd, gitbash, wsl (Windows) or bash, zsh, … Empty uses the first available. Also: Terminal: Select Default Profile.":
     "新しいターミナルで使うシェル: pwsh、powershell、cmd、gitbash、wsl (Windows) または bash、zsh など。空の場合は最初に見つかったものを使います。ターミナル: 既定のプロファイルの選択 からも変更できます。",

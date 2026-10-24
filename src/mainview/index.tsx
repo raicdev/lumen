@@ -6,6 +6,7 @@ import { reloadConfiguredColorTheme } from "./lib/theme";
 import { startUpdates } from "./lib/updates";
 import "./lib/ui-style"; // modern / legacy look (workbench.style)
 import "./lib/tooltip"; // the workbench's own tooltips in place of the browser's
+import "./lib/splash"; // the startup splash, hidden by App once the workspace is restored
 
 // First, so the main process reads extension manifests in the display language.
 startDisplayLanguage();

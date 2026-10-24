@@ -137,7 +137,9 @@ Release <version>: <three or four headline changes>
 
 Co-Authored-By: <the attribution line from the session's system reminder>
 EOF
-git tag -a v<version> -m "Lumen v<version>"
+git tag -s v<version> -m "Lumen v<version>"
+git cat-file commit HEAD | grep -c "BEGIN SSH SIGNATURE"         # must print 1
+git cat-file tag v<version> | grep -c "BEGIN SSH SIGNATURE"      # must print 1
 git push origin main && git push origin v<version>
 ```
 

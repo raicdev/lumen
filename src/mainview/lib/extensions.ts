@@ -57,7 +57,18 @@ export type ContributedCommand = {
 
 export type ContributedKeybinding = { key: string; command: string; when?: string; args?: unknown; extensionId: string };
 
-export type ContributedSetting = { key: string; property: ConfigurationProperty; title: string; extensionId: string; extensionName: string };
+export type ContributedSetting = {
+  key: string;
+  property: ConfigurationProperty;
+  /** Title of the configuration section (falls back to the extension name). */
+  title: string;
+  /** Settings editor group: the section title, or the extension name when it contributes several sections. */
+  category: string;
+  /** The section within `category` when the extension contributes several sections. */
+  subcategory?: string;
+  extensionId: string;
+  extensionName: string;
+};
 
 export type ExtensionsSnapshot = {
   /** The host is up and has sent its extension list. */
@@ -566,11 +577,19 @@ class ExtensionService {
     const out: ContributedSetting[] = [];
     for (const extension of this.#snapshot.extensions) {
       const name = extension.manifest.displayName ?? extension.manifest.name;
-      for (const section of [extension.manifest.contributes?.configuration ?? []].flat()) {
+      // Like VS Code: several sections become sub-categories of the extension, ordered by `order`
+      // (sections without one last); a section titled like the extension stays at the extension itself.
+      const sections = [extension.manifest.contributes?.configuration ?? []]
+        .flat()
+        .sort((a, b) => (a.order ?? Number.MAX_VALUE) - (b.order ?? Number.MAX_VALUE));
+      for (const section of sections) {
+        const title = section.title ?? name;
+        const category = sections.length > 1 ? name : title;
+        const subcategory = title !== category ? title : undefined;
         const entries = Object.entries(section.properties ?? {}).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
         for (const [key, property] of entries) {
           if (property.deprecationMessage || property.markdownDeprecationMessage) continue;
-          out.push({ key, property, title: section.title ?? name, extensionId: extension.id, extensionName: name });
+          out.push({ key, property, title, category, subcategory, extensionId: extension.id, extensionName: name });
         }
       }
     }

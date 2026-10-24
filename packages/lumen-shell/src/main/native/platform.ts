@@ -12,6 +12,8 @@ export type WindowHooks = {
   onMenuAction: (action: string) => void;
   /** The window was maximized, restored or minimized. */
   onStateChange?: (state: WindowState) => void;
+  /** The window became the foreground window, or another one did. */
+  onActiveChange?: (active: boolean) => void;
   /** Hover / press state of the snap-layout maximize button region changed. */
   onMaximizeButtonState?: (state: { hover: boolean; pressed: boolean }) => void;
 };

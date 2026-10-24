@@ -139,6 +139,8 @@ export const views: Record<string, string> = {
   // TerminalView
   "Unsplit Terminal": "ターミナルの分割解除",
   "Relaunch Active Terminal": "アクティブなターミナルの再起動",
+  "{0} earlier lines are not shown here.": "これより前の {0} 行はここには表示されません。",
+  "History of {0}": "{0} の履歴",
   "Create a new terminal": "新しいターミナルを作成",
   Terminals: "ターミナル",
   "{0} (exited)": "{0} (終了済み)",

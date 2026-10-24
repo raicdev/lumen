@@ -6,8 +6,119 @@
     <title>Lumen</title>
     <link rel="stylesheet" href="index.css" />
     <link id="modern-css" rel="stylesheet" href="modern.css" />
+    <style>
+      /* Startup splash: shown before any script runs, removed by lib/splash.ts once the workbench is restored. */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #111113;
+        transition: opacity 0.35s ease;
+      }
+      #splash svg {
+        width: 96px;
+        height: 96px;
+        overflow: visible;
+      }
+      #splash .splash-glow {
+        transform-origin: 128px 132px;
+        animation: splash-glow 1.6s ease-in-out infinite alternate;
+      }
+      #splash .splash-star {
+        transform-origin: 128px 132px;
+        animation: splash-star 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+      }
+      #splash .splash-sparkle {
+        transform-origin: 190px 72px;
+        animation:
+          splash-star 0.5s 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both,
+          splash-twinkle 1.6s 0.85s ease-in-out infinite;
+      }
+      #splash.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash.hidden svg {
+        transform: scale(1.15);
+        transition: transform 0.35s ease;
+      }
+      #root.revealing {
+        animation: splash-reveal 0.35s ease both;
+      }
+      @keyframes splash-star {
+        from {
+          opacity: 0;
+          transform: scale(0.2) rotate(-45deg);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-glow {
+        from {
+          opacity: 0.4;
+          transform: scale(0.85);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
+      @keyframes splash-twinkle {
+        50% {
+          opacity: 0.35;
+          transform: scale(0.7);
+        }
+      }
+      @keyframes splash-reveal {
+        from {
+          opacity: 0;
+          transform: scale(0.985);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash *,
+        #splash.hidden svg,
+        #root.revealing {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 256 256">
+        <defs>
+          <radialGradient id="splash-glow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#ffcf6b" stop-opacity="0.55" />
+            <stop offset="0.45" stop-color="#ff9d4d" stop-opacity="0.18" />
+            <stop offset="1" stop-color="#ff9d4d" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="splash-star" x1="0.2" y1="0.1" x2="0.8" y2="0.9">
+            <stop offset="0" stop-color="#fffaf0" />
+            <stop offset="0.5" stop-color="#ffd27a" />
+            <stop offset="1" stop-color="#ff9447" />
+          </linearGradient>
+        </defs>
+        <circle class="splash-glow" cx="128" cy="132" r="104" fill="url(#splash-glow)" />
+        <path class="splash-star" d="M128 40 Q137 123 216 132 Q137 141 128 224 Q119 141 40 132 Q119 123 128 40 Z" fill="url(#splash-star)" />
+        <path
+          class="splash-sparkle"
+          d="M190 50 Q193 69 210 72 Q193 75 190 94 Q187 75 170 72 Q187 69 190 50 Z"
+          fill="#fff3d6"
+          fill-opacity="0.9"
+        />
+      </svg>
+    </div>
+    <script>
+      // The window stays hidden until the page has loaded: show it as soon as the splash is painted.
+      window.__lumen?.show?.();
+    </script>
     <div id="root"></div>
     <div id="toast-host" class="toast-host"></div>
     <script type="module" src="index.js"></script>

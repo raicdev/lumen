@@ -1,6 +1,6 @@
-import { RotateCcw, X } from "lucide-react";
+import { ChevronRight, RotateCcw, X } from "lucide-react";
 import { ModalEditorTitleActions } from "../features/menus-walkthroughs/MenuActions";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   SETTINGS_SCHEMA,
   configurationDefaultLanguages,
@@ -118,21 +118,76 @@ function ExtensionSettingRow({ setting }: { setting: ContributedSetting }) {
 
 type Props = { open: boolean; onClose: () => void };
 
-type TocEntry = { category: string; label: string; count: number; child?: boolean };
+type TocEntry = {
+  category: string;
+  label: string;
+  count: number;
+  depth?: number;
+  /** An extension with sub-categories: collapsible. */
+  expandable?: boolean;
+  /** The extension a sub-category belongs to (its category). */
+  parent?: string;
+};
 
-/** Category table of contents: core categories, then each extension's settings under "Extensions". */
-function SettingsToc({ entries, active, onSelect }: { entries: TocEntry[]; active: string | null; onSelect: (category: string) => void }) {
+/** An extension's settings group, with the sub-categories of its configuration sections. */
+type ExtensionGroup = { settings: ContributedSetting[]; subcategories: Map<string, ContributedSetting[]> };
+
+/**
+ * Category table of contents: core categories, then each extension's settings under "Extensions".
+ * Extensions with sub-categories start collapsed; all are expanded while filtering.
+ */
+function SettingsToc({
+  entries,
+  active,
+  expandAll,
+  onSelect,
+}: {
+  entries: TocEntry[];
+  active: string | null;
+  expandAll: boolean;
+  onSelect: (category: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const isExpanded = (category: string) => expandAll || expanded.has(category);
+  const toggle = (category: string, open = !expanded.has(category)) =>
+    setExpanded((current) => {
+      if (current.has(category) === open) return current;
+      const next = new Set(current);
+      if (open) next.add(category);
+      else next.delete(category);
+      return next;
+    });
+  // A sub-category scrolled to under a collapsed extension highlights the extension.
+  const activeEntry = entries.find((entry) => entry.category === active);
+  const highlighted = activeEntry?.parent && !isExpanded(activeEntry.parent) ? activeEntry.parent : active;
   return (
     <nav className="settings-toc" aria-label={t("Setting categories")}>
       {entries.map((entry) =>
-        entry.category ? (
+        entry.parent && !isExpanded(entry.parent) ? null : entry.category ? (
           <button
             key={entry.category}
             type="button"
-            className={`settings-toc-item${entry.child ? " child" : ""}${entry.category === active ? " active" : ""}`}
+            className={`settings-toc-item${entry.depth ? ` depth-${entry.depth}` : ""}${entry.category === highlighted ? " active" : ""}`}
             title={entry.label}
-            onClick={() => onSelect(entry.category)}
+            aria-expanded={entry.expandable ? isExpanded(entry.category) : undefined}
+            onClick={() => {
+              if (entry.expandable) toggle(entry.category, true);
+              onSelect(entry.category);
+            }}
           >
+            {entry.expandable ? (
+              <span
+                className={`settings-toc-chevron${isExpanded(entry.category) ? " open" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!expandAll) toggle(entry.category);
+                }}
+              >
+                <ChevronRight size={12} />
+              </span>
+            ) : (
+              entry.depth === 1 && <span className="settings-toc-chevron" />
+            )}
             <span className="settings-toc-label">{entry.label}</span>
             <span className="settings-toc-count">{entry.count}</span>
           </button>
@@ -210,14 +265,16 @@ export function SettingsEditor({ open, onClose }: Props) {
 
   const extensionGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const map = new Map<string, ContributedSetting[]>();
+    const map = new Map<string, ExtensionGroup>();
     for (const setting of extensionService.contributedSettings()) {
       if (modifiedOnly && !extensionService.isExtensionSettingModified(setting.key)) continue;
       const haystack =
         `${setting.key} ${setting.title} ${setting.property.description ?? setting.property.markdownDescription ?? ""} ${setting.extensionName}`.toLowerCase();
       if (q && !q.split(/\s+/).every((word) => haystack.includes(word))) continue;
-      const category = `Extensions › ${setting.title}`;
-      map.set(category, [...(map.get(category) ?? []), setting]);
+      const group: ExtensionGroup = map.get(setting.category) ?? { settings: [], subcategories: new Map() };
+      map.set(setting.category, group);
+      if (setting.subcategory) group.subcategories.set(setting.subcategory, [...(group.subcategories.get(setting.subcategory) ?? []), setting]);
+      else group.settings.push(setting);
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,8 +284,13 @@ export function SettingsEditor({ open, onClose }: Props) {
     const entries: TocEntry[] = [...groups].map(([category, list]) => ({ category, label: t(category), count: list.length }));
     if (extensionGroups.size) {
       entries.push({ category: "", label: t("Extensions"), count: 0 });
-      for (const [category, list] of extensionGroups) {
-        entries.push({ category, label: category.replace(/^Extensions › /, ""), count: list.length, child: true });
+      for (const [name, group] of extensionGroups) {
+        const count = group.settings.length + [...group.subcategories.values()].reduce((sum, list) => sum + list.length, 0);
+        const parent = `Extensions › ${name}`;
+        entries.push({ category: parent, label: name, count, depth: 1, expandable: group.subcategories.size > 0 });
+        for (const [sub, list] of group.subcategories) {
+          entries.push({ category: `${parent} › ${sub}`, label: sub, count: list.length, depth: 2, parent });
+        }
       }
     }
     return entries;
@@ -313,7 +375,7 @@ export function SettingsEditor({ open, onClose }: Props) {
           </button>
         </div>
         <div className="settings-content">
-          <SettingsToc entries={toc} active={activeCategory} onSelect={selectCategory} />
+          <SettingsToc entries={toc} active={activeCategory} expandAll={!!query.trim() || modifiedOnly} onSelect={selectCategory} />
           <div
             className="settings-body"
             ref={bodyRef}
@@ -382,13 +444,23 @@ export function SettingsEditor({ open, onClose }: Props) {
                 })}
               </section>
             ))}
-            {[...extensionGroups].map(([category, entries]) => (
-              <section key={category} className="settings-section" data-category={category}>
-                <h3>{category.replace(/^Extensions › /, `${t("Extensions")} › `)}</h3>
-                {entries.map((setting) => (
-                  <ExtensionSettingRow key={setting.key} setting={setting} />
+            {[...extensionGroups].map(([name, group]) => (
+              <Fragment key={name}>
+                <section className="settings-section" data-category={`Extensions › ${name}`}>
+                  <h3>{`${t("Extensions")} › ${name}`}</h3>
+                  {group.settings.map((setting) => (
+                    <ExtensionSettingRow key={setting.key} setting={setting} />
+                  ))}
+                </section>
+                {[...group.subcategories].map(([sub, list]) => (
+                  <section key={sub} className="settings-section" data-category={`Extensions › ${name} › ${sub}`}>
+                    <h4>{sub}</h4>
+                    {list.map((setting) => (
+                      <ExtensionSettingRow key={setting.key} setting={setting} />
+                    ))}
+                  </section>
                 ))}
-              </section>
+              </Fragment>
             ))}
           </div>
         </div>

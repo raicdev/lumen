@@ -36,6 +36,8 @@ export type ShellBridge = {
   onEnvelope(listener: (raw: string) => void): void;
   installMenu(groups: MenuGroup[]): void;
   menuAction(action: string): void;
+  /** Shows the window once the page has painted, before `load` (e.g. with a splash in the HTML). */
+  show(): void;
 };
 
 declare global {
@@ -82,6 +84,7 @@ function bridge(): ShellBridge {
     onEnvelope: () => {},
     installMenu: () => {},
     menuAction: () => {},
+    show: () => {},
   };
 }
 

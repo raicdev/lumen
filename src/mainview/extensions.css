@@ -207,7 +207,8 @@
   color: var(--compat-partial);
 }
 
-.ext-badge.compat-limited {
+.ext-badge.compat-limited,
+.ext-badge.compat-unsupported {
   border-color: color-mix(in srgb, var(--vscode-errorForeground) 30%, transparent);
   color: var(--vscode-errorForeground);
 }
@@ -457,7 +458,8 @@
   border-left-color: var(--compat-partial);
 }
 
-.ext-compat-summary.compat-limited {
+.ext-compat-summary.compat-limited,
+.ext-compat-summary.compat-unsupported {
   border-left-color: var(--vscode-errorForeground);
 }
 
@@ -1485,7 +1487,9 @@
 }
 
 .ext-compat-icon.compat-limited,
-.ext-compat-card.compat-limited .ext-compat-card-title svg {
+.ext-compat-card.compat-limited .ext-compat-card-title svg,
+.ext-compat-icon.compat-unsupported,
+.ext-compat-card.compat-unsupported .ext-compat-card-title svg {
   color: var(--vscode-errorForeground);
 }
 
