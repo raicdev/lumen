@@ -24,8 +24,14 @@ export function capture(command: string, args: string[]): Promise<CaptureResult>
 }
 
 /** Start a command and forget about it (open a file manager, a URL…). */
-export function launch(command: string, args: string[]): void {
-  const child = spawn(command, args, { stdio: "ignore", detached: true, windowsHide: true });
+export function launch(command: string, args: string[], options: { verbatim?: boolean } = {}): void {
+  const child = spawn(command, args, {
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+    // Windows only: pass args unquoted, for programs that parse their own command line.
+    windowsVerbatimArguments: options.verbatim,
+  });
   child.on("error", () => {});
   child.unref();
 }

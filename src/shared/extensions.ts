@@ -899,8 +899,11 @@ export type HostMethods = {
   deserializeCustomEditor: (path: string, viewType: string, webviewId: string, state: unknown) => boolean;
 
   /* debugging */
-  /** The launch configurations and compounds of a folder (launch.json + provider configurations). */
-  debugListConfigurations: (folder: string | null) => HostDebugConfigurations;
+  /**
+   * The launch configurations and compounds of a folder (launch.json + provider configurations).
+   * `initial`: also ask Initial providers when there is no launch.json (they may show UI).
+   */
+  debugListConfigurations: (folder: string | null, initial?: boolean) => HostDebugConfigurations;
   /** Start the named configuration of a folder; the workspace folder's launch.json is read when needed. */
   debugStart: (folder: string | null, name: string) => { sessionId?: string; error?: string };
   /** Start an explicit configuration object (already chosen by the user, or a default one). */

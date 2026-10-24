@@ -1,7 +1,9 @@
 import koffi from "koffi";
+import { win32 } from "path";
 import { setTimeout as sleep } from "timers/promises";
 import { asPointer, type NativeHandle } from "./webview.ts";
 import { capture, launch, type CaptureResult } from "./process.ts";
+import { nativeOpenDialog, nativeSaveDialog } from "./file-dialog-win32.ts";
 import type {
   MenuGroup,
   MessageBoxOptions,
@@ -699,7 +701,10 @@ function psString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-async function showOpenDialog(options: OpenDialogOptions): Promise<string[]> {
+async function showOpenDialog(options: OpenDialogOptions, owner?: NativeHandle): Promise<string[]> {
+  // In-process and instant; the PowerShell scripts below (a second or more to start) only where COM is not available.
+  const native = nativeOpenDialog(options, owner);
+  if (native) return native;
   const directory = options.properties?.includes("openDirectory");
 
   if (directory) {
@@ -783,7 +788,9 @@ function dialogFilter(filters: SaveDialogOptions["filters"]): string {
   return parts.join("|");
 }
 
-async function showSaveDialog(options: SaveDialogOptions): Promise<string | null> {
+async function showSaveDialog(options: SaveDialogOptions, owner?: NativeHandle): Promise<string | null> {
+  const native = nativeSaveDialog(options, owner);
+  if (native !== null) return native ?? null;
   const defaultPath = options.defaultPath ?? "";
   const fileName = /[\\/]$/.test(defaultPath) ? "" : (defaultPath.split(/[\\/]/).pop() ?? "");
   const directory = fileName ? defaultPath.slice(0, defaultPath.length - fileName.length) : defaultPath;
@@ -844,7 +851,9 @@ function mapMessageBoxResponse(raw: number, buttonCount: number, options: Messag
 }
 
 function showItemInFolder(path: string): void {
-  launch("explorer.exe", [`/select,${path}`]);
+  // Explorer selects only a backslashed path quoted after the comma; Node's quoting
+  // of the whole argument (paths with spaces) or forward slashes open Documents instead.
+  launch("explorer.exe", [`/select,"${win32.resolve(path)}"`], { verbatim: true });
 }
 
 function openPath(path: string): void {

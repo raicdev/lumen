@@ -12,7 +12,7 @@ import { basename, dirname, join } from "path";
  * (`v1.2.3-beta.1`) count too. On Windows the release's per-user setup
  * (`lumen-shell installer`, `<App>-<version>-win32-<arch>-setup.exe`) is
  * downloaded, checked against the SHA-256 digest GitHub publishes for it, and
- * run silently over the installed app once the app exits.
+ * run over the installed app once the app exits, showing only its progress.
  */
 
 /** stable: releases only; beta: pre-releases as well, whichever is newest. */
@@ -271,16 +271,17 @@ class AutoUpdater {
   }
 
   /**
-   * Start the downloaded setup in the background; the caller exits next. The
-   * setup waits until the app's files are no longer in use, installs over the
-   * current installation and, with `relaunch`, starts the app again.
+   * Start the downloaded setup; the caller exits next. The setup shows a
+   * progress window only, waits until the app's files are no longer in use,
+   * installs over the current installation and, with `relaunch`, starts the app again.
    */
   install(file: string, options: { relaunch?: boolean } = {}): void {
     if (!this.canInstall) throw new Error("this copy of the app cannot install updates");
     if (!existsSync(file)) throw new Error(`the downloaded setup ${file} is missing`);
     const installDir = dirname(process.execPath);
     // NSIS reads /D= raw up to the end of the command line: it must come last and stay unquoted.
-    const args = ["/S", ...(options.relaunch ? ["/RELAUNCH"] : []), `/D=${installDir}`].join(" ");
+    // /UPDATE shows only the setup's progress page, which closes by itself once installed.
+    const args = ["/UPDATE", ...(options.relaunch ? ["/RELAUNCH"] : []), `/D=${installDir}`].join(" ");
     const child = spawn(file, [args], { argv0: `"${file}"`, detached: true, stdio: "ignore", windowsVerbatimArguments: true });
     // A refused start is logged: an unhandled 'error' event would crash the app.
     child.on("error", (error) => console.error(`[updater] could not start the setup: ${error.message}`));

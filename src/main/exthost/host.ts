@@ -1683,7 +1683,7 @@ export class ExtensionHost {
 
     deserializeCustomEditor: async (path, viewType, webviewId, state) => this.customEditors.deserialize(path, viewType, webviewId, state),
 
-    debugListConfigurations: (folder) => this.debug.listConfigurations(folder),
+    debugListConfigurations: (folder, initial) => this.debug.listConfigurations(folder, initial),
     debugStart: async (folder, name) => {
       try {
         return { sessionId: await this.debug.startNamed(folder, name) };

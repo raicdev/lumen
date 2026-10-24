@@ -25,6 +25,12 @@ export type Settings = {
   /** Format while typing, through languages.registerOnTypeFormattingEditProvider (off by default, like VS Code). */
   "editor.formatOnType": boolean;
   "editor.gitGutter": boolean;
+  /** Who last changed the cursor's line, after the line (git blame). */
+  "git.blame.editorDecoration.enabled": boolean;
+  /** Who last changed the cursor's line, in the status bar (git blame). */
+  "git.blame.statusBarItem.enabled": boolean;
+  /** Fetch from the remotes every few minutes, so the status bar shows incoming commits. */
+  "git.autofetch": boolean;
   /** Code lenses an extension provider offers (languages.registerCodeLensProvider). */
   "editor.codeLens": boolean;
   /** Mirror linked ranges (e.g. HTML/JSX tags) while typing (languages.registerLinkedEditingRangeProvider). */
@@ -91,6 +97,9 @@ export const DEFAULT_SETTINGS: Settings = {
   "editor.formatOnSave": false,
   "editor.formatOnType": false,
   "editor.gitGutter": true,
+  "git.blame.editorDecoration.enabled": true,
+  "git.blame.statusBarItem.enabled": true,
+  "git.autofetch": false,
   "editor.codeLens": true,
   "editor.linkedEditing": true,
   "files.autoSave": "off",
@@ -255,6 +264,24 @@ export const SETTINGS_SCHEMA: SchemaEntry[] = [
   },
   { key: "workbench.statusBar.visible", category: "Workbench", label: "Status Bar", description: "Controls the visibility of the status bar." },
   { key: "workbench.activityBar.visible", category: "Workbench", label: "Activity Bar", description: "Controls the visibility of the activity bar." },
+  {
+    key: "git.blame.editorDecoration.enabled",
+    category: "Source Control",
+    label: "Blame: Editor Decoration",
+    description: "Show who last changed the cursor's line, when and why, after the line.",
+  },
+  {
+    key: "git.blame.statusBarItem.enabled",
+    category: "Source Control",
+    label: "Blame: Status Bar Item",
+    description: "Show who last changed the cursor's line in the status bar.",
+  },
+  {
+    key: "git.autofetch",
+    category: "Source Control",
+    label: "Autofetch",
+    description: "Fetch from the remotes every 3 minutes, so the status bar shows commits to pull.",
+  },
   { key: "terminal.integrated.fontSize", category: "Terminal", label: "Font Size", description: "Controls the font size of the terminal.", min: 6, max: 40 },
   {
     key: "terminal.integrated.scrollback",

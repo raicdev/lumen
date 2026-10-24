@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Braces, CircleX, GitBranch, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Braces, CircleX, CloudUpload, GitBranch, LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
 import type { CursorInfo } from "../lib/editor";
 import type { HostStatusBarItem } from "../../shared/extensions";
 import { WithCodicons } from "./Codicon";
@@ -37,12 +37,18 @@ function RemoteIndicator() {
 
 export type StatusInfo = {
   branch: string | null;
+  /** What the sync button does: pull and push with the upstream, publish the branch, or nothing (no remote). */
+  sync: "sync" | "publish" | null;
+  /** A fetch, pull or push is running. */
+  syncing: boolean;
   ahead: number;
   behind: number;
   changes: number;
   errors: number;
   warnings: number;
   cursor: CursorInfo | null;
+  /** Git blame of the cursor's line ("Ada, 3 days ago"), the commit as its tooltip. */
+  blame: { text: string; title: string } | null;
   /** "Spaces: 2" / "Tab Size: 4" */
   indentation: string | null;
   eol: "LF" | "CRLF" | null;
@@ -56,6 +62,8 @@ export type StatusInfo = {
 
 type Props = StatusInfo & {
   onBranch: () => void;
+  onSync: () => void;
+  onBlame: () => void;
   onProblems: () => void;
   onGotoLine: () => void;
   onIndentation: () => void;
@@ -102,12 +110,32 @@ export function StatusBar(props: Props) {
       <div className="status-left">
         <RemoteIndicator />
         {props.branch && (
-          <button type="button" className="status-btn" title={t("Source Control (Ctrl+Shift+G)")} onClick={props.onBranch}>
+          <button type="button" className="status-btn" title={t("{0} (Checkout Branch/Tag...)", props.branch)} onClick={props.onBranch}>
             <GitBranch size={13} />
             {props.branch}
             {props.changes > 0 ? "*" : ""}
-            {props.ahead > 0 && ` ↑${props.ahead}`}
-            {props.behind > 0 && ` ↓${props.behind}`}
+          </button>
+        )}
+        {props.branch && props.sync && (
+          <button
+            type="button"
+            className="status-btn"
+            disabled={props.syncing}
+            title={
+              props.syncing
+                ? t("Synchronizing Changes...")
+                : props.sync === "publish"
+                  ? t("Publish Branch")
+                  : t("Synchronize Changes: {0} to pull, {1} to push", props.behind, props.ahead)
+            }
+            onClick={props.onSync}
+          >
+            {props.sync === "publish" && !props.syncing ? (
+              <CloudUpload size={13} />
+            ) : (
+              <RefreshCw size={13} className={props.syncing ? "codicon spin" : undefined} />
+            )}
+            {props.sync === "sync" && (props.behind > 0 || props.ahead > 0) && `${props.behind}↓ ${props.ahead}↑`}
           </button>
         )}
         <button type="button" className="status-btn" title={t("Problems (Ctrl+Shift+M)")} onClick={props.onProblems}>
@@ -128,6 +156,11 @@ export function StatusBar(props: Props) {
         {props.message && <span className="status-item status-message">{props.message}</span>}
       </div>
       <div className="status-right">
+        {props.blame && (
+          <button type="button" className="status-btn" title={props.blame.title} onClick={props.onBlame}>
+            {props.blame.text}
+          </button>
+        )}
         <ExtensionItems items={props.extensionItems} side="right" onClick={props.onExtensionItem} />
         <FeatureStatusItems side="right" />
         {cursor && (

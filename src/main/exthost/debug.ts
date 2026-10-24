@@ -31,7 +31,7 @@ import { parseJsonc } from "../../shared/jsonc.ts";
  *
  * ── RPC surface the view can call (through extensionService.call) ───────────
  *
- *   debugListConfigurations(folder)            → { configurations, compounds, error? }
+ *   debugListConfigurations(folder, initial?)  → { configurations, compounds, error? }
  *   debugStart(folder, name)                   → { sessionId?, error? }
  *   debugStartConfiguration(folder, config)    → { sessionId?, error? }
  *   debugStop(sessionId | null)                → boolean
@@ -719,19 +719,26 @@ export class DebugSessionManager {
     return [...types];
   }
 
-  async listConfigurations(folderInput: string | null): Promise<HostDebugConfigurations> {
+  /**
+   * launch.json and the configurations providers offer. Providers of the Initial
+   * trigger kind are asked only with `initial` (the user starts debugging without a
+   * launch.json): like in VS Code they may ask the user (debugpy shows a quick pick),
+   * which must not happen when the Run and Debug view merely lists configurations.
+   */
+  async listConfigurations(folderInput: string | null, initial = false): Promise<HostDebugConfigurations> {
     const folder = folderInput ?? this.#host.workspace;
     const fromJson = this.#readLaunchJson(folder);
     const configurations: HostDebugConfiguration[] = [...fromJson.configurations];
     const compounds: HostDebugCompound[] = [...fromJson.compounds];
     const known = new Set(configurations.map((configuration) => configuration.name));
     // Activate first: a debugger extension may only wake up for these events.
-    if (!fromJson.present) await this.#host.activateByEvent("onDebugInitialConfigurations");
+    const askInitial = initial && !fromJson.present;
+    if (askInitial) await this.#host.activateByEvent("onDebugInitialConfigurations");
     await this.#host.activateByEvent("onDebugDynamicConfigurations");
     for (const type of this.debuggerTypes()) await this.#host.activateByEvent(`onDebugDynamicConfigurations:${type}`);
-    const initial = fromJson.present ? [] : this.#allProviders().filter((entry) => entry.triggerKind === T.DebugConfigurationProviderTriggerKind.Initial);
+    const initialProviders = askInitial ? this.#allProviders().filter((entry) => entry.triggerKind === T.DebugConfigurationProviderTriggerKind.Initial) : [];
     const dynamic = this.#allProviders().filter((entry) => entry.triggerKind === T.DebugConfigurationProviderTriggerKind.Dynamic);
-    for (const entry of [...initial, ...dynamic]) {
+    for (const entry of [...initialProviders, ...dynamic]) {
       const list = await this.#provideConfigurations(entry, folder).catch((error: unknown) => {
         this.#host.log("warning", `provideDebugConfigurations failed: ${error instanceof Error ? error.message : String(error)}`, entry.extensionId);
         return [] as Record<string, unknown>[];

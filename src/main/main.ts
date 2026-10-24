@@ -6,7 +6,26 @@ import { randomUUID } from "crypto";
 import { homedir } from "os";
 import type { LumenRPC, WindowInit } from "../shared/types.ts";
 import { readDirTree, readTextFile, writeTextFile, createFile, createDirectory, deletePath, renamePath } from "./fs.ts";
-import { gitCommit, gitDiscard, gitShowHead, gitStage, gitStatus, gitUnstage } from "./git.ts";
+import {
+  gitBlame,
+  gitCheckout,
+  gitCommit,
+  gitCommitFiles,
+  gitCreateBranch,
+  gitDeleteBranch,
+  gitDiscard,
+  gitFetch,
+  gitLog,
+  gitPull,
+  gitPush,
+  gitRefs,
+  gitShow,
+  gitShowHead,
+  gitStage,
+  gitStatus,
+  gitSync,
+  gitUnstage,
+} from "./git.ts";
 import { WorkspaceWatcher } from "./watcher.ts";
 import { detectLanguage, jsonSchemaAssociations, setContributedLanguages } from "./language.ts";
 import { createLspWorker, fsWorker, type LspWorker } from "./workers.ts";
@@ -27,7 +46,7 @@ import { showFatalError } from "./crash-log.ts";
 import { BackupStore } from "./backups.ts";
 import { WindowSessionStore, type WindowEntry } from "./window-sessions.ts";
 
-const APP_VERSION = "0.3.0-beta.8";
+const APP_VERSION = "0.3.0-beta.9";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 
@@ -492,6 +511,18 @@ function windowRpc(w: AppWindow) {
         gitDiscard: async ({ root, files }) => await gitDiscard(root, files),
         gitCommit: async ({ root, message, stageAll }) => await gitCommit(root, message, stageAll),
         gitShowHead: async ({ root, path }) => ({ content: await gitShowHead(root, path) }),
+        gitShow: async ({ root, ref, path }) => ({ content: await gitShow(root, ref, path) }),
+        gitFetch: async ({ root }) => await gitFetch(root),
+        gitPull: async ({ root }) => await gitPull(root),
+        gitPush: async ({ root }) => await gitPush(root),
+        gitSync: async ({ root }) => await gitSync(root),
+        gitRefs: async ({ root }) => ({ refs: await gitRefs(root) }),
+        gitCheckout: async ({ root, ref, type }) => await gitCheckout(root, ref, type),
+        gitCreateBranch: async ({ root, name, from }) => await gitCreateBranch(root, name, from),
+        gitDeleteBranch: async ({ root, name, force }) => await gitDeleteBranch(root, name, force),
+        gitLog: async ({ root, path, limit, skip }) => ({ commits: await gitLog(root, { path, limit, skip }) }),
+        gitCommitFiles: async ({ root, hash }) => ({ files: await gitCommitFiles(root, hash) }),
+        gitBlame: async ({ root, path, content }) => ({ blame: await gitBlame(root, path, content) }),
 
         // The close guard (unsaved changes) lives in the shell; this request is
         // used by in-app UI that wants to close the window.

@@ -197,4 +197,17 @@ export const views: Record<string, string> = {
   // ExtensionTreeView
   "More Actions…": "その他の操作…",
   "There is no data provider registered that can provide view data.": "ビュー データを提供できるデータ プロバイダーが登録されていません。",
+
+  // Source control: sync, branches, history, blame
+  "{0} (Checkout Branch/Tag...)": "{0} (ブランチ/タグのチェックアウト...)",
+  "Synchronizing Changes...": "変更を同期しています...",
+  "Publish Branch": "ブランチの発行",
+  "Synchronize Changes: {0} to pull, {1} to push": "変更の同期: プル {0} 件、プッシュ {1} 件",
+  "Sync Changes": "変更の同期",
+  "Copy Commit Hash": "コミット ハッシュのコピー",
+  Commits: "コミット",
+  "No commits yet.": "まだコミットがありません。",
+  "Load More Commits": "さらにコミットを読み込む",
+  "Not Committed Yet": "まだコミットされていません",
+  "{0}, {1}": "{0}、{1}",
 };

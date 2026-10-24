@@ -204,7 +204,7 @@ export async function startDebugging(
 ) {
   let listed;
   try {
-    listed = await debugService.listConfigurations(folder);
+    listed = await debugService.listConfigurations(folder, true);
   } catch (error) {
     toast(t("Could not read launch configurations: {0}", error instanceof Error ? error.message : String(error)), "error");
     return;

@@ -1,15 +1,27 @@
 import koffi from "koffi";
+import {
+  E_NOINTERFACE,
+  GetAt,
+  IID_IUNKNOWN,
+  PassPointer,
+  PutInt,
+  S_OK,
+  asPointer,
+  call,
+  getPointer,
+  getString,
+  getUInt32,
+  guid,
+  queryInterface,
+  release,
+  type Pointer,
+} from "./com.ts";
 
 /**
  * WebView2 features the `webview` C library does not wrap, called through COM
  * on its ICoreWebView2Controller (Windows only). vtable slots and IIDs come
  * from the WebView2 SDK's WebView2.h (IUnknown takes slots 0–2).
  */
-
-type Pointer = bigint;
-
-const S_OK = 0;
-const E_NOINTERFACE = 0x80004002 | 0;
 
 const CONTROLLER_GET_CORE_WEBVIEW2 = 25;
 const WEBVIEW2_2_GET_ENVIRONMENT = 67;
@@ -28,81 +40,15 @@ const ITERATOR_MOVE_NEXT = 5;
 const FRAME_GET_NAME = 3;
 const FRAME_GET_SOURCE = 4;
 
-/** A GUID struct (Data1–3 little-endian, Data4 as bytes) from its "xxxxxxxx-xxxx-…" form. */
-function guid(text: string): Buffer {
-  const hex = text.replace(/-/g, "");
-  const bytes = Buffer.alloc(16);
-  bytes.writeUInt32LE(Number.parseInt(hex.slice(0, 8), 16), 0);
-  bytes.writeUInt16LE(Number.parseInt(hex.slice(8, 12), 16), 4);
-  bytes.writeUInt16LE(Number.parseInt(hex.slice(12, 16), 16), 6);
-  Buffer.from(hex.slice(16), "hex").copy(bytes, 8);
-  return bytes;
-}
-
-const IID_IUNKNOWN = guid("00000000-0000-0000-C000-000000000046");
 const IID_ICOREWEBVIEW2_2 = guid("9E8F0CF8-E670-4B5E-B2BC-73E061E3184C");
 const IID_ICOREWEBVIEW2_19 = guid("6921F954-79B0-437F-A997-C85811897C68");
 const IID_ENVIRONMENT13 = guid("AF641F58-72B2-11EE-B962-0242AC120002");
 const IID_PROCESS_INFOS_COMPLETED_HANDLER = guid("F45E55AA-3BC2-11EE-BE56-0242AC120002");
 
-const QueryInterface = koffi.proto("int32_t __stdcall LumenComQueryInterface(void *self, const void *iid, _Out_ void **out)");
-const Release = koffi.proto("uint32_t __stdcall LumenComRelease(void *self)");
-const GetPointer = koffi.proto("int32_t __stdcall LumenComGetPointer(void *self, _Out_ void **out)");
-const GetUInt32 = koffi.proto("int32_t __stdcall LumenComGetUInt32(void *self, _Out_ uint32_t *out)");
-const GetAt = koffi.proto("int32_t __stdcall LumenComGetAt(void *self, uint32_t index, _Out_ void **out)");
-const PutInt = koffi.proto("int32_t __stdcall LumenComPutInt(void *self, int value)");
-const PassPointer = koffi.proto("int32_t __stdcall LumenComPassPointer(void *self, void *value)");
 // Our own COM object (the completion handler): raw pointers, written by hand.
 const HandlerQueryInterface = koffi.proto("int32_t __stdcall LumenHandlerQueryInterface(void *self, void *iid, void *out)");
 const HandlerRefCount = koffi.proto("uint32_t __stdcall LumenHandlerRefCount(void *self)");
 const HandlerInvoke = koffi.proto("int32_t __stdcall LumenHandlerInvoke(void *self, int32_t error, void *result)");
-
-const ole32 = process.platform === "win32" ? koffi.load("ole32.dll") : null;
-const CoTaskMemFree = ole32?.func("void __stdcall CoTaskMemFree(void *memory)");
-
-function asPointer(value: unknown): Pointer {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number") return BigInt(value);
-  return 0n;
-}
-
-/** Call slot `index` of a COM object's vtable. */
-function call(object: Pointer, index: number, proto: ReturnType<typeof koffi.proto>, ...args: unknown[]): number {
-  const vtable = new BigUint64Array(koffi.view(object, 8))[0]!;
-  const fn = new BigUint64Array(koffi.view(vtable, (index + 1) * 8))[index]!;
-  return (koffi.decode(fn, proto) as (...args: unknown[]) => number)(object, ...args);
-}
-
-function release(object: Pointer): void {
-  if (object) call(object, 2, Release);
-}
-
-/** A pointer-valued property (`get_X(T **)`); 0n on failure. */
-function getPointer(object: Pointer, index: number): Pointer {
-  const out: unknown[] = [null];
-  return call(object, index, GetPointer, out) === S_OK ? asPointer(out[0]) : 0n;
-}
-
-function getUInt32(object: Pointer, index: number): number | null {
-  const out = [0];
-  return call(object, index, GetUInt32, out) === S_OK ? out[0]! : null;
-}
-
-function queryInterface(object: Pointer, iid: Buffer): Pointer {
-  const out: unknown[] = [null];
-  return call(object, 0, QueryInterface, iid, out) === S_OK ? asPointer(out[0]) : 0n;
-}
-
-/** A string property (LPWSTR the caller frees with CoTaskMemFree). */
-function getString(object: Pointer, index: number): string {
-  const text = getPointer(object, index);
-  if (!text) return "";
-  try {
-    return koffi.decode(text, "char16_t", -1) as string;
-  } finally {
-    CoTaskMemFree?.(text);
-  }
-}
 
 /** Run `use` with the controller's ICoreWebView2 queried for `iid`, releasing everything after. */
 function withWebview<T>(controller: Pointer, iid: Buffer, use: (webview: Pointer) => T): T | null {

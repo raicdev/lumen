@@ -1,6 +1,9 @@
 import {
   Blocks,
   Bug,
+  Cloud,
+  GitCommitHorizontal,
+  Tag,
   Ellipsis,
   LayoutPanelLeft,
   Maximize2,
@@ -27,6 +30,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeSet } from "@codemirror/state";
 import { api, setCloseCheckHandler } from "./lib/rpc";
 import { diffTabPath, isDiffTab, parseDiffTab } from "./lib/diff-tab";
+import { gitUri, parseGitUri } from "./lib/git-uri";
+import { blameText, blameTooltip, relativeTime } from "./lib/git-blame";
 import { isSmart, isTsFamily, isUntitled, isVirtualDocument, lspStatusLabel, type CursorInfo, type EditorController, type Location } from "./lib/editor";
 import { isWebviewTab, useWebviews, webviewIdOf, webviewService, webviewTabPath, type SavedWebview } from "./lib/webviews";
 import { ContainerIcon, ViewContainerView, WebviewSlot } from "./components/WebviewSlot";
@@ -132,7 +137,7 @@ import { checkForUpdates, restartToUpdate, updateState } from "./lib/updates";
 import { Welcome } from "./components/Welcome";
 import { ExtensionsView, type ExtensionAction, type ExtensionTarget } from "./components/ExtensionsView";
 import { ExtensionDetails } from "./components/ExtensionDetails";
-import type { Diagnostic, DocumentSymbol, FileEdits, GitFileStatus, GitStatus, SearchOptions, TextRange } from "../shared/types";
+import type { Diagnostic, DocumentSymbol, FileEdits, GitCommitInfo, GitFileStatus, GitRef, GitStatus, SearchOptions, TextRange } from "../shared/types";
 import type {
   ExtensionDescription,
   HostDebugConfiguration,
@@ -196,6 +201,14 @@ type ReadDocumentResult = {
 
 /** Read a document: from disk (in `encoding` when given), or from the file system an extension provides. */
 async function readDocument(path: string, encoding?: string): Promise<ReadDocumentResult | { error: string }> {
+  const gitVersion = parseGitUri(path);
+  if (gitVersion) {
+    const [{ content }, { language }] = await Promise.all([
+      api().request.gitShow({ root: dirname(gitVersion.path), ref: gitVersion.ref, path: gitVersion.path }),
+      api().request.detectLanguage({ path: gitVersion.path }),
+    ]);
+    return { content: content ?? "", language, readOnly: true };
+  }
   if (!isVirtualDocument(path)) return await api().request.readFile({ path, encoding });
   try {
     return await extensionService.call("readVirtualFile", path);
@@ -1735,21 +1748,235 @@ export function App() {
     [refreshGit],
   );
 
+  /**
+   * A changed file in the diff editor, like VS Code: a staged change compares HEAD
+   * with the index, an unstaged one the index with the working tree. A deleted
+   * file opens its last version read-only.
+   */
   const scmOpenChanges = useCallback(
-    async (file: GitFileStatus) => {
-      if (file.worktree === "D" || file.index === "D") {
-        toast(t("{0} was deleted.", basename(file.path)), "info");
+    async (file: GitFileStatus, staged: boolean) => {
+      const name = basename(file.path);
+      if (staged) {
+        if (file.index === "D") await openFile(gitUri(file.path, "HEAD"), { preview: true });
+        else await openDiff(gitUri(file.path, "HEAD"), gitUri(file.path, ""), { title: t("{0} (Index)", name), preview: true });
         return;
       }
-      if (!(await openFile(file.path, { preview: true }))) return;
-      const root = workspaceRootRef.current;
-      if (!root) return;
-      const { content } = await api().request.gitShowHead({ root, path: file.path });
-      if (content === null) toast(t("{0} is new — there is nothing to compare.", basename(file.path)), "info");
-      else editorRef.current?.showInlineDiff(content);
+      if (file.worktree === "D") await openFile(gitUri(file.path, ""), { preview: true });
+      else await openDiff(gitUri(file.path, ""), file.path, { title: t("{0} (Working Tree)", name), preview: true });
     },
-    [openFile, editorRef],
+    [openFile, openDiff],
   );
+
+  /** Fetch, pull, push or sync: one at a time, shown on the status bar's sync button. */
+  const [gitSyncing, setGitSyncing] = useState(false);
+  const gitSyncingRef = useRef(false);
+  const gitRemoteAction = useCallback(
+    async (kind: "fetch" | "pull" | "push" | "sync", options: { quiet?: boolean } = {}) => {
+      const root = workspaceRootRef.current;
+      if (!root || gitSyncingRef.current) return false;
+      gitSyncingRef.current = true;
+      setGitSyncing(true);
+      try {
+        const request = { fetch: api().request.gitFetch, pull: api().request.gitPull, push: api().request.gitPush, sync: api().request.gitSync }[kind];
+        const result = await request({ root });
+        if (!result.ok && !options.quiet) toast(result.error ?? t("Git command failed"), "error");
+        return result.ok;
+      } finally {
+        gitSyncingRef.current = false;
+        setGitSyncing(false);
+        void refreshGit();
+        const current = editorRef.current?.getCurrent()?.path;
+        if (current) void loadGitBase(current);
+      }
+    },
+    [refreshGit, loadGitBase, editorRef],
+  );
+
+  // git.autofetch: every 3 minutes while a repository with a remote is open.
+  const autofetch = settings["git.autofetch"] && !!git?.hasRemote;
+  useEffect(() => {
+    if (!autofetch) return;
+    const timer = setInterval(() => void gitRemoteAction("fetch", { quiet: true }), 3 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [autofetch, gitRemoteAction]);
+
+  const createBranch = useCallback(
+    async (from?: string) => {
+      const name = await showPrompt({
+        title: t("Create Branch"),
+        message: from ? t("New branch name (from {0}):", from) : t("New branch name:"),
+        placeholder: t("Branch name"),
+      });
+      if (!name?.trim()) return;
+      await gitAction((root) => api().request.gitCreateBranch({ root, name: name.trim().replace(/\s+/g, "-"), from }));
+    },
+    [gitAction],
+  );
+
+  const refPickItems = useCallback((refs: GitRef[]): PickItem[] => {
+    const separators: Record<GitRef["type"], string> = { head: t("Branches"), remote: t("Remote Branches"), tag: t("Tags") };
+    const icons: Record<GitRef["type"], React.ReactNode> = { head: <GitBranch size={14} />, remote: <Cloud size={14} />, tag: <Tag size={14} /> };
+    const items: PickItem[] = [];
+    for (const type of ["head", "remote", "tag"] as const) {
+      refs
+        .filter((ref) => ref.type === type)
+        .forEach((ref, index) => {
+          items.push({
+            id: `${type}:${ref.name}`,
+            label: ref.name,
+            description: [ref.current ? t("current") : "", ref.commit, ref.date ? relativeTime(ref.date) : ""].filter(Boolean).join(" · "),
+            detail: ref.subject,
+            icon: icons[type],
+            separator: index === 0 ? separators[type] : undefined,
+          });
+        });
+    }
+    return items;
+  }, []);
+
+  /** Git: Checkout to... (the status bar's branch). */
+  const checkoutPicker = useCallback(async () => {
+    const root = workspaceRootRef.current;
+    if (!root) return;
+    const { refs } = await api().request.gitRefs({ root });
+    pick(
+      t("Select a ref to checkout"),
+      [
+        { id: "__create", label: t("Create new branch..."), icon: <Plus size={14} /> },
+        { id: "__createFrom", label: t("Create new branch from..."), icon: <Plus size={14} /> },
+        ...refPickItems(refs.filter((ref) => !ref.current)),
+      ],
+      (id) => {
+        if (id === "__create") return void createBranch();
+        if (id === "__createFrom") {
+          pick(t("Select a ref to create the branch from"), refPickItems(refs), (from) => void createBranch(from.slice(from.indexOf(":") + 1)));
+          return;
+        }
+        const type = id.slice(0, id.indexOf(":")) as GitRef["type"];
+        void gitAction((root) => api().request.gitCheckout({ root, ref: id.slice(id.indexOf(":") + 1), type }));
+      },
+    );
+  }, [pick, refPickItems, createBranch, gitAction]);
+
+  /** Git: Delete Branch... (local branches; unmerged ones after a confirmation). */
+  const deleteBranchPicker = useCallback(async () => {
+    const root = workspaceRootRef.current;
+    if (!root) return;
+    const { refs } = await api().request.gitRefs({ root });
+    const branches = refs.filter((ref) => ref.type === "head" && !ref.current);
+    if (!branches.length) return toast(t("There are no other branches to delete."), "info");
+    pick(t("Select a branch to delete"), refPickItems(branches), (id) => {
+      const name = id.slice(id.indexOf(":") + 1);
+      void (async () => {
+        const result = await api().request.gitDeleteBranch({ root, name });
+        if (result.ok) return void refreshGit();
+        if (!result.notMerged) return toast(result.error ?? t("Git command failed"), "error");
+        const choice = await showDialog({
+          title: t("Delete Branch"),
+          message: t("The branch “{0}” is not fully merged. Delete anyway?", name),
+          detail: t("Its commits that no other branch has will be lost."),
+          buttons: [
+            { label: t("Delete Branch"), role: "danger", value: "delete" },
+            { label: t("Cancel"), role: "default", value: "cancel" },
+          ],
+        });
+        if (choice === "delete") await gitAction((root) => api().request.gitDeleteBranch({ root, name, force: true }));
+      })();
+    });
+  }, [pick, refPickItems, gitAction, refreshGit]);
+
+  /* history */
+
+  const loadGitLog = useCallback(async (skip: number, limit: number) => {
+    const root = workspaceRootRef.current;
+    if (!root) return [];
+    return (await api().request.gitLog({ root, skip, limit })).commits;
+  }, []);
+
+  const loadCommitFiles = useCallback(async (commit: GitCommitInfo) => {
+    const root = workspaceRootRef.current;
+    if (!root) return [];
+    return (await api().request.gitCommitFiles({ root, hash: commit.hash })).files;
+  }, []);
+
+  /** What a commit changed in a file: its first parent's version ↔ the commit's. */
+  const openCommitChange = useCallback(
+    (commit: { hash: string; shortHash: string }, path: string, oldPath?: string) =>
+      openDiff(gitUri(oldPath ?? path, `${commit.hash}^`), gitUri(path, commit.hash), {
+        title: t("{0} ({1})", basename(path), commit.shortHash),
+        preview: true,
+      }),
+    [openDiff],
+  );
+
+  /** Git: View File History: the commits that changed the active file; one opens its change. */
+  const fileHistoryPicker = useCallback(async () => {
+    const root = workspaceRootRef.current;
+    const path = editorRef.current?.getCurrent()?.path;
+    if (!root || !path || isUntitled(path) || isVirtualDocument(path)) return;
+    const { commits } = await api().request.gitLog({ root, path, limit: 200 });
+    if (!commits.length) return toast(t("This file is not tracked by git."), "info");
+    pick(
+      t("History of {0}", basename(path)),
+      commits.map((commit) => ({
+        id: commit.hash,
+        label: commit.subject,
+        description: `${commit.shortHash} · ${commit.author} · ${relativeTime(commit.date)}`,
+        icon: <GitCommitHorizontal size={14} />,
+      })),
+      (hash) => {
+        const commit = commits.find((candidate) => candidate.hash === hash)!;
+        // --follow: an older commit may know the file under its former name.
+        void loadCommitFiles(commit).then((files) => {
+          const file =
+            files.find((candidate) => lowerKey(candidate.path) === lowerKey(path)) ?? files.find((candidate) => basename(candidate.path) === basename(path));
+          void openCommitChange(commit, file?.path ?? path, file?.oldPath);
+        });
+      },
+    );
+  }, [editorRef, pick, loadCommitFiles, openCommitChange]);
+
+  /* blame */
+
+  /** Blame the document (its unsaved text when dirty) for the cursor line's author (git-blame.ts). */
+  const loadBlame = useCallback(
+    async (path: string) => {
+      const root = workspaceRootRef.current;
+      const s = getSettings();
+      const doc = docs.current.get(path);
+      if (!root || !doc || isUntitled(path) || isVirtualDocument(path)) return;
+      if (!s["git.blame.editorDecoration.enabled"] && !s["git.blame.statusBarItem.enabled"]) return;
+      const text = isDocDirty(path) ? (docContent(path) ?? doc.content) : undefined;
+      try {
+        // In the file's own line endings: git compares them with the committed text.
+        const content = text !== undefined && doc.eol === "CRLF" ? text.replace(/\n/g, "\r\n") : text;
+        const { blame } = await api().request.gitBlame({ root, path, content });
+        // Edited meanwhile: the next blame is on its way.
+        if ((isDocDirty(path) ? (docContent(path) ?? doc.content) : undefined) !== text) return;
+        for (const editor of editors.current.values()) editor.setBlame(path, blame);
+      } catch {
+        /* not a repository */
+      }
+    },
+    [docContent, isDocDirty],
+  );
+  const loadBlameRef = useRef(loadBlame);
+  loadBlameRef.current = loadBlame;
+
+  // Blame the active document again when it changes, or the repository does (a commit, a checkout).
+  const blameEnabled = settings["git.blame.editorDecoration.enabled"] || settings["git.blame.statusBarItem.enabled"];
+  useEffect(() => {
+    if (blameEnabled && activePath && git?.isRepo) void loadBlame(activePath);
+  }, [activePath, git, blameEnabled, loadBlame]);
+
+  /** Git: Toggle Line Blame (the decoration after the cursor's line). */
+  const toggleLineBlame = useCallback(() => {
+    const enabled = !getSettings()["git.blame.editorDecoration.enabled"];
+    updateSetting("git.blame.editorDecoration.enabled", enabled);
+    // Blaming again redraws the decoration with the new setting.
+    const path = editorRef.current?.getCurrent()?.path;
+    if (path) void loadBlame(path);
+  }, [editorRef, loadBlame]);
 
   const toggleInlineDiff = useCallback(async () => {
     const editor = editorRef.current;
@@ -2370,6 +2597,13 @@ export function App() {
     focusSearch,
     toggleInlineDiff,
     refreshGit,
+    gitRemoteAction,
+    checkoutPicker,
+    createBranch,
+    deleteBranchPicker,
+    fileHistoryPicker,
+    toggleLineBlame,
+    scmOpenChanges,
     createEntry,
     newTerminal,
     pickProfile,
@@ -3060,6 +3294,25 @@ export function App() {
       // Source control
       { id: "git.refresh", title: "Refresh", category: "Git", run: () => a().refreshGit() },
       { id: "git.toggleInlineDiff", title: "Toggle Inline Diff (Open Changes)", category: "Git", enabled: hasEditor, run: () => a().toggleInlineDiff() },
+      {
+        id: "git.openChange",
+        title: "Open Changes",
+        category: "Git",
+        enabled: hasEditor,
+        run: () => {
+          const path = editor()?.getCurrent()?.path;
+          if (path && !isUntitled(path) && !isVirtualDocument(path)) void a().scmOpenChanges({ path, relativePath: "", index: " ", worktree: "M" }, false);
+        },
+      },
+      { id: "git.fetch", title: "Fetch", category: "Git", run: () => a().gitRemoteAction("fetch") },
+      { id: "git.pull", title: "Pull", category: "Git", run: () => a().gitRemoteAction("pull") },
+      { id: "git.push", title: "Push", category: "Git", run: () => a().gitRemoteAction("push") },
+      { id: "git.sync", title: "Sync", category: "Git", run: () => a().gitRemoteAction("sync") },
+      { id: "git.checkout", title: "Checkout to...", category: "Git", run: () => a().checkoutPicker() },
+      { id: "git.branch", title: "Create Branch...", category: "Git", run: () => a().createBranch() },
+      { id: "git.deleteBranch", title: "Delete Branch...", category: "Git", run: () => a().deleteBranchPicker() },
+      { id: "git.viewFileHistory", title: "View File History", category: "Git", enabled: hasEditor, run: () => a().fileHistoryPicker() },
+      { id: "git.blame.toggleEditorDecoration", title: "Toggle Git Blame Editor Decoration", category: "Git", run: () => a().toggleLineBlame() },
       // App
       {
         id: "workbench.action.openWelcome",
@@ -3074,7 +3327,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.8", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.9", platform: navigator.platform }));
           await showAbout(info);
         },
       },
@@ -3804,11 +4057,15 @@ export function App() {
       });
     });
     let symbolTimer: ReturnType<typeof setTimeout> | null = null;
+    let blameTimer: ReturnType<typeof setTimeout> | null = null;
     editor.onContentChange((path) => {
       extensionService.documentChanged(path);
       if (symbolTimer) clearTimeout(symbolTimer);
+      if (blameTimer) clearTimeout(blameTimer);
       if (activeGroupIdRef.current === groupId) {
         symbolTimer = setTimeout(() => void loadSymbolsRef.current().then(setSymbols), 700);
+        // An edit drops the blame (git-blame.ts): blame the new text once typing pauses.
+        blameTimer = setTimeout(() => void loadBlameRef.current(path), 1000);
       }
       // files.autoSave = afterDelay
       const s = getSettings();
@@ -5422,8 +5679,18 @@ export function App() {
                   status={git}
                   workspaceRoot={workspaceRoot}
                   busy={gitBusy}
+                  syncing={gitSyncing}
                   onOpen={(file) => void openFile(file.path)}
-                  onOpenChanges={(file) => void scmOpenChanges(file)}
+                  onOpenChanges={(file, staged) => void scmOpenChanges(file, staged)}
+                  onBranch={() => void checkoutPicker()}
+                  onFetch={() => void gitRemoteAction("fetch")}
+                  onPull={() => void gitRemoteAction("pull")}
+                  onPush={() => void gitRemoteAction("push")}
+                  onSync={() => void gitRemoteAction("sync")}
+                  loadLog={loadGitLog}
+                  loadCommitFiles={loadCommitFiles}
+                  onOpenCommitFile={(commit, file) => void openCommitChange(commit, file.path, file.oldPath)}
+                  onCopyHash={(commit) => void navigator.clipboard.writeText(commit.hash).catch(() => {})}
                   onStage={(files) => void gitAction((root) => api().request.gitStage({ root, paths: files.map((f) => f.path) }))}
                   onUnstage={(files) => void gitAction((root) => api().request.gitUnstage({ root, paths: files.map((f) => f.path) }))}
                   onDiscard={(files) =>
@@ -5646,12 +5913,19 @@ export function App() {
       {settings["workbench.statusBar.visible"] && !zenMode && (
         <StatusBar
           branch={git?.isRepo ? git.branch : null}
+          sync={git?.upstream ? "sync" : git?.hasRemote && git.branch !== "(detached)" ? "publish" : null}
+          syncing={gitSyncing}
           ahead={git?.ahead ?? 0}
           behind={git?.behind ?? 0}
           changes={scmCount}
           errors={errorCount}
           warnings={warningCount}
           cursor={editorActive ? cursor : null}
+          blame={
+            editorActive && cursor?.blame && settings["git.blame.statusBarItem.enabled"]
+              ? { text: blameText(cursor.blame, false), title: blameTooltip(cursor.blame) }
+              : null
+          }
           indentation={
             editorActive ? (activeIndentation.insertSpaces ? t("Spaces: {0}", activeIndentation.tabSize) : t("Tab Size: {0}", activeIndentation.tabSize)) : null
           }
@@ -5662,7 +5936,13 @@ export function App() {
           lsp={activeLanguage && editorActive && isSmart(activeLanguage) ? lspStatusLabel(activeLanguage) : null}
           message={statusMessage}
           autoSave={settings["files.autoSave"] !== "off"}
-          onBranch={() => showView("scm")}
+          onBranch={() => void checkoutPicker()}
+          onSync={() => void gitRemoteAction("sync")}
+          onBlame={() => {
+            const blame = cursor?.blame;
+            const path = editorRef.current?.getCurrent()?.path;
+            if (blame && path && !blame.uncommitted) void openCommitChange({ hash: blame.hash, shortHash: blame.hash.slice(0, 7) }, path);
+          }}
           onProblems={() => showPanel("problems", true)}
           onGotoLine={() => setQuick({ kind: "quick", value: ":" })}
           onIndentation={indentationPicker}

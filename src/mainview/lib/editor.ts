@@ -103,6 +103,7 @@ import { linkedEditingExtension } from "./ext-linked-editing";
 import { documentLinksExtension } from "./ext-links";
 import { onTypeFormattingExtension } from "./ext-on-type-format";
 import { expandSelection, shrinkSelection } from "./ext-selection";
+import { blameAt, gitBlameExtension, setBlame, type BlameLine } from "./git-blame";
 import { semanticTokensExtension } from "./ext-semantic-tokens";
 import { closeSignatureHelp, requestSignatureHelp, signatureHelpExtension } from "./ext-signature-help";
 import { renderMarkdown } from "./markdown";
@@ -110,7 +111,7 @@ import { snippetToTemplate, type SnippetVariables } from "./snippets";
 import { refreshTextMateGrammars, textMateLanguage } from "./textmate";
 import { debugEditorExtension, onDebugMarksChange, syncDebugMarks } from "./debug-editor";
 import { t } from "./i18n";
-import type { CompletionItem, Diagnostic, TextEdit, TextRange } from "../../shared/types";
+import type { CompletionItem, Diagnostic, GitBlame, TextEdit, TextRange } from "../../shared/types";
 import type { HostCompletionItem, HostDocumentHighlight, HostSelection } from "../../shared/extensions";
 
 const SMART_LANGS = new Set(["typescript", "javascript", "json", "python", "css", "html", "shell", "yaml"]);
@@ -143,6 +144,12 @@ const chromeStyles = {
   },
   ".cm-git-added": { backgroundColor: "var(--vscode-editorGutter-addedBackground)" },
   ".cm-git-modified": { backgroundColor: "var(--vscode-editorGutter-modifiedBackground)" },
+  ".cm-git-blame": {
+    marginLeft: "3em",
+    color: "var(--vscode-editorCodeLens-foreground)",
+    fontStyle: "italic",
+    whiteSpace: "pre",
+  },
   ".cm-git-deleted": {
     width: "0",
     height: "0",
@@ -484,6 +491,8 @@ export type CursorInfo = {
   column: number;
   selectedChars: number;
   selections: number;
+  /** Git blame of the cursor's line, once the document was blamed. */
+  blame: BlameLine | null;
 };
 
 export type EditorCommand =
@@ -1000,6 +1009,17 @@ export class EditorController {
     }
   }
 
+  /** Git blame of a document (see git-blame.ts); `null` drops it. */
+  setBlame(path: string, blame: GitBlame | null) {
+    if (this.current?.path === path && this.view) {
+      this.view.dispatch({ effects: setBlame.of(blame) });
+      this.emitCursor();
+      return;
+    }
+    const cached = this.cache.get(path);
+    if (cached) cached.state = cached.state.update({ effects: setBlame.of(blame) }).state;
+  }
+
   /** Inline diff against `original` (the HEAD version), or `null` to turn it off. */
   showInlineDiff(original: string | null) {
     if (!this.view) return;
@@ -1343,6 +1363,7 @@ export class EditorController {
       column: head - line.from + 1,
       selectedChars,
       selections: state.selection.ranges.length,
+      blame: blameAt(state, line.number),
     };
     for (const cb of this.cursorListeners) cb(info);
   }
@@ -1631,6 +1652,7 @@ export class EditorController {
       debugEditorExtension(() => self.current?.path ?? null),
       settingsConf.of(settingsExtensions(getSettings(), path)),
       gitGutter,
+      gitBlameExtension,
       foldGutter(),
       foldingExtension(() => self.current),
       dropCursor(),

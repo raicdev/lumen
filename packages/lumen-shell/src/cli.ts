@@ -137,7 +137,7 @@ async function buildMain(config: LumenConfig, outDir: string): Promise<string> {
       bundle: true,
       platform: "node",
       format: "esm",
-      target: "node24",
+      target: "node26",
       minify: false,
       // Prefer ESM builds: UMD "main" entries (vscode-json-languageservice…) hide
       // their relative requires from esbuild and break once bundled.
@@ -520,9 +520,14 @@ ${icon ? `!define MUI_ICON ${nsisString(icon)}\n!define MUI_UNICON ${nsisString(
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "$(DesktopShortcut)"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 
+; /UPDATE (the app's update) shows the progress page only.
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipInUpdate
 !insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipInUpdate
 !insertmacro MUI_PAGE_DIRECTORY
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW UpdateHeader
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipInUpdate
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -533,14 +538,41 @@ LangString DesktopShortcut \${LANG_ENGLISH} "Create a desktop shortcut"
 LangString DesktopShortcut \${LANG_JAPANESE} "デスクトップにショートカットを作成"
 LangString AppRunning \${LANG_ENGLISH} ${nsisString(`${name} is running. Close it, then click Retry.`)}
 LangString AppRunning \${LANG_JAPANESE} ${nsisString(`${name} が実行中です。終了してから [再試行] をクリックしてください。`)}
+LangString UpdateTitle \${LANG_ENGLISH} ${nsisString(`Updating ${name}`)}
+LangString UpdateTitle \${LANG_JAPANESE} ${nsisString(`${name} を更新しています`)}
+LangString UpdateSubtitle \${LANG_ENGLISH} ${nsisString(`${name} starts again once the update is installed.`)}
+LangString UpdateSubtitle \${LANG_JAPANESE} ${nsisString(`更新のインストールが終わると ${name} が再び起動します。`)}
+LangString WaitingForApp \${LANG_ENGLISH} ${nsisString(`Waiting for ${name} to exit...`)}
+LangString WaitingForApp \${LANG_JAPANESE} ${nsisString(`${name} の終了を待っています...`)}
+
+Var UpdateMode
+
+Function .onInit
+  \${GetParameters} $0
+  ClearErrors
+  \${GetOptions} $0 "/UPDATE" $1
+  IfErrors +2
+  StrCpy $UpdateMode 1
+FunctionEnd
+
+Function SkipInUpdate
+  StrCmp $UpdateMode 1 0 +2
+  Abort
+FunctionEnd
+
+Function UpdateHeader
+  StrCmp $UpdateMode 1 0 done
+  !insertmacro MUI_HEADER_TEXT "$(UpdateTitle)" "$(UpdateSubtitle)"
+  done:
+FunctionEnd
 
 Function CreateDesktopShortcut
   CreateShortcut ${nsisString(`$DESKTOP\\${name}.lnk`)} ${nsisString(`$INSTDIR\\${exeName}`)}
 FunctionEnd
 
 ; Wait until no process runs the installed executable. The app's update
-; (/S) starts while the app is still exiting, so a silent install waits up to a
-; minute; an interactive one asks to close the app.
+; (/UPDATE, or /S from older versions) starts while the app is still exiting,
+; so it waits up to a minute; an interactive install asks to close the app.
 Function WaitForApp
   StrCpy $1 0
   wait:
@@ -548,7 +580,11 @@ Function WaitForApp
     ClearErrors
     FileOpen $0 ${nsisString(`$INSTDIR\\${exeName}`)} a
     IfErrors 0 free
-    IfSilent 0 ask
+    IfSilent waiting
+    StrCmp $UpdateMode 1 0 ask
+  waiting:
+    IntCmp $1 0 0 +2 +2
+    DetailPrint "$(WaitingForApp)"
     IntOp $1 $1 + 1
     IntCmp $1 120 fail 0 fail
     Sleep 500

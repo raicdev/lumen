@@ -159,10 +159,52 @@ export type GitStatus = {
   isRepo: boolean;
   root: string | null;
   branch: string | null;
+  /** The branch it tracks (`origin/main`); null when it has none (not published yet). */
+  upstream: string | null;
+  /** The repository has a remote to push to. */
+  hasRemote: boolean;
   ahead: number;
   behind: number;
   files: GitFileStatus[];
   error?: string;
+};
+
+/** A branch, remote branch or tag (`git for-each-ref`). */
+export type GitRef = {
+  /** `main`, `origin/main`, `v1.0.0`. */
+  name: string;
+  type: "head" | "remote" | "tag";
+  /** The short commit id it points at. */
+  commit: string;
+  /** The checked-out branch. */
+  current: boolean;
+  upstream?: string;
+  /** Committer date of its commit (ms since the epoch). */
+  date?: number;
+  subject?: string;
+};
+
+export type GitCommitInfo = {
+  hash: string;
+  shortHash: string;
+  parents: string[];
+  author: string;
+  email: string;
+  /** Author date (ms since the epoch). */
+  date: number;
+  /** Branches and tags pointing at it; `current`: the checked-out branch. */
+  refs: { name: string; type: GitRef["type"]; current?: boolean }[];
+  subject: string;
+  body: string;
+};
+
+/** A file a commit changed: status A M D R C T. */
+export type GitChangedFile = { status: string; path: string; relativePath: string; oldPath?: string };
+
+/** `git blame`: the commit of each line (0-based), and those commits. */
+export type GitBlame = {
+  commits: Record<string, { author: string; email: string; date: number; summary: string }>;
+  lines: string[];
 };
 
 export type ExtensionInstallResult = { extension?: ExtensionDescription; cancelled?: boolean; error?: string };
@@ -415,6 +457,56 @@ export type LumenRPC = {
       gitShowHead: {
         params: { root: string; path: string };
         response: { content: string | null };
+      };
+      /** A file at a commit, or (`ref: ""`) in the index. */
+      gitShow: {
+        params: { root: string; ref: string; path: string };
+        response: { content: string | null };
+      };
+      gitFetch: {
+        params: { root: string };
+        response: { ok: boolean; error?: string };
+      };
+      gitPull: {
+        params: { root: string };
+        response: { ok: boolean; error?: string };
+      };
+      gitPush: {
+        params: { root: string };
+        response: { ok: boolean; error?: string };
+      };
+      gitSync: {
+        params: { root: string };
+        response: { ok: boolean; error?: string };
+      };
+      gitRefs: {
+        params: { root: string };
+        response: { refs: GitRef[] };
+      };
+      gitCheckout: {
+        params: { root: string; ref: string; type: GitRef["type"] };
+        response: { ok: boolean; error?: string };
+      };
+      gitCreateBranch: {
+        params: { root: string; name: string; from?: string };
+        response: { ok: boolean; error?: string };
+      };
+      gitDeleteBranch: {
+        params: { root: string; name: string; force?: boolean };
+        response: { ok: boolean; error?: string; notMerged?: boolean };
+      };
+      gitLog: {
+        params: { root: string; path?: string; limit?: number; skip?: number };
+        response: { commits: GitCommitInfo[] };
+      };
+      gitCommitFiles: {
+        params: { root: string; hash: string };
+        response: { files: GitChangedFile[] };
+      };
+      /** `content`: the editor's unsaved text, blamed instead of the file on disk. */
+      gitBlame: {
+        params: { root: string; path: string; content?: string };
+        response: { blame: GitBlame | null };
       };
       windowClose: {
         params: Record<string, never>;

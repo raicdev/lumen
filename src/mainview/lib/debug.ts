@@ -120,8 +120,9 @@ class DebugService {
 
   /* ── requests (thin wrappers over the host RPC) ────────────────────────── */
 
-  listConfigurations(folder: string | null = null): Promise<HostDebugConfigurations> {
-    return extensionService.call("debugListConfigurations", folder);
+  /** `initial`: the user is starting debugging, so providers may ask which configuration to create. */
+  listConfigurations(folder: string | null = null, initial = false): Promise<HostDebugConfigurations> {
+    return extensionService.call("debugListConfigurations", folder, initial);
   }
 
   start(folder: string | null, name: string) {

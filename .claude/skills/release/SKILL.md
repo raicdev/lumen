@@ -60,7 +60,7 @@ CRLF, so avoid it here.
 ## 3. Verify
 
 ```bash
-npx tsc --noEmit -p .
+pnpm exec tsc --noEmit -p .
 pnpm test
 ```
 

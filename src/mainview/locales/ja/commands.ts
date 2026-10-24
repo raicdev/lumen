@@ -347,4 +347,16 @@ export const commands: Record<string, string> = {
   // Command palette
   "recently used": "最近使用したもの",
   "other commands": "その他のコマンド",
+
+  // Git
+  "Open Changes": "変更を開く",
+  Fetch: "フェッチ",
+  Pull: "プル",
+  Push: "プッシュ",
+  Sync: "同期",
+  "Checkout to...": "チェックアウト先...",
+  "Create Branch...": "ブランチの作成...",
+  "Delete Branch...": "ブランチの削除...",
+  "View File History": "ファイルの履歴を表示",
+  "Toggle Git Blame Editor Decoration": "Git Blame のエディター装飾の切り替え",
 };

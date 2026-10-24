@@ -112,4 +112,12 @@ export const settings: Record<string, string> = {
   Reload: "再読み込み",
   "Select Display Language": "表示言語を選択",
   "(current)": "(現在)",
+
+  "Blame: Editor Decoration": "Blame: エディターの装飾",
+  "Show who last changed the cursor's line, when and why, after the line.": "カーソルのある行を最後に変更した人、日時、理由を行の後ろに表示します。",
+  "Blame: Status Bar Item": "Blame: ステータス バー項目",
+  "Show who last changed the cursor's line in the status bar.": "カーソルのある行を最後に変更した人をステータス バーに表示します。",
+  Autofetch: "自動フェッチ",
+  "Fetch from the remotes every 3 minutes, so the status bar shows commits to pull.":
+    "3 分ごとにリモートからフェッチし、プルするコミットをステータス バーに表示します。",
 };

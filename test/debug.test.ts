@@ -450,3 +450,32 @@ test("resolution can change the type; removed breakpoints are cleared on the ada
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("listing configurations leaves Initial providers alone; starting without a launch.json asks them", async () => {
+  const dir = temp();
+  try {
+    // Like debugpy: an Initial provider that would show a quick pick. Each call leaves a mark in a file.
+    const marks = join(dir, "asked.txt");
+    writeFileSync(marks, "");
+    const main = [
+      `const lumen = require("lumen");`,
+      `exports.activate = () => {`,
+      `  lumen.debug.registerDebugConfigurationProvider("picky", {`,
+      `    provideDebugConfigurations: () => { require("fs").appendFileSync(${JSON.stringify(marks)}, "x"); return [{ type: "picky", name: "Picked", request: "launch" }]; },`,
+      `  });`,
+      `};`,
+    ].join("\n");
+    const { host } = await harness(dir, main, { contributes: { debuggers: [{ type: "picky", label: "Picky" }] } });
+    const asked = () => readFileSync(marks, "utf8").length;
+
+    assert.deepEqual((await host.methods.debugListConfigurations(dir)).configurations, []);
+    assert.equal(asked(), 0);
+    assert.deepEqual(
+      (await host.methods.debugListConfigurations(dir, true)).configurations.map((configuration) => configuration.name),
+      ["Picked"],
+    );
+    assert.equal(asked(), 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
