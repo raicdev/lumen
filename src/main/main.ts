@@ -46,7 +46,7 @@ import { showFatalError } from "./crash-log.ts";
 import { BackupStore } from "./backups.ts";
 import { WindowSessionStore, type WindowEntry } from "./window-sessions.ts";
 
-const APP_VERSION = "0.3.0-beta.9";
+const APP_VERSION = "0.3.0";
 const APP_NAME = "Lumen";
 const APP_IDENTIFIER = "dev.lumen.editor";
 

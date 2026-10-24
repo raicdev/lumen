@@ -3327,7 +3327,7 @@ export function App() {
         run: async () => {
           const info = await api()
             .request.getAppInfo({})
-            .catch(() => ({ name: "Lumen", version: "0.3.0-beta.9", platform: navigator.platform }));
+            .catch(() => ({ name: "Lumen", version: "0.3.0", platform: navigator.platform }));
           await showAbout(info);
         },
       },
